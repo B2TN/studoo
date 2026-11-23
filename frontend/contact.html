@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact · Studoo</title>
+  <meta name="description" content="Contacte l'équipe Studoo : question, bug, idée ou demande concernant tes données.">
+  <link rel="canonical" href="https://studoo.vercel.app/contact">
+  <meta name="theme-color" content="#FBF6E9">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:title" content="Contact · Studoo">
+  <meta property="og:description" content="Contacte l'équipe Studoo : question, bug, idée ou demande concernant tes données.">
+  <meta property="og:image" content="https://studoo.vercel.app/og-image.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  
+  <script src="/boot.js"></script>
+  <script type="module" src="/src/static.js"></script>
+</head>
+<body data-page="contact">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+  <header class="l-top">
+    <a class="logo" href="/" aria-label="Studoo, accueil"><img src="/favicon.svg" alt="" width="46" height="46"><span>Studoo</span></a>
+    <span class="spacer"></span>
+    <div class="theme-slot"></div>
+  </header>
+  <main id="contenu" class="page">
+    <h1>Nous <span class="hl">contacter</span></h1>
+    <p>Une question, un bug, une idée, ou une demande sur tes données ? Écris ici.</p>
+    <form id="contact-form" class="card sketch" novalidate>
+      <div class="field">
+        <label for="email">Ton e-mail</label>
+        <input class="input" id="email" name="email" type="email" autocomplete="email" required maxlength="320" aria-describedby="err-email">
+        <p class="error" id="err-email" aria-live="polite"></p>
+      </div>
+      <div class="field">
+        <label for="subject">Sujet</label>
+        <input class="input" id="subject" name="subject" type="text" required minlength="3" maxlength="120" aria-describedby="err-subject">
+        <p class="error" id="err-subject" aria-live="polite"></p>
+      </div>
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea class="input" id="message" name="message" required minlength="10" maxlength="4000" aria-describedby="err-message"></textarea>
+        <p class="error" id="err-message" aria-live="polite"></p>
+      </div>
+      <div class="sr-only" aria-hidden="true">
+        <label for="website">Ne pas remplir ce champ</label>
+        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+      </div>
+      <p class="small muted">Ton e-mail sert uniquement à te répondre (conservé 12 mois). <a href="/rgpd">En savoir plus</a>.</p>
+      <button class="btn primary" type="submit">Envoyer</button>
+    </form>
+  </main>
+  <footer class="site-footer">
+    <nav aria-label="Liens légaux">
+      <a href="/rgpd">Données personnelles (RGPD)</a>
+      <a href="/cgu">Conditions d'utilisation</a>
+      <a href="/contact">Contact</a>
+    </nav>
+    <p class="small muted">Studoo · projet étudiant open source · <a href="https://github.com/B2TN/studoo">code sur GitHub</a></p>
+  </footer>
+</body>
+</html>

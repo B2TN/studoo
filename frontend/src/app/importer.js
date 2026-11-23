@@ -13,7 +13,7 @@ export async function render({ view, query, go }) {
   const dest = query.get("dest");
   const status = h("p", { role: "status", class: "muted" });
   const input = h("input", { type: "file", accept: "application/pdf,.pdf", id: "pdf-file", class: "sr-only" });
-  const drop = h("label", { for: "pdf-file", class: "card sketch", style: { display: "block", textAlign: "center", padding: "40px 20px", cursor: "pointer", borderStyle: "dashed" } },
+  const drop = h("label", { for: "pdf-file", class: "card sketch", tabindex: "0", onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } }, style: { display: "block", textAlign: "center", padding: "40px 20px", cursor: "pointer", borderStyle: "dashed" } },
     icon("file-upload", { doodle: true }), h("p", { style: { fontSize: "24px", margin: "10px 0" } }, "Choisis un PDF de cours"),
     h("span", { class: "muted small" }, "ou glisse-le ici · 40 Mo maximum"));
 

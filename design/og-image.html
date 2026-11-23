@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Studoo — image de partage</title>
+<style>
+@font-face { font-family: "Gochi Hand"; src: url("../frontend/node_modules/@fontsource/gochi-hand/files/gochi-hand-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Patrick Hand"; src: url("../frontend/node_modules/@fontsource/patrick-hand/files/patrick-hand-latin-400-normal.woff2") format("woff2"); }
+html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+body {
+  background-color: #FBF6E9;
+  background-image:
+    linear-gradient(#B9C9EA 1px, transparent 1px), linear-gradient(90deg, #B9C9EA 1px, transparent 1px),
+    linear-gradient(#D7E1F3 1px, transparent 1px), linear-gradient(90deg, #D7E1F3 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+  font-family: "Patrick Hand", cursive; color: #16296E; position: relative;
+}
+body::before { content: ""; position: absolute; left: 80px; top: 0; bottom: 0; width: 3px; background: #E8848C; }
+.mark { position: absolute; left: 130px; top: 120px; width: 230px; height: 230px; transform: rotate(-7deg); }
+h1 { position: absolute; left: 400px; top: 110px; margin: 0; font-family: "Gochi Hand"; font-weight: 400; font-size: 150px; line-height: 1; }
+.tag { position: absolute; left: 404px; top: 290px; font-size: 46px; }
+.hl { background: #F7EF5A; padding: 0 10px; border-radius: 8px 3px 10px 4px; }
+.notes { position: absolute; left: 130px; bottom: 60px; display: flex; gap: 26px; }
+.note { padding: 16px 22px; font-size: 30px; box-shadow: 3px 7px 0 rgba(22,41,110,.18); border-radius: 2px 2px 20px 2px; }
+.note:nth-child(1) { background: #FF9CCB; transform: rotate(-2deg); }
+.note:nth-child(2) { background: #8BEA9F; transform: rotate(1.5deg); }
+.note:nth-child(3) { background: #9FD3FF; transform: rotate(-1deg); }
+.note:nth-child(4) { background: #FFC27A; transform: rotate(2deg); }
+</style>
+</head>
+<body>
+  <img class="mark" src="../brand/studoo-mark.svg" alt="">
+  <h1>Studoo</h1>
+  <p class="tag">Tes cours, <span class="hl">au propre</span>.</p>
+  <div class="notes">
+    <div class="note">Transcription</div><div class="note">Fiches</div><div class="note">Podcasts</div><div class="note">Vidéos</div>
+  </div>
+</body>
+</html>

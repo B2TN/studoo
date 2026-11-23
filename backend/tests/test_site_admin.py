@@ -71,3 +71,17 @@ def test_admin_overview_and_analytics(client):
 def test_security_headers(client):
     res = client.get("/api/health")
     assert res.headers["x-content-type-options"] == "nosniff"
+
+
+def test_purge_old_data(client):
+    from datetime import timedelta
+    from sqlalchemy import func, insert, select
+    from studoo.routes.site import purge_old_data
+    with db.get_engine().begin() as conn:
+        conn.execute(insert(db.visitors).values(day=db.today() - timedelta(days=5), hash="old"))
+        conn.execute(insert(db.visitors).values(day=db.today(), hash="new"))
+        conn.execute(insert(db.rate_limits).values(key="k", window=1, count=1))
+    purge_old_data()
+    with db.get_engine().connect() as conn:
+        assert conn.execute(select(func.count()).select_from(db.visitors)).scalar_one() == 1
+        assert conn.execute(select(func.count()).select_from(db.rate_limits)).scalar_one() == 0

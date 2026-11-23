@@ -28,6 +28,7 @@ export const KINDS = {
   "podcast-script": { label: "Podcast (voix du navigateur)", icon: "headphones", color: "blue" },
   video: { label: "Vidéo", icon: "movie", color: "orange" },
   settings: { label: "Réglages", icon: "settings", color: "yellow" },
+  timetable: { label: "Emploi du temps", icon: "calendar-week", color: "lilac" },
 };
 export const kindOf = (file) => file?.appProperties?.kind || (file?.mimeType === "application/pdf" ? "pdf" : "file");
 export const isFolder = (file) => file?.mimeType === "application/vnd.google-apps.folder";
@@ -118,6 +119,7 @@ export function ficheToText(fiche) {
   return lines.join("\n");
 }
 
+export const HIDDEN_KINDS = new Set(["settings", "timetable", "scan-text"]);
 export const SOURCE_KINDS = new Set(["transcript", "scan", "scan-text", "pdf", "fiche"]);
 
 /** Nettoie un nom de fichier pour Drive. */

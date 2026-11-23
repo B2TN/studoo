@@ -19,7 +19,7 @@ def client_ip(request: Request) -> str:
 
 def rate_limit(key: str, limit: int, window_seconds: int) -> None:
     """Refuse la requête si `key` a dépassé `limit` appels dans la fenêtre."""
-    window = int(time.time() // window_seconds)
+    window = int(time.time() // window_seconds) * window_seconds  # début de la fenêtre (horodatage)
     count = db.increment(db.rate_limits, {"key": key[:128], "window": window})
     if count > limit:
         raise HTTPException(

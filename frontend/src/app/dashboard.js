@@ -2,7 +2,7 @@
 import { h, mount } from "../lib/dom.js";
 import { longDate, plural, relativeDate, time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
-import { drive, KINDS, kindOf } from "../lib/storage.js";
+import { drive, HIDDEN_KINDS, KINDS, kindOf } from "../lib/storage.js";
 import { eventsOfDay, lessonAt, loadEvents, nextLesson } from "../lib/timetable-data.js";
 
 const TOOLS = [
@@ -62,7 +62,7 @@ function coursesCard(tree) {
 export async function render({ view, user }) {
   const [tree, recent, events] = await Promise.all([
     drive.tree(),
-    drive.recent(6),
+    drive.recent(14).then((list) => list.filter((f) => !HIDDEN_KINDS.has(kindOf(f))).slice(0, 6)),
     loadEvents().catch(() => []),
   ]);
   const next = nextLesson(events);

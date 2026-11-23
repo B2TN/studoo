@@ -1,10 +1,12 @@
 """Routes publiques : configuration, mesure d'audience maison, formulaire de contact."""
+import random
 import re
 import time
+from datetime import timedelta
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import insert
+from sqlalchemy import delete, insert
 from sqlalchemy.exc import IntegrityError
 
 from .. import db
@@ -56,7 +58,18 @@ async def page_view(body: EventIn, request: Request):
             conn.execute(insert(db.visitors).values(day=day, hash=h))
     except IntegrityError:
         pass
+    if random.random() < 0.02:
+        purge_old_data()
     return None
+
+
+def purge_old_data() -> None:
+    """Durées de conservation annoncées dans la page RGPD."""
+    with db.get_engine().begin() as conn:
+        conn.execute(delete(db.visitors).where(db.visitors.c.day < db.today() - timedelta(days=2)))
+        conn.execute(delete(db.messages).where(db.messages.c.created_at < db.now() - timedelta(days=365)))
+        conn.execute(delete(db.page_views).where(db.page_views.c.day < db.today() - timedelta(days=760)))
+        conn.execute(delete(db.rate_limits).where(db.rate_limits.c.window < int(time.time()) - 2 * 86400))
 
 
 class ContactIn(BaseModel):
