@@ -4,4 +4,4 @@ Disallow: /api/
 Disallow: /admin
 Disallow: /analytics
 
-Sitemap: https://studoo.vercel.app/sitemap.xml
+Sitemap: https://studoo-app.vercel.app/sitemap.xml

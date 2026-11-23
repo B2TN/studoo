@@ -41,7 +41,7 @@ def test_dev_login_me_logout(logged):
 
 def test_dev_login_disabled_outside_localhost(client, monkeypatch):
     from studoo.config import get_settings
-    monkeypatch.setenv("APP_URL", "https://studoo.vercel.app")
+    monkeypatch.setenv("APP_URL", "https://studoo-app.vercel.app")
     get_settings.cache_clear()
     assert client.post("/api/auth/dev-login").status_code == 404
 

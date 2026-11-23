@@ -9,7 +9,7 @@ Un site de révision pour lycéens et étudiants : transcription de cours, numé
 fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes propres cours, le tout rangé dans ton Google Drive.</p>
 
 <p align="center">
-  <a href="https://studoo.vercel.app">studoo.vercel.app</a> ·
+  <a href="https://studoo-app.vercel.app">studoo-app.vercel.app</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
   <a href="docs/DEPLOIEMENT.md">Mise en ligne</a>
 </p>
