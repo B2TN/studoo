@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Studoo — révise tes cours avec l'IA : transcription, fiches, podcasts</title>
+  <meta name="description" content="Studoo transcrit tes cours au micro, numérise tes feuilles et crée des fiches de révision, des podcasts et des vidéos à partir de TES cours. Gratuit, rangé dans ton Google Drive.">
+  <link rel="canonical" href="https://studoo.vercel.app/">
+  <meta name="theme-color" content="#FBF6E9">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Studoo">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:title" content="Studoo — tes cours, au propre">
+  <meta property="og:description" content="Transcription de cours, fiches de révision, podcasts et vidéos créés à partir de tes propres cours. Gratuit.">
+  <meta property="og:url" content="https://studoo.vercel.app/">
+  <meta property="og:image" content="https://studoo.vercel.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Logo Studoo : un post-it rose avec deux yeux, sur une page de cahier">
+  <meta name="twitter:card" content="summary_large_image">
+  <script src="/boot.js"></script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Studoo","url":"https://studoo.vercel.app/","applicationCategory":"EducationalApplication","operatingSystem":"Web","inLanguage":"fr","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"description":"Transcription de cours, fiches de révision, podcasts et vidéos générés à partir de tes propres cours."}
+  </script>
+  <script type="module" src="/src/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <!-- ============ PAGE D'ACCUEIL (visiteur non connecté) ============ -->
+  <div id="landing">
+    <header class="l-top">
+      <a class="logo" href="/" aria-label="Studoo, accueil">
+        <img src="/favicon.svg" alt="" width="46" height="46"><span>Studoo</span>
+      </a>
+      <span class="spacer"></span>
+      <div class="theme-slot"></div>
+    </header>
+
+    <main id="contenu">
+      <section class="hero">
+        <div class="hero-text">
+          <h1>Tes cours, <span class="hl">au propre</span>.<br>Tes révisions, <span class="hl pink">en mode facile</span>.</h1>
+          <p class="lead">Studoo écoute ton prof, range tes feuilles et transforme <strong>tes propres cours</strong> en fiches, podcasts et vidéos. Tout est rangé dans ton Google Drive.</p>
+          <button class="btn primary big google-cta" type="button">
+            <svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.2C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.2-8.5 2.2-6.3 0-11.6-4.2-13.5-10l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>
+            Se connecter avec Google
+          </button>
+          <p class="small muted">Gratuit · Lycéens et étudiants · Aucune autre clé ni compte à créer</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="mini-note c-pink">« <b>Prof :</b> Une suite géométrique… »</div>
+          <div class="mini-note c-yellow">Fiche : les suites ✓</div>
+          <div class="mini-note c-blue">Podcast 10 min ▶</div>
+          <img class="hero-mascot doodle" src="/favicon.svg" alt="" width="150" height="150">
+        </div>
+      </section>
+
+      <section class="tools-l" aria-labelledby="t-outils">
+        <h2 id="t-outils" class="section-title">Six outils, <span class="hl green">zéro prise de tête</span></h2>
+        <div class="tool-grid">
+          <article class="tool-card c-pink">
+            <h3>Enregistre ton cours</h3>
+            <p>Lance le micro, écoute le prof. Studoo écrit tout et indique <strong>qui parle</strong> : « Professeur : … », « Élève : … ». L'audio est effacé juste après : seul le texte est gardé.</p>
+          </article>
+          <article class="tool-card c-yellow">
+            <h3>Numérise tes feuilles</h3>
+            <p>Une photo de ton cours papier, et hop : un PDF droit, recadré, contrasté, comme s'il sortait de l'imprimante. Studoo devine même de quel cours il s'agit.</p>
+          </article>
+          <article class="tool-card c-green">
+            <h3>Des fiches qui donnent envie</h3>
+            <p>Choisis tes cours, obtiens une fiche dessinée à la main : définitions surlignées, formules encadrées, pièges à éviter, mini-quiz. Uniquement à partir de <strong>ton</strong> contenu.</p>
+          </article>
+          <article class="tool-card c-blue">
+            <h3>Révise en podcast</h3>
+            <p>Dans le bus ou au sport : deux voix t'expliquent ton chapitre en 10, 20 ou 30 minutes, comme une vraie émission.</p>
+          </article>
+          <article class="tool-card c-orange">
+            <h3>Des vidéos explicatives</h3>
+            <p>Un diaporama animé et commenté, au format TikTok (2 min), YouTube (10 min) ou long (30 min). Parfait pour revoir un chapitre la veille d'un contrôle.</p>
+          </article>
+          <article class="tool-card c-lilac">
+            <h3>Ton emploi du temps</h3>
+            <p>Connecte Pronote, ton ENT ou un lien iCal : Studoo crée tes dossiers de matières tout seul et sait quel cours tu enregistres.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="how" aria-labelledby="t-comment">
+        <h2 id="t-comment" class="section-title">Comment ça marche ?</h2>
+        <ol class="steps">
+          <li class="card sketch"><span class="num">1</span><h3>Connecte-toi avec Google</h3><p>Un clic. Studoo crée un dossier « Studoo » dans ton Drive.</p></li>
+          <li class="card sketch"><span class="num">2</span><h3>Ajoute tes cours</h3><p>Enregistre, photographie ou importe un PDF. Studoo propose le bon cours et le bon chapitre.</p></li>
+          <li class="card sketch"><span class="num">3</span><h3>Révise à ta façon</h3><p>Fiche, podcast ou vidéo : tout est rangé dans le dossier du chapitre.</p></li>
+        </ol>
+      </section>
+
+      <section class="privacy card sketch" aria-labelledby="t-prive">
+        <span class="tape"></span>
+        <h2 id="t-prive">Tes cours restent <span class="hl">chez toi</span></h2>
+        <ul>
+          <li>Tout est enregistré dans <strong>ton</strong> Google Drive, pas sur nos serveurs.</li>
+          <li>Studoo ne voit que les fichiers qu'il a créés lui-même, jamais le reste de ton Drive.</li>
+          <li>Aucun enregistrement audio n'est conservé, pour respecter tes profs.</li>
+          <li>Pas de pub, pas de revente de données. <a href="/rgpd">Tout savoir sur tes données</a>.</li>
+        </ul>
+      </section>
+
+      <section class="final-cta">
+        <h2>Prêt à réviser <span class="hl pink">plus malin</span> ?</h2>
+        <button class="btn primary big google-cta" type="button">Se connecter avec Google</button>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============ APPLICATION (utilisateur connecté) ============ -->
+  <div id="app" aria-live="polite"></div>
+
+  <footer class="site-footer">
+    <nav aria-label="Liens légaux">
+      <a href="/rgpd">Données personnelles (RGPD)</a>
+      <a href="/cgu">Conditions d'utilisation</a>
+      <a href="/contact">Contact</a>
+    </nav>
+    <p class="small muted">Studoo · projet étudiant open source · <a href="https://github.com/B2TN/studoo">code sur GitHub</a></p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,47 @@
+/* ---------- Fiche de révision (écran + impression PDF) ---------- */
+.fiche { background: var(--paper-2); border: 2.5px solid var(--ink); border-radius: var(--wobbly); box-shadow: 3px 4px 0 var(--shadow); padding: 26px clamp(16px, 3vw, 40px); position: relative; }
+.fiche::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; width: 2px; background: var(--margin); }
+.f-head { padding-left: 18px; margin-bottom: 18px; }
+.f-head h1 { font-size: clamp(34px, 4.5vw, 50px); }
+.f-sub { color: var(--ink-soft); margin-top: 6px; }
+.f-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; padding-left: 18px; }
+.f-section { border: 2px solid var(--ink); border-radius: var(--wobbly-2); padding: 14px 16px; transform: rotate(var(--rot, 0deg)); background: var(--paper); break-inside: avoid; }
+.f-section h2 { font-size: 26px; margin-bottom: 10px; }
+.f-section p { margin: 4px 0 8px; }
+.f-section ul { margin: 4px 0 8px; padding-left: 1.2em; }
+.f-def { margin-bottom: 10px; }
+.f-def > .hl { font-weight: 700; margin-right: 6px; }
+.f-formula { border: 2px dashed var(--ink); border-radius: 10px 4px 12px 6px; padding: 8px 12px; margin: 8px 0; text-align: center; }
+.f-math { font-size: 22px; font-family: var(--font-title); margin: 4px 0; }
+.f-label { display: block; font-size: 15px; color: var(--ink-soft); }
+.f-warn { border-left: 5px solid var(--danger); padding: 4px 10px; margin: 8px 0; border-radius: 0; }
+.f-warn strong { color: var(--danger); }
+.f-tip { padding: 8px 12px; margin: 8px 0; color: var(--on-fluo); border-radius: var(--radius-note); }
+.f-example { margin: 8px 0; padding-left: 10px; border-left: 3px dotted var(--ink-2); border-radius: 0; }
+.f-pill { display: inline-block; border: 2px solid var(--ink); border-radius: 20px; padding: 0 10px; margin-right: 6px; font-weight: 700; }
+.f-keys { position: relative; margin: 26px 0 0 18px; padding: 18px 22px; color: var(--on-fluo); border-radius: var(--radius-note); box-shadow: 2px 6px 0 rgba(22,41,110,.18); transform: rotate(-.5deg); }
+.f-keys h2 { font-size: 28px; }
+.f-keys ol { margin: 6px 0 0; }
+.f-mnemo { margin: 20px 0 0 18px; }
+.f-quiz { margin: 22px 0 0 18px; }
+.f-quiz h2 { font-size: 28px; margin-bottom: 8px; }
+.f-quiz details { border-bottom: 1.5px dashed var(--grid-strong); padding: 6px 0; }
+.f-quiz summary { cursor: pointer; }
+.f-foot { margin: 22px 0 0 18px; font-size: 14px; color: var(--ink-soft); }
+@media (max-width: 760px) { .f-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Impression / export PDF : seule la fiche est imprimée, en couleurs claires */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  :root { --paper: #fff; --paper-2: #fff; --ink: #16296E; --ink-soft: #46527F; --shadow: transparent; }
+  body { background: #fff !important; font-size: 13pt; }
+  body * { visibility: hidden; }
+  .fiche, .fiche * { visibility: visible; }
+  .fiche { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; border: none; padding: 0 0 0 8mm; }
+  .fiche::before { left: 2mm; }
+  .f-section { transform: none; }
+  .f-keys { transform: none; box-shadow: none; }
+  .f-quiz details { display: block; }
+  .f-quiz details > p { display: block; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

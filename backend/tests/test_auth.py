@@ -23,7 +23,7 @@ def test_service_token():
 
 
 def test_me_requires_login(client):
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/auth/me").json() == {"user": None}
 
 
 def test_csrf_header_required(client):
@@ -36,7 +36,7 @@ def test_dev_login_me_logout(logged):
     assert me["name"] == "Léa Démo" and me["isAdmin"]
     assert logged.cookies.get("studoo_in") == "1"
     logged.post("/api/auth/logout")
-    assert logged.get("/api/auth/me").status_code == 401
+    assert logged.get("/api/auth/me").json()["user"] is None
 
 
 def test_dev_login_disabled_outside_localhost(client, monkeypatch):
@@ -82,4 +82,4 @@ def test_google_login_without_refresh_asks_consent(client, monkeypatch):
 
 def test_delete_account(logged):
     assert logged.delete("/api/auth/account").status_code == 200
-    assert logged.get("/api/auth/me").status_code == 401
+    assert logged.get("/api/auth/me").json()["user"] is None

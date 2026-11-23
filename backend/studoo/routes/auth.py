@@ -116,7 +116,12 @@ async def dev_login(response: Response):
 
 
 @router.get("/me")
-async def me(user: Annotated[User, Depends(current_user)]):
+async def me(request: Request):
+    """Utilisateur connecté, ou `null` (pas d'erreur 401 : c'est un cas normal)."""
+    session = read_session(request)
+    if not session or "sub" not in session:
+        return {"user": None}
+    user = current_user(request)
     data = {"sub": user.sub, "email": user.email, "name": user.name, "picture": user.picture}
     out = _public_user(data)
     if user.refresh_token == "dev":
