@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     quota_user_per_day: int = 60
 
     # Sécurité
-    session_secret: str = Field(default="dev-secret-change-me-dev-secret-change-me", min_length=32)
+    session_secret: str = Field(default="dev-secret-change-me-dev-secret-change-me", min_length=32)  # voir DEFAULT_SECRET
     admin_emails: str = ""
 
     # Base de données (SQLite en local, Postgres Neon en production)
@@ -62,10 +62,17 @@ class Settings(BaseSettings):
 
     @property
     def ai_fake_enabled(self) -> bool:
-        # Le mode « IA factice » sert aux tests et aux démos locales.
-        return self.ai_fake or (self.is_local and not self.gemini_api_key)
+        # Le mode « IA factice » sert aux tests et aux démos locales uniquement.
+        return self.is_local and (self.ai_fake or not self.gemini_api_key)
+
+
+DEFAULT_SECRET = "dev-secret-change-me-dev-secret-change-me"
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    if not s.is_local and s.session_secret == DEFAULT_SECRET:
+        # Sécurité : on refuse de démarrer en ligne avec la clé de développement.
+        raise RuntimeError("SESSION_SECRET doit être défini en production.")
+    return s

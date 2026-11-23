@@ -1,0 +1,137 @@
+<p align="center">
+  <img src="frontend/public/icon-192.png" alt="Logo Studoo : un post-it rose avec deux yeux" width="110">
+</p>
+
+<h1 align="center">Studoo</h1>
+
+<p align="center"><strong>Tes cours, au propre.</strong><br>
+Un site de révision pour lycéens et étudiants : transcription de cours, numérisation de feuilles,<br>
+fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes propres cours, le tout rangé dans ton Google Drive.</p>
+
+<p align="center">
+  <a href="https://studoo.vercel.app">studoo.vercel.app</a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/DEPLOIEMENT.md">Mise en ligne</a>
+</p>
+
+![Page d'accueil de Studoo au style cahier quadrillé](docs/screenshots/accueil.png)
+
+## Ce que fait Studoo
+
+| Outil | Comment |
+|---|---|
+| 🎙️ **Enregistrer un cours** | Le micro de l'appareil enregistre par tranches de 5 min. Chaque tranche est transcrite par Gemini avec le **rôle de chaque personne** (« Professeur : », « Élève : »), puis **l'audio est effacé**. |
+| 📷 **Numériser une feuille** | Photo → détection de la feuille → redressement → suppression des ombres → **PDF propre**. Traitement d'image écrit à la main en JavaScript, dans le navigateur. |
+| 🗂️ **Ranger automatiquement** | Après chaque enregistrement/numérisation, Studoo **devine le cours** (emploi du temps + IA), le chapitre et **génère le titre**. |
+| 📝 **Fiches de révision** | Fiches dessinées à la main (définitions surlignées, formules encadrées, pièges, mini-quiz), exportables en PDF. |
+| 🎧 **Podcasts** | 10, 20 ou 30 min à deux voix (Gemini TTS), encodés en MP3 dans le navigateur. |
+| 🎬 **Vidéos explicatives** | Diaporama animé dessiné + voix + sous-titres, encodé en **MP4** dans le navigateur (WebCodecs) : format TikTok, YouTube ou long. |
+| 📅 **Emploi du temps** | Connecteur Pronote (QR code), parcours guidés pour les 20 plus grandes universités, ou lien/fichier `.ics`. Création des dossiers de matières en un clic. |
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/tableau-de-bord.jpg" alt="Tableau de bord : outils en post-it, cours du jour, mes cours"></td>
+    <td><img src="docs/screenshots/fiche.jpg" alt="Fiche de révision générée au style cahier"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/video.jpg" alt="Vidéo explicative générée au format vertical"></td>
+    <td><img src="docs/screenshots/emploi-du-temps-sombre.jpg" alt="Emploi du temps de la semaine en mode sombre"></td>
+  </tr>
+</table>
+
+<p align="center"><img src="docs/screenshots/mobile.jpg" alt="Tableau de bord sur téléphone avec barre de navigation et bouton micro" width="260"></p>
+
+## Choix techniques (et pourquoi)
+
+| Partie | Technologie | Pourquoi |
+|---|---|---|
+| Site | **HTML, CSS, JavaScript** sans framework, assemblés par **Vite** | Comprendre chaque ligne ; site léger (Lighthouse **100/100** partout). |
+| API | **Python 3 + FastAPI** | Lisible, rapide, validation automatique des données (Pydantic). |
+| Connexion | **Google uniquement** (OAuth 2.0, flux « code ») | Un seul compte : Google fournit l'IA *et* le stockage. |
+| Stockage | **Google Drive** de l'utilisateur, autorisation `drive.file` | Aucun cours sur nos serveurs ; Studoo ne voit que ses propres fichiers. |
+| IA | **Gemini** (Flash-Lite, Flash, TTS) via le SDK `google-genai` | Transcription audio avec rôles, OCR, fiches, scripts, voix. |
+| Base de données | **Postgres (Neon)**, SQLite en local, SQLAlchemy Core | Seulement comptes, compteurs et messages. |
+| Pronote | **Node.js + Pawnote** (bibliothèque non officielle) | Connexion par QR code, récupération du lien iCal officiel. |
+| Hébergement | **Vercel** (site + fonctions Python et Node) | Gratuit, déploiement automatique depuis GitHub, HTTPS. |
+
+```
+Navigateur ──► Google Drive (direct, jeton de l'utilisateur)
+    │
+    └──► /api (FastAPI) ──► Gemini   (clé cachée côté serveur)
+    │                  └──► Neon     (comptes, compteurs)
+    └──► /api/pronote (Node) ──► Pronote
+```
+
+Détails, limites et quotas : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Sécurité et vie privée
+
+- **Aucune clé dans le navigateur** : la clé Gemini et le secret OAuth restent dans l'API.
+- **Session chiffrée** (Fernet/AES) dans un cookie `httpOnly`, `Secure`, `SameSite=Lax` ; protection **CSRF** par en-tête dédié.
+- **HTTPS forcé** + HSTS, **Content-Security-Policy** stricte, `X-Frame-Options`, `Permissions-Policy`.
+- **Validation côté serveur** de toutes les entrées (tailles, formats), **limitation de débit**, formulaire de contact **anti-spam** (pot de miel + piège temporel).
+- Import de liens `.ics` protégé contre le **SSRF** (adresses privées refusées, redirections vérifiées).
+- **Analytics maison sans cookie** (empreinte anonyme renouvelée chaque jour), avec consentement.
+- Pages **RGPD** et **CGU**, bannière cookies (« Refuser » aussi simple qu'« Accepter »), suppression du compte en un clic.
+
+## Lancer le projet en local
+
+Prérequis : Python 3.12+, Node.js 20+.
+
+```bash
+git clone https://github.com/B2TN/studoo.git
+cd studoo
+
+# API Python
+python -m venv .venv
+.venv/Scripts/activate        # Windows (macOS/Linux : source .venv/bin/activate)
+pip install -r requirements-dev.txt
+cp .env.example .env          # puis remplis les valeurs (voir le fichier)
+
+# Dépendances JavaScript
+npm install                   # connecteur Pronote
+npm install --prefix frontend # site
+```
+
+Dans trois terminaux :
+
+```bash
+uvicorn studoo.main:app --app-dir backend --port 8000 --reload   # API
+node scripts/dev-pronote.js                                       # Pronote (facultatif)
+npm run dev --prefix frontend                                     # site → http://localhost:5173
+```
+
+> **Mode démo** : sans identifiants Google, laisse `GOOGLE_CLIENT_ID` vide avec `DEV_LOGIN=1` et `AI_FAKE=1`.
+> Le bouton de connexion ouvre alors une session de démonstration (faux Drive en mémoire, IA factice).
+> Ces modes sont automatiquement désactivés hors `localhost`.
+
+## Tests
+
+```bash
+cd backend && python -m pytest -q     # 39 tests : sessions, CSRF, quotas, IA, .ics, anti-SSRF, admin…
+npm test                               # connecteur Pronote (jetons, chiffrement)
+npm test --prefix frontend             # scanner, homographie, routeur, fiches, emploi du temps…
+```
+
+Les tests tournent automatiquement sur GitHub à chaque envoi (GitHub Actions).
+
+## Mise en ligne
+
+Hébergement gratuit sur Vercel, base Neon, configuration Google Cloud et Search Console :
+voir le guide pas à pas [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
+
+## Limites connues (offre gratuite)
+
+- Quotas Gemini gratuits **partagés entre tous les utilisateurs** (≈ 20 cours de 2 h transcrits par jour pour tout le site).
+- Voix Gemini limitée à quelques minutes par jour : au-delà, les podcasts sont lus par la voix du navigateur et les vidéos sont sous-titrées sans voix.
+- En offre gratuite, Google peut réutiliser les contenus envoyés à Gemini (indiqué dans la page RGPD).
+- Pronote et les ENT n'ont pas d'API officielle : le connecteur Pronote peut cesser de fonctionner ; le lien iCal reste toujours possible.
+
+## Licence et crédits
+
+Code sous licence **GNU GPL v3 ou ultérieure** (voir [LICENSE.md](LICENSE.md)), compatible avec la bibliothèque Pawnote utilisée pour Pronote.
+
+Icônes [Tabler](https://tabler.io/icons) (MIT) · polices Patrick Hand, Gochi Hand et Atkinson Hyperlegible (SIL OFL) ·
+[pdf-lib](https://pdf-lib.js.org) (MIT) · [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0) · [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT) ·
+[lamejs](https://github.com/breezystack/lamejs) (LGPL) · [jsQR](https://github.com/cozmo/jsQR) (Apache 2.0) · [Pawnote](https://github.com/LiterateInk/Pawnote) (GPL-3.0).
+Studoo n'est affilié ni à Google, ni à Index Éducation, ni aux établissements cités.
