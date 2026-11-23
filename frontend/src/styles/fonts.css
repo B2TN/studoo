@@ -1,0 +1,16 @@
+/* Polices manuscrites hébergées sur le site (pas d'appel à Google Fonts = meilleur pour la vie privée).
+   Licence : SIL Open Font License. Sous-ensemble « latin » (accents français et œ compris). */
+@font-face {
+  font-family: "Patrick Hand";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/patrick-hand.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Gochi Hand";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/gochi-hand.woff2") format("woff2");
+}

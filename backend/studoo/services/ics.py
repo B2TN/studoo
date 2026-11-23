@@ -8,7 +8,7 @@ on refuse toute adresse privée ou locale.
 import ipaddress
 import re
 import socket
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
@@ -88,6 +88,7 @@ def clean_subject(summary: str) -> str:
     s = summary.strip()
     s = re.split(r"\s+[-–|/]\s+", s)[0]
     s = PREFIX_RE.sub("", s).strip(" -–:")
+    s = re.sub(r"\s+(LV\d|LVA|LVB|SPE|SPÉ|OPT)\b.*$", "", s, flags=re.I).strip()
     if s.isupper():
         s = s.capitalize()
     fixes = {"Mathematiques": "Mathématiques", "Francais": "Français", "Histoire-geographie": "Histoire-Géographie",
@@ -98,11 +99,11 @@ def clean_subject(summary: str) -> str:
 
 
 def _iso(value) -> str:
+    """Date ISO. Les heures « flottantes » (sans fuseau) restent sans fuseau :
+    le navigateur les interprète alors à l'heure locale de l'élève."""
     if isinstance(value, datetime):
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
         return value.isoformat()
-    return datetime.combine(value, time(0), tzinfo=timezone.utc).isoformat()
+    return datetime.combine(value, time(0)).isoformat()
 
 
 def parse_ics(text: str, start: date, end: date) -> dict:

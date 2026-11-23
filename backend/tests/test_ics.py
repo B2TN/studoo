@@ -32,6 +32,7 @@ END:VCALENDAR
     ("CM Analyse 1", "Analyse 1"),
     ("TD Physique-Chimie", "Physique-Chimie"),
     ("SVT", "SVT"),
+    ("ANGLAIS LV1 - M. CARTER", "Anglais"),
 ])
 def test_clean_subject(raw, expected):
     assert ics.clean_subject(raw) == expected
@@ -68,3 +69,9 @@ def test_ssrf_private_address_refused():
 def test_ics_file_endpoint(logged):
     res = logged.post("/api/timetable/ics-file", json={"content": SAMPLE, "days_before": 60, "days_after": 60})
     assert res.status_code == 200
+
+
+def test_floating_times_stay_local():
+    cal = SAMPLE.replace("DTSTART:20261123T080000Z", "DTSTART:20261123T080000").replace("DTEND:20261123T090000Z", "DTEND:20261123T090000")
+    ev = ics.parse_ics(cal, date(2026, 11, 20), date(2026, 11, 24))["events"][0]
+    assert ev["start"] == "2026-11-23T08:00:00"

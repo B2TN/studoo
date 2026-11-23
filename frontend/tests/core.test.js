@@ -10,7 +10,7 @@ import { applyH, detectCorners, enhance, homography, otsu, outputSize, warp } fr
 import { ficheToText, safeName } from "../src/lib/storage.js";
 import { eventsOfDay, lessonAt, subjectsOf } from "../src/lib/timetable-data.js";
 import { captionAt, slideDurations } from "../src/lib/video-render.js";
-import { findCourse } from "../src/app/confirm.js";
+import { findChapter, findCourse } from "../src/app/confirm.js";
 
 describe("scanner", () => {
   it("Otsu sépare deux niveaux", () => {
@@ -138,6 +138,9 @@ describe("emploi du temps", () => {
     expect(findCourse(tree, "mathematiques").name).toBe("Mathématiques");
     expect(findCourse(tree, "Histoire")?.name).toBe("Histoire-Géographie");
     expect(findCourse(tree, "")).toBeNull();
+    const chapters = [{ name: "Ch. 3 — Suites" }, { name: "Ch. 4 — Exponentielle" }];
+    expect(findChapter(chapters, "Suites").name).toBe("Ch. 3 — Suites");
+    expect(findChapter(chapters, "Probabilités")).toBeNull();
   });
 });
 

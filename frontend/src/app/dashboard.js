@@ -14,6 +14,15 @@ const TOOLS = [
   ["/importer", "lilac", "file-upload", "Importer un PDF", "Range-le dans un chapitre"],
 ];
 
+/** « » (aujourd'hui), « demain » ou « jeudi ». */
+function whenLabel(iso, now = new Date()) {
+  const d = new Date(iso);
+  const days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date(now).setHours(0, 0, 0, 0)) / 86400000);
+  if (days <= 0) return "";
+  if (days === 1) return "demain";
+  return d.toLocaleDateString("fr-FR", { weekday: "long" });
+}
+
 const firstName = (user) => (user.name || "").split(" ")[0] || "toi";
 
 export function mascotSvg() {
@@ -67,8 +76,8 @@ export async function render({ view, user }) {
   ]);
   const next = nextLesson(events);
   const todayCount = eventsOfDay(events).filter((e) => !e.cancelled).length;
-  const subtitle = [longDate(), events.length ? plural(todayCount, "cours") + " aujourd'hui" : null,
-    next ? `prochain : ${next.subject} à ${time(next.start)}` : null].filter(Boolean).join(" · ");
+  const subtitle = [longDate(), events.length ? plural(todayCount, "cours", "cours") + " aujourd'hui" : null,
+    next ? `prochain : ${[next.subject, whenLabel(next.start), "à", time(next.start)].filter(Boolean).join(" ")}` : null].filter(Boolean).join(" · ");
 
   mount(view,
     h("section", { class: "hello" }, mascotSvg(),

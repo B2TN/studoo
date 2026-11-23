@@ -89,6 +89,11 @@ export function createMemoryDrive({ seed = false } = {}) {
 const md = (s) => new Blob([s], { type: "text/markdown" });
 
 async function seedDemo(d) {
+  const root = await d.init();
+  await d.save({
+    parentId: root, name: "studoo-reglages.json", mimeType: "application/json", kind: "settings",
+    blob: new Blob([JSON.stringify({ version: 1, recordingConsent: null, timetable: { sources: [{ id: "demo", type: "demo", label: "Emploi du temps de démonstration" }] }, voices: { A: "Kore", B: "Puck" } })], { type: "application/json" }),
+  });
   const maths = await d.createCourse("Mathématiques", "pink");
   const suites = await d.createChapter(maths.id, "Ch. 3 — Suites");
   await d.createChapter(maths.id, "Ch. 4 — Fonction exponentielle");

@@ -9,7 +9,8 @@ html:not(.is-app) #app { display: none; }
 
 #landing main { max-width: 1120px; margin: 0 auto; padding: 0 16px 40px; }
 .hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 32px; align-items: center; padding: 30px 0 50px; }
-.hero h1 { font-size: clamp(40px, 6vw, 68px); }
+.hero h1 { font-size: clamp(38px, 5vw, 62px); }
+.hero h1 .hl { white-space: nowrap; }
 .lead { font-size: 22px; margin: 18px 0 24px; max-width: 34em; }
 .btn.big { font-size: 22px; min-height: 58px; padding: .4em 1.3em; }
 .g-logo { width: 26px; height: 26px; background: #fff; border-radius: 50%; padding: 3px; }
@@ -17,8 +18,8 @@ html:not(.is-app) #app { display: none; }
 .mini-note { position: absolute; padding: 14px 16px; width: 220px; color: var(--on-fluo); box-shadow: 2px 6px 0 rgba(22,41,110,.18); border-radius: var(--radius-note); font-size: 18px; }
 .mini-note:nth-child(1) { top: 0; left: 4%; transform: rotate(-4deg); }
 .mini-note:nth-child(2) { top: 110px; right: 0; transform: rotate(3deg); }
-.mini-note:nth-child(3) { bottom: 10px; left: 14%; transform: rotate(-1deg); }
-.hero-mascot { position: absolute; right: 18%; bottom: 0; width: 130px; height: 130px; transform: rotate(8deg); }
+.mini-note:nth-child(3) { bottom: 10px; left: 0; transform: rotate(-1deg); }
+.hero-mascot { position: absolute; right: 4%; bottom: 0; width: 130px; height: 130px; transform: rotate(8deg); }
 
 .section-title { font-size: clamp(32px, 4vw, 44px); margin: 30px 0 22px; }
 .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }

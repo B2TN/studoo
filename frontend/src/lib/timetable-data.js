@@ -24,7 +24,28 @@ export async function pronoteCall(body) {
   return api("/api/pronote", { method: "POST", json: body, headers: { Authorization: `Bearer ${token}` } });
 }
 
+/** Emploi du temps fictif (mode démo local uniquement). */
+export function demoEvents(now = new Date()) {
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const plan = [
+    [["Anglais", 8, 9, "B12"], ["Mathématiques", 10, 12, "A03"], ["Histoire-Géographie", 14, 15, "C21"]],
+    [["Physique-Chimie", 8, 10, "Labo 2"], ["Mathématiques", 13, 14, "A03"]],
+    [["Histoire-Géographie", 9, 11, "C21"], ["Anglais", 11, 12, "B12"]],
+    [["Mathématiques", 8, 10, "A03"], ["Physique-Chimie", 14, 16, "Labo 2"]],
+    [["Anglais", 10, 11, "B12"], ["Histoire-Géographie", 13, 15, "C21"]],
+  ];
+  const iso = (d, hh) => { const x = new Date(d); x.setHours(hh, 0, 0, 0); return x.toISOString(); };
+  return plan.flatMap((day, i) => day.map(([subject, a, b, room]) => {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    return { uid: `demo-${i}-${a}`, title: subject, subject, start: iso(d, a), end: iso(d, b), location: room, description: "", cancelled: false };
+  }));
+}
+
 async function fromSource(src) {
+  if (src.type === "demo") return demoEvents();
   if (src.type === "ics-url" || (src.type === "pronote" && src.icalUrl)) {
     return (await api("/api/timetable/ics-url", { method: "POST", json: { url: src.url || src.icalUrl } })).events;
   }

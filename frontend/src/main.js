@@ -1,7 +1,6 @@
 // Point d'entrée de la page principale.
 // Visiteur → page d'accueil. Connecté → le tableau de bord remplace l'accueil.
-import "@fontsource/patrick-hand/400.css";
-import "@fontsource/gochi-hand/400.css";
+import "./styles/fonts.css";
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
 import "./styles/base.css";

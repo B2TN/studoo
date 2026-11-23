@@ -118,7 +118,7 @@ function pronoteQrForm(onDone) {
   const qrState = h("p", { role: "status", class: "muted" }, "Aucun QR code lu pour l'instant.");
   const pin = h("input", { class: "input", id: "pin", inputmode: "numeric", pattern: "[0-9]{4}", maxlength: 4, autocomplete: "off", style: { maxWidth: "140px" } });
   const err = h("p", { class: "error", role: "alert" });
-  const shot = h("input", { type: "file", accept: "image/*", class: "sr-only", id: "qr-shot" });
+  const shot = h("input", { type: "file", accept: "image/*", hidden: true, id: "qr-shot", "aria-label": "Capture d'écran du QR code" });
   const stop = () => { stream?.getTracks().forEach((t) => t.stop()); stream = null; video.hidden = true; };
   const found = (data) => { qrData = data; stop(); qrState.textContent = "QR code lu ✓ Tape maintenant ton code à 4 chiffres."; pin.focus(); };
 

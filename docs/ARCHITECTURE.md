@@ -68,10 +68,11 @@ Consentement : engagement accepté une fois, puis rappel discret.
 Ensuite : page de confirmation (cours/chapitre estimés, titre auto).
 
 ### 4.2 Numérisation de cours papier
-Dans le navigateur avec **OpenCV.js** : détection des bords de la feuille, redressement
-(perspective), recadrage, contraste et nettoyage du fond. PDF assemblé avec **pdf-lib**.
-La photo ne quitte jamais l'appareil (seule une miniature basse définition part vers Gemini
-pour estimer le cours et le titre).
+Traitement d'image **écrit à la main en JavaScript** (`frontend/src/lib/scan-core.js`, ~200 lignes,
+au lieu d'OpenCV.js qui pèse ~10 Mo) : détection de la feuille (seuil d'Otsu + plus grande zone claire),
+coins ajustables à la main, redressement par homographie, suppression des ombres (normalisation de
+l'éclairage) et contraste. PDF assemblé avec **pdf-lib**. La photo ne quitte jamais l'appareil
+(seule une copie réduite part vers Gemini pour lire le texte et estimer le cours).
 
 ### 4.3 Fiches
 Gemini produit un JSON structuré (titres, définitions, encadrés, schémas simples), rendu par le
@@ -95,9 +96,9 @@ ordinateur récent (plus lent sur téléphone). Sans voix Gemini disponible : MP
 | Méthode | Réalisme |
 |---|---|
 | **Lien / fichier `.ics`** | Fiable. Pronote, ADE, HyperPlanning, Celcat… proposent un lien iCal personnel mis à jour en continu. Chaque service a un tutoriel intégré. |
-| **Pronote (lycéens)** | Bibliothèque **non officielle** Pawnote (Node). Connexion par **QR code** (le mot de passe n'est jamais envoyé) ou identifiants pour les comptes sans ENT. On ne garde que le **jeton de reconnexion**, chiffré, dans le Drive de l'élève. Peut casser à chaque mise à jour de Pronote ; zone grise vis-à-vis des CGU d'Index Éducation. |
+| **Pronote (lycéens)** | Bibliothèque **non officielle** Pawnote (Node). Connexion par **QR code** (aucun mot de passe). Si l'instance Pronote propose l'export iCal (Pronote 2024+), Studoo récupère le **lien iCal officiel** et ne garde rien d'autre ; sinon un **jeton de reconnexion chiffré** (AES-256-GCM, lié à l'utilisateur) est rangé dans le Drive de l'élève. Peut casser à chaque mise à jour de Pronote ; zone grise vis-à-vis des CGU d'Index Éducation. |
 | **ENT lycée (5 services)** | Pronote (connecteur), puis École Directe, Skolengo/Kdecole, Oze/ENT régionaux, Monlycée.net : **tutoriel lien iCal** quand le service l'offre ; sinon export via Pronote (la plupart des ENT régionaux y renvoient). |
-| **20 grands établissements du supérieur** | Fiche par établissement (logiciel d'EDT, URL, tutoriel iCal). Connecteur expérimental « CAS → ADE » pour ceux qui utilisent ADE : identifiants utilisés une fois, en HTTPS, **jamais stockés**. **Je ne peux pas tester sans comptes** : ces connecteurs sont « au mieux », avec repli automatique sur le lien iCal. |
+| **20 grands établissements du supérieur** | Parcours guidé par établissement (lien vers l'ENT, étapes pour obtenir le lien iCal d'ADE / Celcat / HyperPlanning, reconnaissance automatique du logiciel). Les liens ADE ont des dates fixes : Studoo les **fait glisser automatiquement** pour rester à jour. **Pas de connexion CAS par mot de passe** : impossible à tester sans comptes, fragile, et le lien iCal donne le même résultat sans aucun identifiant. |
 
 Création automatique des dossiers de cours à partir des noms de matières de l'EDT.
 

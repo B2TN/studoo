@@ -22,6 +22,15 @@ export function findCourse(tree, name) {
     || null;
 }
 
+/** Chapitre existant correspondant (« Suites » ≈ « Ch. 3 — Suites »). */
+export function findChapter(chapters, name) {
+  const n = norm(name);
+  if (!n) return null;
+  return chapters.find((ch) => norm(ch.name) === n)
+    || chapters.find((ch) => norm(ch.name).includes(n) || n.includes(norm(ch.name)))
+    || null;
+}
+
 export async function estimate(doc, tree) {
   let hint = "";
   try {
@@ -39,7 +48,7 @@ export async function estimate(doc, tree) {
     toast(`Estimation automatique indisponible : ${err.message}`, "info");
   }
   const course = findCourse(tree, hint) || findCourse(tree, ai?.course);
-  const chapter = course ? course.chapters.find((ch) => norm(ch.name) === norm(ai?.chapter)) : null;
+  const chapter = course ? findChapter(course.chapters, ai?.chapter) : null;
   return {
     course, chapter,
     newCourse: course ? "" : (ai?.course || hint || ""),

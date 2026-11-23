@@ -89,10 +89,10 @@ export async function render({ view, go, refreshQuota }) {
   const pages = []; // canvases des pages finales
   let current = null; // { canvas, corners }
 
-  const camera = h("input", { type: "file", accept: "image/*", capture: "environment", class: "sr-only", id: "scan-camera" });
-  const gallery = h("input", { type: "file", accept: "image/*", multiple: true, class: "sr-only", id: "scan-gallery" });
+  const camera = h("input", { type: "file", accept: "image/*", capture: "environment", hidden: true, id: "scan-camera", "aria-label": "Prendre une photo" });
+  const gallery = h("input", { type: "file", accept: "image/*", multiple: true, hidden: true, id: "scan-gallery", "aria-label": "Choisir des images" });
   const editor = h("section", { class: "card sketch", hidden: true, style: { marginTop: "20px" } });
-  const pagesBox = h("div", { class: "pages", "aria-label": "Pages numérisées" });
+  const pagesBox = h("div", { class: "pages", role: "group", "aria-label": "Pages numérisées" });
   const finishBtn = h("button", { class: "btn primary big", type: "button", hidden: true }, icon("check"), "Terminer et ranger");
   const status = h("p", { class: "muted", role: "status" });
   const queue = [];

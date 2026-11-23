@@ -1,6 +1,5 @@
 // Script des pages statiques (RGPD, CGU, contact, 404).
-import "@fontsource/patrick-hand/400.css";
-import "@fontsource/gochi-hand/400.css";
+import "./styles/fonts.css";
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
 import "./styles/base.css";
