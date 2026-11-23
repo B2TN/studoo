@@ -22,12 +22,96 @@
       "destination": "/api/pronote"
     },
     {
-      "source": "/api/(.*)",
+      "source": "/api/:path*",
       "destination": "/api/index"
     },
     {
-      "source": "/(cours|cours/.*|fichier/.*|enregistrer|numeriser|importer|confirmer|creer/.*|emploi-du-temps|reglages|admin|analytics)",
-      "destination": "/index.html"
+      "source": "/cours",
+      "destination": "/"
+    },
+    {
+      "source": "/cours/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/fichier",
+      "destination": "/"
+    },
+    {
+      "source": "/fichier/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/enregistrer",
+      "destination": "/"
+    },
+    {
+      "source": "/enregistrer/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/numeriser",
+      "destination": "/"
+    },
+    {
+      "source": "/numeriser/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/importer",
+      "destination": "/"
+    },
+    {
+      "source": "/importer/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/confirmer",
+      "destination": "/"
+    },
+    {
+      "source": "/confirmer/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/creer",
+      "destination": "/"
+    },
+    {
+      "source": "/creer/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/emploi-du-temps",
+      "destination": "/"
+    },
+    {
+      "source": "/emploi-du-temps/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/reglages",
+      "destination": "/"
+    },
+    {
+      "source": "/reglages/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/admin",
+      "destination": "/"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/analytics",
+      "destination": "/"
+    },
+    {
+      "source": "/analytics/:path*",
+      "destination": "/"
     }
   ],
   "headers": [
