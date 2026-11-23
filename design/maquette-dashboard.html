@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studoo — maquette tableau de bord</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gochi+Hand&family=Patrick+Hand&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+/* ---------- Jetons de design (couleurs, polices) ---------- */
+:root {
+  --paper: #FBF6E9;
+  --paper-2: #FFFDF6;
+  --grid: #D7E1F3;
+  --grid-strong: #B9C9EA;
+  --margin: #E8848C;
+  --ink: #16296E;          /* encre bleue foncée : texte */
+  --ink-2: #2747B8;        /* encre bleue vive : liens, actions */
+  --ink-soft: #46527F;     /* texte secondaire */
+  --shadow: rgba(22, 41, 110, .85);
+  --fluo-yellow: #F7EF5A;
+  --fluo-pink: #FF9CCB;
+  --fluo-green: #8BEA9F;
+  --fluo-blue: #9FD3FF;
+  --fluo-orange: #FFC27A;
+  --fluo-lilac: #CDB8FF;
+  --tape: rgba(255, 247, 194, .85);
+  --font-hand: "Patrick Hand", "Comic Sans MS", cursive;
+  --font-title: "Gochi Hand", "Patrick Hand", cursive;
+  --wobbly: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --wobbly-2: 15px 255px 15px 225px / 225px 15px 255px 15px;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --paper: #1A2133;
+  --paper-2: #222B41;
+  --grid: #263049;
+  --grid-strong: #2F3B59;
+  --margin: #8C4A5A;
+  --ink: #EEF1FA;
+  --ink-2: #9FC1FF;
+  --ink-soft: #B7C0DA;
+  --shadow: rgba(0, 0, 0, .55);
+  --tape: rgba(255, 247, 194, .35);
+  color-scheme: dark;
+}
+:root[data-font="lisible"] { --font-hand: "Atkinson Hyperlegible", system-ui, sans-serif; }
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--ink);
+  background-color: var(--paper);
+  /* Cahier quadrillé : petits carreaux + carreau fort tous les 4 */
+  background-image:
+    linear-gradient(var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 96px 96px, 96px 96px, 24px 24px, 24px 24px;
+}
+h1, h2, h3 { font-family: var(--font-title); font-weight: 400; margin: 0; line-height: 1.15; }
+a { color: var(--ink-2); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px dashed var(--ink-2); outline-offset: 3px; }
+
+/* ---------- Briques « dessinées à la main » ---------- */
+.sketch {
+  background: var(--paper-2);
+  border: 2.5px solid var(--ink);
+  border-radius: var(--wobbly);
+  box-shadow: 3px 4px 0 var(--shadow);
+}
+.hl { /* surligneur fluo */
+  background: linear-gradient(100deg, transparent 1%, var(--fluo-yellow) 3%, var(--fluo-yellow) 96%, transparent 99%);
+  padding: 0 .25em; border-radius: 6px 2px 8px 3px;
+  color: #16296E;
+}
+.hl.pink { background: linear-gradient(100deg, transparent 1%, var(--fluo-pink) 3%, var(--fluo-pink) 96%, transparent 99%); }
+.doodle { filter: url(#wobble); }
+.tape { position: absolute; width: 74px; height: 22px; background: var(--tape); top: -11px; left: 50%; transform: translateX(-50%) rotate(-3deg); box-shadow: 0 1px 0 rgba(0,0,0,.08); }
+.btn {
+  display: inline-flex; align-items: center; gap: .4em;
+  padding: .35em .9em; background: var(--paper-2);
+  border: 2px solid var(--ink); border-radius: var(--wobbly-2);
+  box-shadow: 2px 3px 0 var(--shadow);
+  transition: transform .12s, box-shadow .12s;
+}
+.btn:hover { transform: translate(-1px, -1px) rotate(-.5deg); box-shadow: 3px 5px 0 var(--shadow); }
+.btn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--shadow); }
+.icon-btn { width: 44px; height: 44px; justify-content: center; padding: 0; border-radius: 50% 45% 52% 48%; }
+.ti { font-size: 1.25em; }
+
+/* ---------- Mise en page ---------- */
+.layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 100vh; }
+.topbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 2.5px solid var(--ink); background: var(--paper); position: sticky; top: 0; z-index: 5; }
+.logo { display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--ink); font-family: var(--font-title); font-size: 34px; }
+.logo svg { width: 46px; height: 46px; }
+.search { flex: 1; max-width: 420px; margin-left: auto; position: relative; }
+.search input { width: 100%; font: inherit; color: var(--ink); background: var(--paper-2); border: 2px solid var(--ink); border-radius: var(--wobbly); padding: .35em .8em .35em 2.2em; }
+.search .ti { position: absolute; left: .6em; top: 50%; transform: translateY(-50%); }
+.avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--fluo-green); color: #16296E; display: grid; place-items: center; border: 2px solid var(--ink); font-family: var(--font-title); font-size: 22px; }
+
+.sidebar { padding: 22px 14px; border-right: 2px dashed var(--grid-strong); display: flex; flex-direction: column; gap: 6px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 8px 12px; text-decoration: none; color: var(--ink); border-radius: var(--wobbly); font-size: 20px; }
+.nav a:hover { background: color-mix(in srgb, var(--fluo-yellow) 35%, transparent); }
+.nav a[aria-current="page"] { background: var(--fluo-yellow); color: #16296E; border: 2px solid var(--ink); }
+.sidebar .bottom { margin-top: auto; }
+.quota { font-size: 16px; color: var(--ink-soft); padding: 10px 12px; }
+.bar { height: 14px; border: 2px solid var(--ink); border-radius: var(--wobbly-2); margin-top: 6px; overflow: hidden; background: var(--paper-2); }
+.bar span { display: block; height: 100%; width: 62%; background: repeating-linear-gradient(-45deg, var(--fluo-green), var(--fluo-green) 6px, #6fd88a 6px, #6fd88a 12px); }
+
+main { padding: 28px 32px 120px; position: relative; }
+main::before { content: ""; position: absolute; left: 12px; top: 0; bottom: 0; width: 2px; background: var(--margin); opacity: .8; }
+.hello { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; }
+.hello h1 { font-size: 44px; }
+.hello p { margin: 4px 0 0; color: var(--ink-soft); }
+.mascot { width: 74px; height: 74px; flex: none; transform: rotate(-6deg); }
+
+h2.section { font-size: 30px; margin: 30px 0 14px; display: inline-block; }
+
+/* Outils = post-it */
+.tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+@media (min-width: 1500px) { .tools { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.postit {
+  position: relative; text-align: left; padding: 20px 16px 16px; min-height: 140px;
+  border: none; color: #16296E;
+  box-shadow: 2px 6px 0 rgba(22,41,110,.18), 0 1px 0 rgba(0,0,0,.05);
+  border-radius: 2px 2px 18px 2px / 2px 2px 8px 2px;
+  transition: transform .15s;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.postit:nth-child(odd) { transform: rotate(-1.6deg); }
+.postit:nth-child(even) { transform: rotate(1.3deg); }
+.postit:hover { transform: rotate(0) translateY(-4px) scale(1.02); }
+.postit .ti { font-size: 34px; }
+.postit strong { font-family: var(--font-title); font-weight: 400; font-size: 23px; line-height: 1.1; }
+.postit small { font-size: 16px; opacity: .85; }
+.c-pink { background: var(--fluo-pink); } .c-yellow { background: var(--fluo-yellow); }
+.c-green { background: var(--fluo-green); } .c-blue { background: var(--fluo-blue); }
+.c-orange { background: var(--fluo-orange); } .c-lilac { background: var(--fluo-lilac); }
+
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 28px; margin-top: 12px; }
+.card { padding: 18px 20px; position: relative; }
+.card h3 { font-size: 26px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.card h3 a { margin-left: auto; font-family: var(--font-hand); font-size: 16px; }
+
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { display: grid; grid-template-columns: 62px 16px 1fr; gap: 10px; align-items: start; padding: 7px 0; border-bottom: 1.5px dashed var(--grid-strong); }
+.timeline li:last-child { border-bottom: none; }
+.timeline time { font-size: 17px; color: var(--ink-soft); }
+.dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); margin-top: 5px; }
+.timeline .now { background: color-mix(in srgb, var(--fluo-yellow) 40%, transparent); border-radius: var(--wobbly); padding: 7px 6px; }
+:root[data-theme="dark"] .timeline .now { background: rgba(247, 239, 90, .14); }
+.timeline .room { display: block; font-size: 15px; color: var(--ink-soft); }
+.tag { font-size: 14px; border: 1.5px solid var(--ink); border-radius: 20px 8px 18px 10px; padding: 0 8px; margin-left: 6px; }
+
+.folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+.folder { position: relative; padding: 18px 12px 12px; text-decoration: none; color: var(--ink); text-align: left; }
+.folder .spine { position: absolute; left: 0; top: 0; bottom: 0; width: 12px; border-right: 2px solid var(--ink); border-radius: 12px 0 0 12px; }
+.folder strong { display: block; font-family: var(--font-title); font-weight: 400; font-size: 21px; padding-left: 10px; }
+.folder span { display: block; font-size: 15px; color: var(--ink-soft); padding-left: 10px; }
+
+.recent { list-style: none; margin: 0; padding: 0; }
+.recent li { display: flex; align-items: center; gap: 12px; padding: 9px 4px; border-bottom: 1.5px dashed var(--grid-strong); }
+.recent li:last-child { border-bottom: none; }
+.recent .kind { width: 38px; height: 38px; display: grid; place-items: center; border: 2px solid var(--ink); border-radius: 45% 55% 50% 50%; color: #16296E; flex: none; }
+.recent .meta { margin-left: auto; font-size: 15px; color: var(--ink-soft); white-space: nowrap; }
+
+/* Barre du bas (mobile) + bouton d'enregistrement */
+.tabbar, .fab { display: none; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .search { display: none; }
+  .topbar { padding: 10px 16px; }
+  .topbar .spacer { margin-left: auto; }
+  main { padding: 20px 16px 130px 26px; }
+  .hello h1 { font-size: 36px; }
+  .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .postit { min-height: 118px; }
+  .tabbar {
+    display: flex; position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 6;
+    justify-content: space-around; padding: 6px 4px;
+  }
+  .tabbar a { display: flex; flex-direction: column; align-items: center; font-size: 14px; text-decoration: none; color: var(--ink); padding: 4px 6px; border-radius: var(--wobbly); min-width: 56px; }
+  .tabbar a[aria-current="page"] { background: var(--fluo-yellow); color: #16296E; }
+  .fab {
+    display: grid; place-items: center; position: fixed; right: 22px; bottom: 92px; z-index: 7;
+    width: 68px; height: 68px; border-radius: 48% 52% 50% 46%; background: var(--fluo-pink); color: #16296E;
+    border: 2.5px solid var(--ink); box-shadow: 3px 4px 0 var(--shadow); font-size: 30px;
+  }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<!-- Filtre SVG qui fait « trembler » légèrement les traits (logo, icônes) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="wobble"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="2.2"/></filter>
+</svg>
+
+<div class="layout">
+  <header class="topbar">
+    <a class="logo" href="#" aria-label="Studoo, tableau de bord">
+      <svg class="doodle" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M6 9 L58 6 L59 57 L7 59 Z" fill="#FF9CCB" stroke="#B0437A" stroke-width="2"/>
+        <path d="M23 3 L42 2 L42.5 10 L23.5 11 Z" fill="#FFF7C2" opacity=".9"/>
+        <circle cx="22" cy="33" r="10" fill="#fff" stroke="#16296E" stroke-width="3"/><circle cx="43" cy="33" r="10" fill="#fff" stroke="#16296E" stroke-width="3"/>
+        <circle cx="25" cy="35" r="4" fill="#16296E"/><circle cx="46" cy="35" r="4" fill="#16296E"/>
+        <path d="M24 49 C29 52 36 52 41 49" fill="none" stroke="#16296E" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <span>Studoo</span>
+    </a>
+    <label class="search"><i class="ti ti-search" aria-hidden="true"></i><span class="sr-only" style="position:absolute;left:-9999px">Rechercher</span><input type="search" placeholder="Chercher un cours, une fiche…"></label>
+    <span class="spacer"></span>
+    <button class="btn icon-btn" id="font" aria-label="Police plus lisible" title="Police plus lisible"><i class="ti ti-text-size" aria-hidden="true"></i></button>
+    <button class="btn icon-btn" id="theme" aria-label="Mode sombre" title="Mode sombre"><i class="ti ti-moon" aria-hidden="true"></i></button>
+    <div class="avatar" aria-label="Compte de Léa">L</div>
+  </header>
+
+  <aside class="sidebar">
+    <nav class="nav" aria-label="Navigation principale">
+      <a href="#" aria-current="page"><i class="ti ti-layout-dashboard doodle" aria-hidden="true"></i>Tableau de bord</a>
+      <a href="#"><i class="ti ti-folders doodle" aria-hidden="true"></i>Mes cours</a>
+      <a href="#"><i class="ti ti-calendar-week doodle" aria-hidden="true"></i>Emploi du temps</a>
+      <a href="#"><i class="ti ti-microphone doodle" aria-hidden="true"></i>Enregistrer</a>
+      <a href="#"><i class="ti ti-camera doodle" aria-hidden="true"></i>Numériser</a>
+    </nav>
+    <div class="bottom">
+      <div class="quota">IA disponible aujourd'hui
+        <div class="bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="62" aria-label="Quota IA restant : 62 %"><span></span></div>
+      </div>
+      <nav class="nav" aria-label="Compte">
+        <a href="#"><i class="ti ti-settings doodle" aria-hidden="true"></i>Réglages</a>
+        <a href="#"><i class="ti ti-logout doodle" aria-hidden="true"></i>Se déconnecter</a>
+      </nav>
+    </div>
+  </aside>
+
+  <main>
+    <section class="hello">
+      <svg class="mascot doodle" viewBox="0 0 80 80" aria-hidden="true">
+        <path d="M10 14 L70 10 L72 70 L12 72 Z" fill="#FF9CCB" stroke="#16296E" stroke-width="2.5"/>
+        <circle cx="30" cy="38" r="11" fill="#fff" stroke="#16296E" stroke-width="3"/><circle cx="54" cy="38" r="11" fill="#fff" stroke="#16296E" stroke-width="3"/>
+        <circle cx="33" cy="35" r="4.5" fill="#16296E"/><circle cx="57" cy="35" r="4.5" fill="#16296E"/>
+        <path d="M32 56 C38 61 47 61 52 56" fill="none" stroke="#16296E" stroke-width="3" stroke-linecap="round"/>
+        <path d="M70 26 L78 18" stroke="#16296E" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Salut <span class="hl">Léa</span> !</h1>
+        <p>Mardi 24 novembre · 3 cours aujourd'hui · prochain : Maths à 10h</p>
+      </div>
+    </section>
+
+    <h2 class="section">Qu'est-ce qu'on fait ?</h2>
+    <div class="tools">
+      <button class="postit c-pink"><span class="tape"></span><i class="ti ti-microphone doodle" aria-hidden="true"></i><strong>Enregistrer un cours</strong><small>Transcription avec « Prof : » / « Élève : »</small></button>
+      <button class="postit c-yellow"><span class="tape"></span><i class="ti ti-camera doodle" aria-hidden="true"></i><strong>Numériser une feuille</strong><small>Photo → PDF tout propre</small></button>
+      <button class="postit c-green"><span class="tape"></span><i class="ti ti-notes doodle" aria-hidden="true"></i><strong>Créer une fiche</strong><small>L'essentiel, rien que tes cours</small></button>
+      <button class="postit c-blue"><span class="tape"></span><i class="ti ti-headphones doodle" aria-hidden="true"></i><strong>Faire un podcast</strong><small>10, 20 ou 30 min à écouter</small></button>
+      <button class="postit c-orange"><span class="tape"></span><i class="ti ti-movie doodle" aria-hidden="true"></i><strong>Faire une vidéo</strong><small>Format TikTok, YouTube ou long</small></button>
+      <button class="postit c-lilac"><span class="tape"></span><i class="ti ti-file-upload doodle" aria-hidden="true"></i><strong>Importer un PDF</strong><small>Range-le dans un chapitre</small></button>
+    </div>
+
+    <div class="cols">
+      <section class="card sketch" aria-labelledby="t-today">
+        <h3 id="t-today"><i class="ti ti-calendar-week doodle" aria-hidden="true"></i>Aujourd'hui <a href="#">Toute la semaine</a></h3>
+        <ol class="timeline">
+          <li><time>08:00</time><span class="dot c-blue"></span><span>Anglais<span class="room">Salle B12 · M. Carter</span></span></li>
+          <li class="now"><time>10:00</time><span class="dot c-pink"></span><span>Mathématiques <span class="tag">maintenant</span><span class="room">Salle A03 · Mme Durand</span></span></li>
+          <li><time>14:00</time><span class="dot c-green"></span><span>Histoire-Géo<span class="room">Salle C21 · M. Petit</span></span></li>
+        </ol>
+        <p style="margin:10px 0 0;font-size:15px;color:var(--ink-soft)"><i class="ti ti-refresh" aria-hidden="true"></i> Synchronisé avec Pronote il y a 5 min</p>
+      </section>
+
+      <section class="card sketch" aria-labelledby="t-courses">
+        <span class="tape"></span>
+        <h3 id="t-courses"><i class="ti ti-folders doodle" aria-hidden="true"></i>Mes cours <a href="#">Tout voir</a></h3>
+        <div class="folders">
+          <a class="folder sketch" href="#"><span class="spine c-pink"></span><strong>Maths</strong><span>4 chapitres · 12 fichiers</span></a>
+          <a class="folder sketch" href="#"><span class="spine c-green"></span><strong>Histoire-Géo</strong><span>3 chapitres · 8 fichiers</span></a>
+          <a class="folder sketch" href="#"><span class="spine c-blue"></span><strong>Anglais</strong><span>2 chapitres · 5 fichiers</span></a>
+          <a class="folder sketch" href="#"><span class="spine c-orange"></span><strong>Physique</strong><span>3 chapitres · 9 fichiers</span></a>
+        </div>
+      </section>
+    </div>
+
+    <h2 class="section"><span class="hl pink">Récemment</span></h2>
+    <section class="card sketch">
+      <ul class="recent">
+        <li><span class="kind c-green"><i class="ti ti-notes" aria-hidden="true"></i></span><span><strong>Fiche — Les suites géométriques</strong><br><small style="color:var(--ink-soft)">Maths › Ch. 3 Suites</small></span><span class="meta">il y a 2 h</span></li>
+        <li><span class="kind c-pink"><i class="ti ti-microphone" aria-hidden="true"></i></span><span><strong>Transcription — La guerre froide (1947-1991)</strong><br><small style="color:var(--ink-soft)">Histoire-Géo › Ch. 2</small></span><span class="meta">hier</span></li>
+        <li><span class="kind c-blue"><i class="ti ti-headphones" aria-hidden="true"></i></span><span><strong>Podcast 10 min — Present perfect</strong><br><small style="color:var(--ink-soft)">Anglais › Ch. 1 Grammar</small></span><span class="meta">lundi</span></li>
+        <li><span class="kind c-orange"><i class="ti ti-movie" aria-hidden="true"></i></span><span><strong>Vidéo 2 min — Loi d'Ohm</strong><br><small style="color:var(--ink-soft)">Physique › Ch. 1 Électricité</small></span><span class="meta">dimanche</span></li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<!-- Mobile : bouton d'enregistrement + barre de navigation du bas -->
+<button class="fab" aria-label="Enregistrer un cours"><i class="ti ti-microphone" aria-hidden="true"></i></button>
+<nav class="tabbar sketch" aria-label="Navigation mobile">
+  <a href="#" aria-current="page"><i class="ti ti-layout-dashboard" aria-hidden="true"></i>Accueil</a>
+  <a href="#"><i class="ti ti-folders" aria-hidden="true"></i>Cours</a>
+  <a href="#"><i class="ti ti-camera" aria-hidden="true"></i>Scanner</a>
+  <a href="#"><i class="ti ti-calendar-week" aria-hidden="true"></i>EDT</a>
+  <a href="#"><i class="ti ti-user" aria-hidden="true"></i>Moi</a>
+</nav>
+
+<script>
+  const root = document.documentElement;
+  document.getElementById('theme').onclick = () => {
+    root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  };
+  document.getElementById('font').onclick = () => {
+    root.dataset.font = root.dataset.font === 'lisible' ? '' : 'lisible';
+  };
+</script>
+</body>
+</html>
