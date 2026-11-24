@@ -27,10 +27,11 @@ Studoo (Vercel) ── nouvelle tâche ──► base Neon (contenu chiffré)
 2. Tu reçois **100 $ de crédit pour 12 mois**, renouvelables chaque année tant que tu es étudiant.
    Quand le crédit est épuisé, Azure **arrête** les services : aucune facture possible.
 
-## 2. Rendre l'image publique (une seule fois)
-1. Attends que l'action GitHub **« Image du serveur de tâches »** soit verte (onglet *Actions* du dépôt, ≈ 10 min).
-2. GitHub → ton profil → **Packages** → `studoo-worker` → **Package settings** → *Danger Zone* →
-   **Change visibility** → **Public**. (L'image ne contient que le code, déjà public sur GitHub.)
+## 2. L'image du serveur (rien à faire)
+L'action GitHub **« Image du serveur de tâches »** la publie sur `ghcr.io/b2tn/studoo-worker` à chaque
+modification du worker (≈ 4 min). Elle est publique, comme le dépôt (vérifié le 24/11/2026 : 0,8 Go compressé) ;
+elle ne contient que le code. Si un jour Azure n'arrive pas à la télécharger : GitHub → **Packages** →
+`studoo-worker` → **Package settings** → **Change visibility** → **Public**.
 
 ## 3. Installer l'outil Azure et se connecter (une seule fois)
 
@@ -90,7 +91,7 @@ Crédit (pages Azure du 24/11/2026) :
 - **« RequestDisallowedByPolicy » / région refusée** : ton abonnement étudiant limite les régions →
   relance avec une autre région, par exemple
   `powershell -ExecutionPolicy Bypass -File worker\azure\deploy.ps1 -Location westeurope`.
-- **« image pull » / image introuvable** : l'étape 2 (image publique) n'est pas faite, ou l'action GitHub a échoué.
+- **« image pull » / image introuvable** : vérifie que l'action GitHub « Image du serveur de tâches » est verte et que le paquet est public (étape 2).
 - **Rien ne démarre** : vérifie `WORKER_QUEUE_URL` dans Vercel puis *Redeploy* ; regarde l'historique d'exécution du job.
 - **Le crédit baisse trop vite** : portail Azure → *Abonnements* → *Coûts* ; on peut réduire la machine
   (dans le script : `cpu = 2.0; memory = "4Gi"`, et passer `OCR_MODEL=lightonai/LightOnOCR-3-1B` dans `.env.worker`).
