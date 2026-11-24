@@ -1,15 +1,48 @@
 // Couche « métier » au-dessus du Drive : réglages, types de fichiers,
 // récupération du texte des cours pour l'IA.
+import { readCache, writeCache } from "./cache.js";
 import { createGoogleDrive } from "./drive.js";
 import { createMemoryDrive } from "./memory-drive.js";
 
 export let drive = null;
 
 export async function initStorage(user) {
-  drive = user?.dev ? createMemoryDrive({ seed: true }) : createGoogleDrive();
-  await drive.ready;
+  if (user?.dev) {
+    drive = createMemoryDrive({ seed: true });
+    await drive.ready;
+  } else {
+    // L'identifiant du dossier « Studoo » est mémorisé : pas besoin de le chercher à chaque visite.
+    drive = createGoogleDrive({
+      rootId: readCache("root")?.value || null,
+      onRoot: (id) => writeCache("root", id),
+    });
+  }
   await drive.init();
+  drive.checkRoot?.().catch(() => {});
+  memoizeTree(drive);
   return drive;
+}
+
+/**
+ * La liste des cours est demandée par presque toutes les pages : on la garde
+ * 60 s en mémoire, et on l'oublie dès qu'un dossier ou un fichier est modifié.
+ */
+function memoizeTree(d) {
+  const original = d.tree.bind(d);
+  let memo = null;
+  d.tree = () => {
+    if (!memo || Date.now() - memo.at > 60e3) memo = { at: Date.now(), promise: original().catch((e) => { memo = null; throw e; }) };
+    return memo.promise;
+  };
+  for (const name of ["createCourse", "createChapter", "rename", "trash", "move", "save", "setProps"]) {
+    const fn = d[name]?.bind(d);
+    if (!fn) continue;
+    d[name] = async (...args) => {
+      const out = await fn(...args);
+      memo = null;
+      return out;
+    };
+  }
 }
 
 /** Pour les tests : remplace le stockage. */
@@ -41,9 +74,21 @@ let settingsFileId = null;
 
 export async function getSettings() {
   if (settingsCache) return settingsCache;
+  // L'identifiant du fichier de réglages est mémorisé : une seule requête au lieu de deux.
+  const knownId = drive.kind === "google" ? readCache("settingsId")?.value : null;
+  if (knownId) {
+    try {
+      settingsFileId = knownId;
+      settingsCache = { ...DEFAULT_SETTINGS, ...(await drive.readJson(knownId)) };
+      return settingsCache;
+    } catch {
+      settingsFileId = null; // fichier supprimé ou illisible : on le recherche
+    }
+  }
   const file = await drive.findSettings();
   if (file) {
     settingsFileId = file.id;
+    writeCache("settingsId", file.id);
     try {
       settingsCache = { ...DEFAULT_SETTINGS, ...(await drive.readJson(file.id)) };
     } catch {
@@ -63,6 +108,7 @@ export async function saveSettings(patch) {
   } else {
     const root = await drive.init();
     settingsFileId = (await drive.save({ parentId: root, name: "studoo-reglages.json", mimeType: "application/json", blob, kind: "settings" })).id;
+    writeCache("settingsId", settingsFileId);
   }
   settingsCache = next;
   return next;

@@ -82,8 +82,25 @@ export function createMemoryDrive({ seed = false } = {}) {
     openUrl: () => "#",
   };
 
-  api.ready = seed ? seedDemo(api) : Promise.resolve();
+  api.ready = (seed ? seedDemo(api) : Promise.resolve()).then(() => simulateLatency(api));
   return api;
+}
+
+/**
+ * Mesures de performance en local : `localStorage["studoo-latence"] = 250` ajoute
+ * 250 ms à chaque appel, comme un vrai Google Drive.
+ */
+function simulateLatency(api) {
+  let ms = 0;
+  try { ms = Number(localStorage.getItem("studoo-latence") || 0); } catch { /* indisponible */ }
+  if (!ms) return;
+  for (const [key, fn] of Object.entries(api)) {
+    if (typeof fn !== "function" || key === "openUrl") continue;
+    api[key] = async (...args) => {
+      await new Promise((r) => setTimeout(r, ms));
+      return fn(...args);
+    };
+  }
 }
 
 const md = (s) => new Blob([s], { type: "text/markdown" });

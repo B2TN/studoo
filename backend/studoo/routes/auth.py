@@ -11,8 +11,6 @@ from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token as google_id_token
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, insert, select, update
 
@@ -34,6 +32,9 @@ class CodeIn(BaseModel):
 
 
 def _verify_id_token(token: str) -> dict:
+    # Import tardif : ces bibliothèques sont lourdes et ne servent qu'à la connexion.
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
     return google_id_token.verify_oauth2_token(
         token, google_requests.Request(), get_settings().google_client_id, clock_skew_in_seconds=10,
     )
@@ -116,10 +117,12 @@ async def dev_login(response: Response):
 
 
 @router.get("/me")
-async def me(request: Request):
+async def me(request: Request, response: Response):
     """Utilisateur connecté, ou `null` (pas d'erreur 401 : c'est un cas normal)."""
     session = read_session(request)
     if not session or "sub" not in session:
+        if request.cookies:
+            clear_session(response)  # cookie expiré ou invalide : on nettoie
         return {"user": None}
     user = current_user(request)
     data = {"sub": user.sub, "email": user.email, "name": user.name, "picture": user.picture}

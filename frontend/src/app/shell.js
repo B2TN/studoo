@@ -4,6 +4,7 @@ import { signOut } from "../lib/auth.js";
 import { $, h, mount } from "../lib/dom.js";
 import { icon } from "../lib/icons.js";
 import { createRouter } from "../lib/router.js";
+import { setCacheScope } from "../lib/cache.js";
 import { initStorage } from "../lib/storage.js";
 import { errorToast, themeButtons, trackPage } from "../lib/ui.js";
 
@@ -47,7 +48,9 @@ function navLink([href, ic, label], cls = "") {
 
 export async function startShell(user) {
   ctx.user = user;
-  await initStorage(user);
+  setCacheScope(user.sub);
+  // Le stockage se prépare pendant qu'on dessine l'interface (pas d'attente à l'écran).
+  const storageReady = initStorage(user);
 
   const view = h("main", { class: "view", id: "contenu", tabindex: "-1" });
   const quotaBar = h("div", { class: "bar", role: "meter", "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": "Quota d'IA restant aujourd'hui" }, h("span"));
@@ -95,9 +98,9 @@ export async function startShell(user) {
       if (a.dataset.nav === route.nav) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     }
-    mount(view, h("div", { class: "loading" }, h("div", { class: "spinner" }), "Chargement…"));
+    mount(view, skeletonPage());
     try {
-      const mod = await route.load();
+      const [mod] = await Promise.all([route.load(), storageReady]);
       cleanup = await mod.render({ view, params, query, data, route, user, go: router.go, refreshQuota });
     } catch (err) {
       errorToast(err);
@@ -120,6 +123,15 @@ export async function startShell(user) {
       quotaBar.title = `${pct} % restant`;
     } catch { /* pas grave */ }
   }
-  refreshQuota();
+  // La jauge d'IA n'est pas urgente : on la charge après l'affichage de la page.
+  setTimeout(refreshQuota, 1500);
   await router.run();
+}
+
+/** Squelette générique affiché pendant le chargement d'une page. */
+export function skeletonPage() {
+  return h("div", { class: "skeleton-page", "aria-busy": "true", "aria-label": "Chargement" },
+    h("div", { class: "sk sk-title" }),
+    h("div", { class: "sk sk-line" }),
+    h("div", { class: "sk-grid" }, h("div", { class: "sk sk-card" }), h("div", { class: "sk sk-card" }), h("div", { class: "sk sk-card" })));
 }

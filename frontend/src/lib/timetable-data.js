@@ -45,7 +45,13 @@ export function demoEvents(now = new Date()) {
 }
 
 async function fromSource(src) {
-  if (src.type === "demo") return demoEvents();
+  if (src.type === "demo") {
+    // Démo locale : simule l'aller-retour serveur + ENT (≈ 4 × la latence choisie).
+    let ms = 0;
+    try { ms = Number(localStorage.getItem("studoo-latence") || 0) * 4; } catch { /* indisponible */ }
+    if (ms) await new Promise((r) => setTimeout(r, ms));
+    return demoEvents();
+  }
   if (src.type === "ics-url" || (src.type === "pronote" && src.icalUrl)) {
     return (await api("/api/timetable/ics-url", { method: "POST", json: { url: src.url || src.icalUrl } })).events;
   }

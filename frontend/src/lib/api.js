@@ -10,6 +10,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Mesures en local uniquement : simule l'aller-retour vers le serveur en ligne. */
+async function simulatedLatency() {
+  if (!["localhost", "127.0.0.1"].includes(location.hostname)) return;
+  let ms = 0;
+  try { ms = Number(localStorage.getItem("studoo-latence") || 0); } catch { /* indisponible */ }
+  if (ms) await new Promise((r) => setTimeout(r, ms));
+}
+
 export async function api(path, { method = "GET", json, body, headers = {}, raw = false, signal } = {}) {
   const init = { method, headers: { "X-Studoo": "1", ...headers }, credentials: "same-origin", signal };
   if (json !== undefined) {
@@ -20,6 +28,7 @@ export async function api(path, { method = "GET", json, body, headers = {}, raw 
   }
   let res;
   try {
+    await simulatedLatency();
     res = await fetch(path, init);
   } catch (err) {
     if (err.name === "AbortError") throw err;

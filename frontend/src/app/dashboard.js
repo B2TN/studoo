@@ -2,6 +2,7 @@
 import { h, mount } from "../lib/dom.js";
 import { longDate, plural, relativeDate, time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
+import { swr } from "../lib/cache.js";
 import { drive, HIDDEN_KINDS, KINDS, kindOf } from "../lib/storage.js";
 import { eventsOfDay, lessonAt, loadEvents, nextLesson } from "../lib/timetable-data.js";
 
@@ -68,27 +69,65 @@ function coursesCard(tree) {
         h("a", { class: "btn primary", href: "/cours", "data-link": "1" }, icon("folder-plus"), "Créer mon premier cours")));
 }
 
-export async function render({ view, user }) {
-  const [tree, recent, events] = await Promise.all([
-    drive.tree(),
-    drive.recent(14).then((list) => list.filter((f) => !HIDDEN_KINDS.has(kindOf(f))).slice(0, 6)),
-    loadEvents().catch(() => []),
-  ]);
+function skeletonCard(title, id, lines = 3) {
+  return h("section", { class: "card sketch", "aria-labelledby": id, "aria-busy": "true" },
+    h("h3", { id }, title), ...Array.from({ length: lines }, () => h("div", { class: "sk sk-line" })));
+}
+
+function recentCard(recent) {
+  return h("section", { class: "card sketch" }, recent.length
+    ? h("ul", { class: "files" }, recent.map((f) => fileRow(f)))
+    : h("p", { class: "empty" }, "Tes transcriptions, fiches, podcasts et vidéos apparaîtront ici."));
+}
+
+function subtitleText(events) {
   const next = nextLesson(events);
   const todayCount = eventsOfDay(events).filter((e) => !e.cancelled).length;
-  const subtitle = [longDate(), events.length ? plural(todayCount, "cours", "cours") + " aujourd'hui" : null,
+  return [longDate(), events.length ? plural(todayCount, "cours", "cours") + " aujourd'hui" : null,
     next ? `prochain : ${[next.subject, whenLabel(next.start), "à", time(next.start)].filter(Boolean).join(" ")}` : null].filter(Boolean).join(" · ");
+}
+
+/**
+ * Tableau de bord affiché IMMÉDIATEMENT : les post-it sont statiques, et chaque bloc
+ * (emploi du temps, cours, récents) montre la dernière version connue puis se met
+ * à jour tout seul quand Google Drive répond. Aucun bloc n'attend les autres.
+ */
+export async function render({ view, user }) {
+  const subtitle = h("p", {}, longDate());
+  const todaySlot = h("div", {}, skeletonCard("Aujourd'hui", "t-today"));
+  const coursesSlot = h("div", {}, skeletonCard("Mes cours", "t-courses"));
+  const recentSlot = h("div", {}, h("section", { class: "card sketch", "aria-busy": "true" }, h("div", { class: "sk sk-line" }), h("div", { class: "sk sk-line" })));
+
+  const showEvents = (events) => { mount(todaySlot, todayCard(events)); subtitle.textContent = subtitleText(events); };
+  const showTree = (tree) => mount(coursesSlot, coursesCard(tree));
+  const showRecent = (recent) => mount(recentSlot, recentCard(recent));
+
+  const sources = [
+    swr("edt", () => loadEvents().catch(() => []), showEvents, { maxAgeMs: 86400e3 }),
+    swr("tree", () => drive.tree(), showTree),
+    swr("recent", () => drive.recent(14).then((list) => list.filter((f) => !HIDDEN_KINDS.has(kindOf(f))).slice(0, 6)), showRecent),
+  ];
+  const [edt, tree, recent] = sources;
+  if (edt.cached) showEvents(edt.cached);
+  if (tree.cached) showTree(tree.cached);
+  if (recent.cached) showRecent(recent.cached);
 
   mount(view,
     h("section", { class: "hello" }, mascotSvg(),
-      h("div", {}, h("h1", {}, "Salut ", h("span", { class: "hl" }, firstName(user)), " !"), h("p", {}, subtitle))),
+      h("div", {}, h("h1", {}, "Salut ", h("span", { class: "hl" }, firstName(user)), " !"), subtitle)),
     h("h2", { class: "section" }, "Qu'est-ce qu'on fait ?"),
     h("div", { class: "tools" }, TOOLS.map(([href, color, ic, title, sub]) =>
       h("a", { class: `postit c-${color}`, href, "data-link": "1" }, h("span", { class: "tape" }), icon(ic, { doodle: true }),
         h("strong", {}, title), h("small", {}, sub)))),
-    h("div", { class: "cols" }, todayCard(events), coursesCard(tree)),
+    h("div", { class: "cols" }, todaySlot, coursesSlot),
     h("h2", { class: "section" }, h("span", { class: "hl pink" }, "Récemment")),
-    h("section", { class: "card sketch" }, recent.length
-      ? h("ul", { class: "files" }, recent.map((f) => fileRow(f)))
-      : h("p", { class: "empty" }, "Tes transcriptions, fiches, podcasts et vidéos apparaîtront ici.")));
+    recentSlot);
+  performance.mark("studoo:affichage");
+
+  // Les données fraîches arrivent en arrière-plan ; la page reste utilisable pendant ce temps.
+  Promise.allSettled(sources.map((s) => s.fresh)).then((results) => {
+    performance.mark("studoo:donnees");
+    const failed = results.find((r) => r.status === "rejected");
+    if (failed && !tree.cached) mount(coursesSlot, h("section", { class: "card sketch" }, h("p", { class: "error" }, failed.reason?.message || "Google Drive ne répond pas.")));
+  });
 }

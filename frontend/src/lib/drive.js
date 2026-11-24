@@ -45,8 +45,8 @@ async function list(query, { orderBy = "folder,name", pageSize = 200 } = {}) {
 
 const byProp = (key, value) => `appProperties has { key='${key}' and value='${q(value)}' } and trashed = false`;
 
-export function createGoogleDrive() {
-  let rootId = null;
+export function createGoogleDrive({ rootId: knownRoot = null, onRoot } = {}) {
+  let rootId = knownRoot;
 
   async function createFolder(name, parentId, props) {
     const res = await call(`${API}/files?fields=${FIELDS}`, {
@@ -84,7 +84,19 @@ export function createGoogleDrive() {
       if (rootId) return rootId;
       const found = await list(byProp("studoo", "root"));
       rootId = found[0]?.id || (await createFolder("Studoo", null, { studoo: "root" })).id;
+      onRoot?.(rootId);
       return rootId;
+    },
+
+    /** Vérifie (en arrière-plan) que le dossier mémorisé existe toujours ; sinon on le recrée. */
+    async checkRoot() {
+      if (!rootId) return;
+      try {
+        const meta = await (await call(`${API}/files/${rootId}?fields=id,trashed`)).json();
+        if (!meta.trashed) return;
+      } catch { /* dossier introuvable */ }
+      rootId = null;
+      await this.init();
     },
 
     async tree() {

@@ -12,9 +12,7 @@ from datetime import date, datetime, time, timedelta
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
-import recurring_ical_events
 from fastapi import HTTPException
-from icalendar import Calendar
 
 MAX_BYTES = 3 * 1024 * 1024
 MAX_EVENTS = 3000
@@ -107,6 +105,10 @@ def _iso(value) -> str:
 
 
 def parse_ics(text: str, start: date, end: date) -> dict:
+    # Import tardif : la lecture iCal ne sert qu'aux pages d'emploi du temps.
+    import recurring_ical_events
+    from icalendar import Calendar
+
     try:
         cal = Calendar.from_ical(text)
     except ValueError:

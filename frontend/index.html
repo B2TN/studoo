@@ -120,7 +120,16 @@
   </div>
 
   <!-- ============ APPLICATION (utilisateur connecté) ============ -->
-  <div id="app" aria-live="polite"></div>
+  <div id="app" aria-live="polite">
+    <div class="app-boot" aria-busy="true" aria-label="Chargement de ton tableau de bord">
+      <div class="boot-top"></div>
+      <div class="skeleton-page">
+        <div class="sk sk-title"></div>
+        <div class="sk sk-line"></div>
+        <div class="sk-grid"><div class="sk sk-card"></div><div class="sk sk-card"></div><div class="sk sk-card"></div></div>
+      </div>
+    </div>
+  </div>
 
   <footer class="site-footer">
     <nav aria-label="Liens légaux">
