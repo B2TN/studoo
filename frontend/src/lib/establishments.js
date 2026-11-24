@@ -1,9 +1,9 @@
 // Services d'emploi du temps pris en charge.
 //
 // Honnêteté : aucun de ces services n'a d'API publique officielle.
-// - Pronote : connecteur non officiel (Pawnote) par QR code, ou lien iCal.
+// - Pronote et 26 ENT régionaux : connecteur non officiel (pronotepy, côté serveur), QR code ou identifiants.
 // - Universités : l'emploi du temps (ADE, Celcat, HyperPlanning…) propose presque
-//   toujours un lien iCal personnel. Studoo guide l'étudiant pour le récupérer, puis
+//   un lien iCal personnel ; connexion automatique prévue sur le serveur de tâches, puis
 //   le synchronise en continu (les dates des liens ADE sont mises à jour automatiquement).
 
 export const HIGH_SCHOOL_SERVICES = [
