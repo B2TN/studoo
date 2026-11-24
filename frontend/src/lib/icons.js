@@ -11,6 +11,7 @@ import check from "@tabler/icons/outline/check.svg?raw";
 import chevronRight from "@tabler/icons/outline/chevron-right.svg?raw";
 import download from "@tabler/icons/outline/download.svg?raw";
 import edit from "@tabler/icons/outline/edit.svg?raw";
+import externalLink from "@tabler/icons/outline/external-link.svg?raw";
 import file from "@tabler/icons/outline/file.svg?raw";
 import fileText from "@tabler/icons/outline/file-text.svg?raw";
 import fileTypePdf from "@tabler/icons/outline/file-type-pdf.svg?raw";
@@ -51,7 +52,7 @@ import x from "@tabler/icons/outline/x.svg?raw";
 const ICONS = {
   "alert-triangle": alertTriangle, "arrow-left": arrowLeft, "arrow-right": arrowRight, bulb,
   "calendar-week": calendarWeek, camera, "chart-bar": chartBar, check, "chevron-right": chevronRight,
-  download, edit, file, "file-text": fileText, "file-type-pdf": fileTypePdf, "file-upload": fileUpload,
+  download, edit, "external-link": externalLink, file, "file-text": fileText, "file-type-pdf": fileTypePdf, "file-upload": fileUpload,
   folder, "folder-plus": folderPlus, folders, headphones, "layout-dashboard": layoutDashboard, link,
   logout, mail, microphone, moon, movie, notes, photo, "player-pause": playerPause, "player-play": playerPlay,
   "player-stop": playerStop, plus, printer, qrcode, refresh, rotate, school, search, settings,

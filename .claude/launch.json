@@ -4,25 +4,41 @@
     {
       "name": "api",
       "runtimeExecutable": ".venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "studoo.main:app", "--app-dir", "backend", "--port", "8000", "--reload", "--reload-dir", "backend"],
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "studoo.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "backend"
+      ],
       "port": 8000
-    },
-    {
-      "name": "pronote",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["scripts/dev-pronote.js"],
-      "port": 8001
     },
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "maquette",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5510", "--bind", "127.0.0.1"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5510",
+        "--bind",
+        "127.0.0.1"
+      ],
       "port": 5510
     }
   ]

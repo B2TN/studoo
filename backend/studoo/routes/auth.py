@@ -18,7 +18,6 @@ from .. import db
 from ..config import get_settings
 from ..deps import User, clear_session, current_user, read_session, write_session
 from ..limits import client_ip, rate_limit
-from ..security import sign_service_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -149,12 +148,6 @@ async def access_token(user: Annotated[User, Depends(current_user)], response: R
         raise HTTPException(401, detail={"code": "session_expired", "message": "Ta session a expiré, reconnecte-toi."})
     data = res.json()
     return {"accessToken": data["access_token"], "expiresIn": data.get("expires_in", 3599)}
-
-
-@router.get("/service-token")
-async def service_token(user: Annotated[User, Depends(current_user)]):
-    """Jeton court pour appeler la fonction Pronote (Node)."""
-    return {"token": sign_service_token(user.sub)}
 
 
 @router.post("/logout")

@@ -135,3 +135,41 @@ def parse_ics(text: str, start: date, end: date) -> dict:
     events.sort(key=lambda e: e["start"])
     subjects = sorted({e["subject"] for e in events})
     return {"events": events, "subjects": subjects}
+
+
+def url_variants(url: str) -> list[str]:
+    """Formes à essayer pour un lien d'emploi du temps (« teste tout ») :
+    le lien tel quel (dates ADE prolongées), puis, pour ADE, le format iCal forcé
+    et la version « N semaines » qui n'a jamais besoin d'être mise à jour."""
+    base = normalize_url(url)
+    variants = [base]
+    parsed = urlparse(base)
+    params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    if "anonymous_cal.jsp" in parsed.path or "resources" in params:
+        forced = {**params, "calType": "ical"}
+        variants.append(urlunparse(parsed._replace(query=urlencode(forced))))
+        weeks = {k: v for k, v in forced.items() if k not in {"firstDate", "lastDate"}}
+        weeks["nbWeeks"] = "26"
+        variants.append(urlunparse(parsed._replace(query=urlencode(weeks))))
+    if parsed.scheme == "http":
+        variants += [v.replace("http://", "https://", 1) for v in list(variants)]
+    seen, out = set(), []
+    for v in variants:
+        if v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
+async def fetch_working(url: str, start: date, end: date) -> tuple[str, dict]:
+    """Essaie chaque variante et renvoie la première qui donne un vrai calendrier."""
+    last_error: HTTPException | None = None
+    for candidate in url_variants(url):
+        try:
+            text = await fetch_ics(candidate)
+            if "BEGIN:VCALENDAR" not in text[:2000]:
+                raise _bad("Ce lien renvoie une page web, pas un calendrier. As-tu bien copié le lien « Exporter / iCal » ?")
+            return candidate, parse_ics(text, start, end)
+        except HTTPException as exc:
+            last_error = exc
+    raise last_error or _bad("Lien d'emploi du temps inutilisable.")

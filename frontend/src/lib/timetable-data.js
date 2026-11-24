@@ -19,9 +19,9 @@ export function clearTimetableCache() {
   try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignoré */ }
 }
 
-export async function pronoteCall(body) {
-  const { token } = await api("/api/auth/service-token");
-  return api("/api/pronote", { method: "POST", json: body, headers: { Authorization: `Bearer ${token}` } });
+/** Connexion Pronote (QR code, identifiants Pronote ou ENT). Renvoie la source scellée. */
+export function pronoteLogin(body) {
+  return api("/api/timetable/pronote", { method: "POST", json: body });
 }
 
 /** Emploi du temps fictif (mode démo local uniquement). */
@@ -52,12 +52,20 @@ async function fromSource(src) {
     if (ms) await new Promise((r) => setTimeout(r, ms));
     return demoEvents();
   }
+  if (src.type === "sealed") {
+    // Source chiffrée : seul le serveur sait la lire.
+    const res = await api("/api/timetable/sync", { method: "POST", json: { sealed: src.sealed } });
+    if (res.sealed) await updateSource(src.id, { sealed: res.sealed }); // Pronote renouvelle son jeton à chaque connexion
+    return res.events;
+  }
   if (src.type === "ics-url" || (src.type === "pronote" && src.icalUrl)) {
-    return (await api("/api/timetable/ics-url", { method: "POST", json: { url: src.url || src.icalUrl } })).events;
+    // Ancien format (lien en clair) : on le remplace par sa version scellée.
+    const res = await api("/api/timetable/ics-url", { method: "POST", json: { url: src.url || src.icalUrl } });
+    await updateSource(src.id, { type: "sealed", sealed: res.sealed, url: undefined, icalUrl: undefined });
+    return res.events;
   }
   if (src.type === "pronote" && src.blob) {
-    const res = await pronoteCall({ action: "sync", blob: src.blob, deviceUUID: src.deviceUUID });
-    return res.events;
+    throw new Error("Ta connexion Pronote doit être refaite (nouvelle méthode plus sûre). Va dans « Emploi du temps ».");
   }
   if (src.type === "ics-file" && src.fileId) {
     const content = await drive.readText(src.fileId);
@@ -91,6 +99,18 @@ export async function addSource(source) {
   clearTimetableCache();
 }
 
+async function updateSource(id, patch) {
+  const settings = await getSettings();
+  const sources = (settings.timetable?.sources || []).map((s) => {
+    if (s.id !== id) return s;
+    const next = { ...s, ...patch };
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    return next;
+  });
+  await saveSettings({ timetable: { ...settings.timetable, sources } });
+}
+
+/** Retirer une source = révoquer son jeton : il est supprimé du Drive et n'est plus utilisable. */
 export async function removeSource(id) {
   const settings = await getSettings();
   await saveSettings({ timetable: { ...settings.timetable, sources: (settings.timetable?.sources || []).filter((s) => s.id !== id) } });

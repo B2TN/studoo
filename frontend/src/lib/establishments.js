@@ -7,21 +7,32 @@
 //   le synchronise en continu (les dates des liens ADE sont mises à jour automatiquement).
 
 export const HIGH_SCHOOL_SERVICES = [
-  { id: "pronote", name: "Pronote", connector: "pronote", note: "Connexion par QR code (recommandé) ou lien iCal." },
-  { id: "monlycee", name: "Monlycée.net (Île-de-France)", connector: "pronote", note: "L'emploi du temps vient de Pronote : utilise le QR code Pronote." },
-  { id: "mbn", name: "Mon Bureau Numérique (Grand Est)", connector: "pronote", note: "Ouvre Pronote depuis l'ENT, puis utilise le QR code." },
-  { id: "skolengo", name: "Skolengo / ENT régionaux", connector: "pronote", note: "Si ton établissement utilise Pronote : QR code. Sinon, lien iCal s'il est proposé." },
-  { id: "hdf", name: "ENT Hauts-de-France", connector: "pronote", note: "Ouvre Pronote depuis l'ENT, puis utilise le QR code." },
-  { id: "toutatice", name: "Toutatice (Bretagne)", connector: "pronote", note: "Ouvre Pronote depuis Toutatice, puis utilise le QR code." },
+  { id: "pronote", name: "Pronote", connector: "pronote", note: "Compte Pronote direct (sans ENT) : QR code, identifiants Pronote ou lien iCal." },
+  { id: "monlycee", name: "Monlycée.net (Île-de-France)", short: "Monlycée.net", ent: "ile_de_france", connector: "pronote", note: "Connexion avec tes identifiants Monlycée.net, ou par QR code / lien iCal depuis Pronote." },
+  { id: "mbn", name: "Mon Bureau Numérique (Grand Est)", short: "Mon Bureau Numérique", ent: "monbureaunumerique", connector: "pronote", note: "Connexion avec tes identifiants Mon Bureau Numérique, ou par QR code / lien iCal." },
+  { id: "hdf", name: "ENT Hauts-de-France", short: "ENT HDF", ent: "ent_hdf", connector: "pronote", note: "Connexion avec tes identifiants ENT HDF, ou par QR code / lien iCal." },
+  { id: "toutatice", name: "Toutatice (Bretagne)", short: "Toutatice", ent: "ac_rennes", connector: "pronote", note: "Connexion avec tes identifiants Toutatice, ou par QR code / lien iCal." },
+  { id: "eclat", name: "Éclat-BFC (Bourgogne-Franche-Comté)", short: "Éclat-BFC", ent: "eclat_bfc", connector: "pronote", note: "Connexion avec tes identifiants Éclat-BFC, ou par QR code / lien iCal." },
+  { id: "atrium", name: "Atrium (Provence-Alpes-Côte d'Azur)", short: "Atrium", ent: "atrium_sud", connector: "pronote", note: "Connexion avec tes identifiants Atrium, ou par QR code / lien iCal." },
+  { id: "autre-ent", name: "Autre ENT régional", short: "ENT", ent: "*", connector: "pronote", note: "Choisis ton ENT dans la liste (26 ENT pris en charge), ou utilise le QR code / lien iCal Pronote." },
+  { id: "skolengo", name: "Skolengo", connector: "pronote", note: "Skolengo n'est pas pris en charge par le connecteur : si ton lycée utilise Pronote, prends le QR code ou le lien iCal." },
   { id: "ecoledirecte", name: "ÉcoleDirecte", connector: "ics", note: "ÉcoleDirecte ne propose pas d'export iCal : importe un fichier .ics si ton établissement en fournit un." },
 ];
 
 // Les 20 plus grands établissements d'enseignement supérieur (par nombre d'étudiants).
+const STEPS_PARIS_CITE = [
+  "Clique sur « Ouvrir l'emploi du temps ADE » : la page officielle de l'Université Paris Cité s'ouvre (connexion avec ton identifiant ENT habituel).",
+  "Choisis ta formation / ton groupe dans l'arborescence (IUT de Paris – Rives de Seine → ton BUT → ton groupe).",
+  "Clique sur « Export Agenda », choisis une date de début et de fin, puis « Générer URL ».",
+  "Copie le lien généré (il contient « anonymous_cal.jsp ») et colle-le ci-dessous.",
+];
+
 export const UNIVERSITIES = [
+  { name: "IUT de Paris – Rives de Seine", city: "Université Paris Cité", url: "https://iutparis-seine.u-paris.fr", ade: "https://adeconsult.app.u-pariscite.fr/direct/", steps: STEPS_PARIS_CITE },
   { name: "Aix-Marseille Université", city: "Marseille", url: "https://www.univ-amu.fr" },
   { name: "Université de Lorraine", city: "Nancy / Metz", url: "https://www.univ-lorraine.fr" },
   { name: "Université de Lille", city: "Lille", url: "https://www.univ-lille.fr" },
-  { name: "Université Paris Cité", city: "Paris", url: "https://u-paris.fr" },
+  { name: "Université Paris Cité", city: "Paris", url: "https://u-paris.fr", ade: "https://adeconsult.app.u-pariscite.fr/direct/", steps: STEPS_PARIS_CITE },
   { name: "Sorbonne Université", city: "Paris", url: "https://www.sorbonne-universite.fr" },
   { name: "Université Paris 1 Panthéon-Sorbonne", city: "Paris", url: "https://www.pantheonsorbonne.fr" },
   { name: "Université de Bordeaux", city: "Bordeaux", url: "https://www.u-bordeaux.fr" },

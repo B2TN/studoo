@@ -4,7 +4,7 @@ import { h, mount } from "../lib/dom.js";
 import { time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
 import { drive, getSettings } from "../lib/storage.js";
-import { addSource, clearTimetableCache, loadEvents, pronoteCall, removeSource } from "../lib/timetable-data.js";
+import { addSource, clearTimetableCache, loadEvents, pronoteLogin, removeSource } from "../lib/timetable-data.js";
 import {
   detectSoftware, HIGH_SCHOOL_SERVICES, ICAL_STEPS_PRONOTE, ICAL_STEPS_UNIVERSITY, QR_STEPS_PRONOTE, UNIVERSITIES,
 } from "../lib/establishments.js";
@@ -42,7 +42,7 @@ function weekView(events, monday) {
 }
 
 // ---------- Ajout d'un lien / fichier .ics ----------
-function icsForm({ steps, label = "Lien de ton emploi du temps", onDone, sourceType = "ics-url", extra = {} }) {
+function icsForm({ steps, label = "Lien de ton emploi du temps", onDone, extra = {}, open = null }) {
   const input = h("input", { class: "input", id: "ics-url", type: "url", inputmode: "url", placeholder: "https://…/calendar.ics", autocomplete: "off" });
   const hint = h("span", { class: "hint", "aria-live": "polite" });
   const err = h("p", { class: "error", role: "alert" });
@@ -56,7 +56,8 @@ function icsForm({ steps, label = "Lien de ton emploi du temps", onDone, sourceT
     btn.disabled = true;
     try {
       const res = await api("/api/timetable/ics-url", { method: "POST", json: { url } });
-      await addSource({ type: sourceType, url: res.url, label: detectSoftware(url) || "Lien iCal", ...extra });
+      // Seule la version chiffrée du lien est rangée dans ton Drive.
+      await addSource({ type: "sealed", sealed: res.sealed, label: detectSoftware(url) || "Lien iCal", ...extra });
       toast(`${res.events.length} cours trouvés !`, "success");
       onDone(res.subjects);
     } catch (e2) {
@@ -65,6 +66,7 @@ function icsForm({ steps, label = "Lien de ton emploi du temps", onDone, sourceT
       btn.disabled = false;
     }
   } },
+    open ? h("p", {}, h("a", { class: "btn", href: open.url, target: "_blank", rel: "noopener" }, icon("external-link"), open.label)) : null,
     steps ? h("ol", { class: "steps-list" }, steps.map((s) => h("li", {}, s))) : null,
     h("div", { class: "field" }, h("label", { for: "ics-url" }, label), input, hint),
     err, h("div", {}, btn));
@@ -150,11 +152,12 @@ function pronoteQrForm(onDone) {
     err.textContent = "";
     if (!qrData) { err.textContent = "Scanne d'abord le QR code."; return; }
     if (!/^\d{4}$/.test(pin.value)) { err.textContent = "Le code doit contenir 4 chiffres."; pin.focus(); return; }
+    let qr;
+    try { qr = JSON.parse(qrData); } catch { err.textContent = "Ce QR code ne vient pas de Pronote."; return; }
     submit.disabled = true;
     try {
-      const res = await pronoteCall({ action: "qr", qr: qrData, pin: pin.value, deviceUUID: deviceId() });
-      await addSource(res.icalUrl ? { type: "pronote", icalUrl: res.icalUrl, label: "Pronote (lien iCal)" } : { type: "pronote", blob: res.blob, deviceUUID: deviceId(), label: "Pronote" });
-      toast(`Pronote connecté : ${res.events.length} cours trouvés.`, "success");
+      const res = await pronoteLogin({ mode: "qr", qr, pin: pin.value, uuid: deviceId() });
+      await saveResult(res, "Pronote (QR code)");
       stop();
       onDone(res.subjects);
     } catch (e2) {
@@ -169,8 +172,58 @@ function pronoteQrForm(onDone) {
     video, qrState,
     h("div", { class: "field" }, h("label", { for: "pin" }, "Code à 4 chiffres choisi dans Pronote"), pin),
     err, h("div", {}, submit),
-    h("p", { class: "small muted" }, icon("shield-lock"), " Ton mot de passe n'est jamais demandé. Si Pronote fournit un lien iCal, Studoo ne garde que ce lien ; sinon, un jeton de reconnexion chiffré est rangé dans ton Drive. Connecteur non officiel : il peut cesser de fonctionner après une mise à jour de Pronote."));
+    h("p", { class: "small muted" }, icon("shield-lock"), " Aucun mot de passe. Studoo garde seulement un jeton chiffré (le lien iCal de ton compte, ou à défaut le jeton de reconnexion Pronote), rangé dans ton Drive. Connecteur non officiel : il peut cesser de fonctionner après une mise à jour de Pronote."));
   return { el: form, stop };
+}
+
+/** Enregistre le résultat d'une connexion Pronote : uniquement le jeton chiffré. */
+async function saveResult(res, label) {
+  if (res.sealed) {
+    await addSource({ type: "sealed", sealed: res.sealed, label: res.method === "ical" ? `${label} · lien iCal` : label });
+    toast(`Pronote connecté : ${res.events.length} cours trouvés.`, "success");
+  } else {
+    toast(`${res.events.length} cours récupérés. Ton établissement ne permet pas la synchro automatique : reconnecte-toi pour mettre à jour.`, "info", 9000);
+  }
+}
+
+/** Connexion par identifiants (Pronote direct ou ENT régional). Le mot de passe sert une fois, puis est oublié. */
+function pronotePasswordForm({ ent = "", entName = "", onDone, ents = [] }) {
+  const url = h("input", { class: "input", id: "pn-url", type: "url", inputmode: "url", placeholder: "https://0750000a.index-education.net/pronote/eleve.html", autocomplete: "off" });
+  const user = h("input", { class: "input", id: "pn-user", autocomplete: "off", autocapitalize: "none", spellcheck: false });
+  const pass = h("input", { class: "input", id: "pn-pass", type: "password", autocomplete: "off" });
+  const entSelect = ents.length ? h("select", { class: "input", id: "pn-ent" },
+    h("option", { value: "" }, "Choisis ton ENT…"), ents.map((e) => h("option", { value: e.id }, e.name))) : null;
+  const err = h("p", { class: "error", role: "alert" });
+  const submit = h("button", { class: "btn primary", type: "submit" }, icon("check"), "Se connecter");
+  return h("form", { class: "stack", novalidate: true, autocomplete: "off", onsubmit: async (e) => {
+    e.preventDefault();
+    err.textContent = "";
+    const chosenEnt = ent || entSelect?.value || "";
+    if (entSelect && !chosenEnt) { err.textContent = "Choisis ton ENT dans la liste."; entSelect.focus(); return; }
+    if (!/^https:\/\/\S+pronote/i.test(url.value.trim())) { err.textContent = "Colle l'adresse de ta page Pronote (https://…pronote…)."; url.focus(); return; }
+    if (!user.value.trim() || !pass.value) { err.textContent = "Identifiant et mot de passe requis."; return; }
+    submit.disabled = true;
+    submit.replaceChildren(h("span", { class: "spinner", style: { width: "22px", height: "22px" } }), "Connexion…");
+    try {
+      const res = await pronoteLogin({ mode: chosenEnt ? "ent" : "password", ent: chosenEnt, url: url.value.trim(), username: user.value.trim(), password: pass.value });
+      await saveResult(res, entName ? `Pronote via ${entName}` : "Pronote");
+      onDone(res.subjects);
+    } catch (e2) {
+      err.textContent = e2.message;
+    } finally {
+      pass.value = ""; // on efface le mot de passe du formulaire dans tous les cas
+      submit.disabled = false;
+      submit.replaceChildren(icon("check"), "Se connecter");
+    }
+  } },
+    entSelect ? h("div", { class: "field" }, h("label", { for: "pn-ent" }, "Ton ENT"), entSelect) : null,
+    h("div", { class: "field" }, h("label", { for: "pn-url" }, "Adresse de ta page Pronote"), url,
+      h("span", { class: "hint" }, "Ouvre Pronote dans ton navigateur et copie l'adresse en haut (elle contient « index-education.net/pronote »).")),
+    h("div", { class: "field" }, h("label", { for: "pn-user" }, entName ? `Identifiant ${entName}` : "Identifiant Pronote"), user),
+    h("div", { class: "field" }, h("label", { for: "pn-pass" }, "Mot de passe"), pass),
+    err, h("div", {}, submit),
+    h("p", { class: "small muted" }, icon("shield-lock"),
+      " Ton mot de passe passe une seule fois, en HTTPS, par le serveur de Studoo pour ouvrir ta session Pronote. Il n'est jamais enregistré ni écrit dans les journaux. Studoo garde ensuite seulement le lien iCal chiffré de ton compte."));
 }
 
 function afterImport(go) {
@@ -181,30 +234,46 @@ function afterImport(go) {
   };
 }
 
+let entsPromise = null;
+const loadEnts = () => (entsPromise ||= api("/api/timetable/ents").then((r) => r.ents).catch(() => []));
+
+/** Fenêtre de connexion d'un service lycée : QR code, identifiants (ENT ou Pronote), lien iCal. */
+function openHighSchool(s, done) {
+  let qr = null;
+  openDialog(s.name, (close) => {
+    const finish = (x) => { close(); done(x); };
+    if (s.connector === "ics") return h("div", { class: "stack" }, h("p", {}, s.note), icsFileForm(finish));
+    qr = pronoteQrForm(finish);
+    const pwdSlot = h("div");
+    if (s.ent === "*") loadEnts().then((ents) => mount(pwdSlot, pronotePasswordForm({ ents, entName: "ENT", onDone: finish })));
+    else mount(pwdSlot, pronotePasswordForm({ ent: s.ent || "", entName: s.ent ? s.short || s.name : "", onDone: finish }));
+    return h("div", { class: "stack" }, h("p", { class: "small" }, s.note),
+      h("details", { open: true }, h("summary", {}, h("strong", {}, "Méthode 1 : QR code (recommandée, aucun mot de passe)")), qr.el),
+      h("details", {}, h("summary", {}, h("strong", {}, s.ent ? `Méthode 2 : identifiants ${s.short || "ENT"}` : "Méthode 2 : identifiants Pronote")), pwdSlot),
+      h("details", {}, h("summary", {}, h("strong", {}, "Méthode 3 : lien iCal depuis Pronote (aucun mot de passe)")),
+        icsForm({ steps: ICAL_STEPS_PRONOTE, onDone: finish })));
+  }, { onClose: () => qr?.stop() });
+}
+
 function addPanel(go) {
   const done = afterImport(go);
   const tabs = [
     ["Je suis au lycée", () => h("div", { class: "stack" },
       h("p", {}, "Choisis ton service :"),
-      h("div", { class: "establishments" }, HIGH_SCHOOL_SERVICES.map((s) => h("button", { class: "btn", type: "button", onclick: () => {
-        let qr = null;
-        openDialog(s.name, (close) => {
-          if (s.connector === "ics") return h("div", { class: "stack" }, h("p", {}, s.note), icsFileForm((x) => { close(); done(x); }));
-          qr = pronoteQrForm((x) => { close(); done(x); });
-          return h("div", { class: "stack" }, h("p", { class: "small" }, s.note),
-            h("details", { open: true }, h("summary", {}, h("strong", {}, "Méthode 1 : QR code (recommandée)")), qr.el),
-            h("details", {}, h("summary", {}, h("strong", {}, "Méthode 2 : lien iCal Pronote")),
-              icsForm({ steps: ICAL_STEPS_PRONOTE, sourceType: "ics-url", onDone: (x) => { close(); done(x); } })));
-        }, { onClose: () => qr?.stop() });
-      } }, icon("school"), h("span", {}, h("strong", {}, s.name)))))),
+      h("div", { class: "establishments" }, HIGH_SCHOOL_SERVICES.map((s) => h("button", { class: "btn", type: "button", onclick: () => openHighSchool(s, done) },
+        icon("school"), h("span", {}, h("strong", {}, s.name)))))),
     ],
     ["Je suis étudiant·e", () => h("div", { class: "stack" },
-      h("p", {}, "Choisis ton établissement (20 plus grands en France), ou « Autre » :"),
+      h("p", {}, "Choisis ton établissement, ou « Autre » :"),
       h("div", { class: "establishments" }, [...UNIVERSITIES, { name: "Autre établissement", city: "", url: "" }].map((u) =>
         h("button", { class: "btn", type: "button", onclick: () => openDialog(u.name, (close) => h("div", { class: "stack" },
           u.url ? h("p", {}, "Site de l'établissement : ", h("a", { href: u.url, target: "_blank", rel: "noopener" }, u.url.replace("https://", ""))) : null,
-          icsForm({ steps: ICAL_STEPS_UNIVERSITY, onDone: (x) => { close(); done(x); }, extra: { establishment: u.name } }),
-          h("p", { class: "small muted" }, "Les liens ADE sont automatiquement prolongés : ton emploi du temps reste à jour toute l'année."))) },
+          icsForm({
+            steps: u.steps || ICAL_STEPS_UNIVERSITY,
+            open: u.ade ? { url: u.ade, label: "Ouvrir l'emploi du temps ADE (connexion officielle)" } : null,
+            onDone: (x) => { close(); done(x); }, extra: { establishment: u.name },
+          }),
+          h("p", { class: "small muted" }, icon("shield-lock"), " Tu te connectes sur la page officielle de ton université : Studoo ne voit jamais ton mot de passe. Il garde seulement le lien d'export, chiffré. Studoo teste automatiquement plusieurs formats du lien (iCal forcé, période glissante) pour qu'il reste valable toute l'année."))) },
           icon("school"), h("span", {}, h("strong", {}, u.name), u.city ? h("span", { class: "small muted" }, ` · ${u.city}`) : null))))),
     ],
     ["Lien ou fichier .ics", () => h("div", { class: "stack" },
@@ -247,9 +316,9 @@ export async function render({ view, query, go }) {
       weekView(events, monday),
       h("h2", { class: "section" }, "Sources connectées"),
       h("ul", { class: "files card sketch" }, sources.map((s) => h("li", {},
-        h("span", { class: "kind c-lilac" }, icon(s.type === "pronote" ? "school" : "link")),
+        h("span", { class: "kind c-lilac" }, icon(/pronote/i.test(s.label || "") ? "school" : "link")),
         h("span", {}, h("strong", {}, s.label || s.type), s.establishment ? h("span", { class: "small muted" }, ` · ${s.establishment}`) : null),
-        h("span", { class: "meta" }, h("button", { class: "btn small danger", onclick: async () => { await removeSource(s.id); go(location.pathname, { replace: true }); } }, icon("trash"), "Retirer"))))),
+        h("span", { class: "meta" }, h("button", { class: "btn small danger", title: "Supprime le jeton chiffré : Studoo ne pourra plus lire cet emploi du temps", onclick: async () => { await removeSource(s.id); toast("Déconnecté : le jeton a été supprimé.", "success"); go(location.pathname, { replace: true }); } }, icon("logout"), "Déconnecter"))))),
     ] : h("p", { class: "muted" }, "Connecte ton emploi du temps : Studoo saura quel cours tu enregistres et créera tes dossiers de matières."),
     addPanel(go));
 }

@@ -18,8 +18,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // En local : /api/pronote → petit serveur Node, le reste → FastAPI
-      "/api/pronote": "http://127.0.0.1:8001",
+      // En local : /api → FastAPI (uvicorn sur le port 8000)
       "/api": "http://127.0.0.1:8000",
     },
   },

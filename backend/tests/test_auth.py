@@ -2,7 +2,7 @@ import respx
 from httpx import Response
 
 from studoo.routes import auth
-from studoo.security import decrypt_json, encrypt_json, sign_service_token, verify_service_token
+from studoo.security import decrypt_json, encrypt_json
 
 DRIVE = "https://www.googleapis.com/auth/drive.file"
 
@@ -12,14 +12,6 @@ def test_encrypt_roundtrip_and_tamper():
     assert "secret" not in token
     assert decrypt_json(token) == {"sub": "1", "rt": "secret"}
     assert decrypt_json(token[:-4] + "AAAA") is None
-
-
-def test_service_token():
-    tok = sign_service_token("abc")
-    assert verify_service_token(tok) == "abc"
-    payload, sig = tok.split(".")
-    assert verify_service_token(payload + "." + sig[::-1]) is None
-    assert verify_service_token(sign_service_token("abc", ttl=-1)) is None
 
 
 def test_me_requires_login(client):
