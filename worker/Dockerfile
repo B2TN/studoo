@@ -2,7 +2,7 @@
 # Construit depuis la racine du dépôt :  docker build -f worker/Dockerfile .
 
 # 1) Programme officiel llama.cpp (modèle de langage), déjà compilé
-FROM ghcr.io/ggml-org/llama.cpp:server-b12674 AS llama
+FROM ghcr.io/ggml-org/llama.cpp:server-b12679 AS llama
 
 # 2) Image du worker
 FROM python:3.12-slim
