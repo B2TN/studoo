@@ -12,7 +12,7 @@
 #   4. les clés de .env.worker deviennent des « secrets » du job (lues sur TON PC, jamais affichées).
 # On peut le relancer sans risque (après une mise à jour du code, par exemple).
 param(
-    [string]$Location = "francecentral",
+    [string]$Location = "",   # vide = choisie automatiquement parmi les régions autorisées par l'abonnement
     [string]$Image = "ghcr.io/b2tn/studoo-worker:latest",
     [string]$EnvFile = ".env.worker"
 )
@@ -41,7 +41,20 @@ Write-Host "1/5 Préparation de l'abonnement Azure…"
 Invoke-AzCli extension add --name containerapp --upgrade --only-show-errors | Out-Null
 Invoke-AzCli provider register --namespace Microsoft.App --wait | Out-Null
 Invoke-AzCli provider register --namespace Microsoft.Storage --wait | Out-Null
-Invoke-AzCli group create --name $Group --location $Location --only-show-errors | Out-Null
+if (-not $Location) {
+    # Azure for Students n'autorise que quelques régions (règle « Allowed resource deployment regions »).
+    # On prend la plus proche de la France, dans l'Union européenne si possible (RGPD).
+    $allowed = @(Invoke-AzCli policy assignment list --query "[].parameters.listOfAllowedLocations.value[]" -o tsv)
+    $preferred = "francecentral", "italynorth", "spaincentral", "germanywestcentral", "westeurope", "northeurope",
+                 "swedencentral", "polandcentral", "austriaeast", "belgiumcentral", "switzerlandnorth", "norwayeast", "uksouth"
+    $Location = if ($allowed.Count -eq 0) { "francecentral" } else { $preferred | Where-Object { $allowed -contains $_ } | Select-Object -First 1 }
+    if (-not $Location) { throw "Aucune région européenne autorisée ($($allowed -join ', ')) : relance avec -Location <région>." }
+}
+Write-Host "    Région : $Location"
+# Le groupe n'est qu'un dossier : s'il existe déjà (même dans une autre région), on le garde.
+if ((Invoke-AzCli group exists --name $Group) -ne "true") {
+    Invoke-AzCli group create --name $Group --location $Location --only-show-errors | Out-Null
+}
 
 Write-Host "2/5 File de réveil (Azure Storage)…"
 $account = Invoke-AzCli storage account list --resource-group $Group --query "[0].name" -o tsv

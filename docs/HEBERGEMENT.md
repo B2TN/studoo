@@ -76,7 +76,7 @@ Navigateur (PWA) ──► Vercel : site + API légère (connexion, files d'atte
   - il est **effacé dès que la tâche se termine** (réussite ou échec définitif) : rien n'est gardé entre deux tâches ;
   - jamais écrit dans les journaux.
 - **RGPD** : nouvelle ligne dans la page Données personnelles (« jeton d'accès temporaire, chiffré, supprimé à la fin
-  de la génération »), base légale = exécution du service demandé. Nouveau sous-traitant : Microsoft Azure (région France Central).
+  de la génération »), base légale = exécution du service demandé. Nouveau sous-traitant : Microsoft Azure (région Italy North, Milan : Azure for Students n'autorise pas la France).
   Révocation : « Supprimer mon compte » ou myaccount.google.com/permissions coupe tout immédiatement.
 
 ## 5. Notifications

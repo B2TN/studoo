@@ -18,7 +18,9 @@ Studoo (Vercel) ── nouvelle tâche ──► base Neon (contenu chiffré)
 - L'image du serveur est construite par GitHub Actions et publiée sur **ghcr.io** (gratuit) à chaque modification
   du code du worker ; elle ne contient aucune clé.
 - Si un réveil se perd, la page « Mes générations » relance le réveil d'elle-même (au plus une fois toutes les 5 min).
-- Région **France Central** (Paris).
+- Région : Azure for Students n'autorise que 5 régions par abonnement (pour nous : Norvège, Italie, Espagne,
+  Danemark, Suisse ; pas la France). Le script choisit tout seul la plus proche dans l'Union européenne :
+  **Italy North** (Milan).
 
 ## 1. Activer Azure for Students (à faire toi-même)
 1. <https://azure.microsoft.com/free/students> → **Commencer gratuitement** → connecte-toi avec ton
@@ -88,9 +90,10 @@ Crédit (pages Azure du 24/11/2026) :
 - La file de réveil coûte moins d'un centime par mois.
 
 ## En cas de problème
-- **« RequestDisallowedByPolicy » / région refusée** : ton abonnement étudiant limite les régions →
-  relance avec une autre région, par exemple
-  `powershell -ExecutionPolicy Bypass -File worker\azure\deploy.ps1 -Location westeurope`.
+- **« RequestDisallowedByAzure » / région refusée** : le script lit normalement les régions autorisées tout seul.
+  Pour les voir : `az policy assignment list --query "[].parameters.listOfAllowedLocations.value[]" -o tsv`,
+  puis relance avec l'une d'elles, par exemple
+  `powershell -ExecutionPolicy Bypass -File worker\azure\deploy.ps1 -Location spaincentral`.
 - **« image pull » / image introuvable** : vérifie que l'action GitHub « Image du serveur de tâches » est verte et que le paquet est public (étape 2).
 - **Rien ne démarre** : vérifie `WORKER_QUEUE_URL` dans Vercel puis *Redeploy* ; regarde l'historique d'exécution du job.
 - **Le crédit baisse trop vite** : portail Azure → *Abonnements* → *Coûts* ; on peut réduire la machine
