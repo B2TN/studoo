@@ -4,7 +4,8 @@
 
 | Offre | Carte ? | Puissance gratuite | Durée max d'une tâche | Mise en veille | Tâches de fond ? | Verdict |
 |---|---|---|---|---|---|---|
-| **Modal** (serverless Python, « Starter ») | **Oui** (vérifié) | 30 $ de calcul / mois (CPU **et GPU**), 100 conteneurs | **24 h** | Aucun coût au repos (démarre à la demande) | ✅ fonctions lancées à la demande | **Choisi** ✅ |
+| **Modal** (serverless Python, « Starter ») | **Oui** (vérifié) | 30 $ de calcul / mois (CPU **et GPU**), 100 conteneurs | **24 h** | Aucun coût au repos (démarre à la demande) | ✅ fonctions lancées à la demande | Écarté (carte) |
+| **Azure for Students** (Container Apps jobs) | **Non** (e-mail de l'école) | 100 $ / an + 180 000 vCPU-s et 360 000 Go-s gratuits chaque mois, jusqu'à 4 vCPU / 8 Go | non documentée (réglée à 6 h) | Aucun coût au repos | ✅ démarrage sur message de file | **Choisi** ✅ |
 | **Northflank** (« Sandbox ») | **Oui** en pratique à l'inscription (constaté le 24/11/2026) | 20 $ de ressources / mois, 2 services + 2 jobs + 1 base | Non précisé | **Jamais** (« always on ») | ✅ service toujours allumé | Écarté (carte aussi, moins de puissance) |
 | Hugging Face Spaces (CPU 2 vCPU / 16 Go) | — | Gratuit **seulement en site statique** | — | 48 h | ❌ Docker/Gradio exigent un abonnement payant depuis 2026 | Exclu |
 | Hugging Face ZeroGPU | — | 5 min de GPU / jour | 60 s par appel | — | ❌ | Exclu (trop court) |
@@ -15,7 +16,7 @@
 | Google Cloud Run / Oracle Always Free | **Oui** | élevée | 60 min / illimitée | — | ✅ | Exclu (carte) |
 | **Vercel Hobby** (actuel) | Non | 1 vCPU / 2 Go | **300 s** | — | ❌ (cron 1×/jour) | Garde le site et l'API légère |
 
-¹ **Décision du 24/11/2026** : Northflank demandait lui aussi une carte ; puisqu'une carte est nécessaire de toute façon, on prend le meilleur, **Modal** (aucun coût au repos, 30 $ offerts par mois, région UE). Guide : [MODAL.md](MODAL.md).
+¹ **Décision du 24/11/2026** : Northflank et Modal demandent une carte. Après une recherche élargie (Daytona, E2B, Kaggle, Lightning AI, Oracle, Google Cloud éducation, Cloudflare, Groq…), le seul hébergement gratuit, sans carte et assez puissant est **Azure for Students** (réservé aux étudiants). Guide : [AZURE.md](AZURE.md).
 
 ## 2. Combien de temps ça prend ? (mesuré sur 1 cœur, 24/11/2026)
 
@@ -45,6 +46,8 @@ Protection anti-spam : au-delà de N tâches en attente par élève, les nouvell
 
 ## 3. Architecture recommandée
 
+> **Mise à jour du 24/11/2026** : l'architecture retenue est celle de [AZURE.md](AZURE.md) (Azure Container Apps, processeur seulement, réveil par file). Les mentions de Modal ci-dessous datent de l'étude.
+
 ```
 Navigateur (PWA) ──► Vercel : site + API légère (connexion, files d'attente, emplois du temps)
                          │  1. crée la tâche dans Neon (Postgres gratuit, déjà en place)
@@ -73,7 +76,7 @@ Navigateur (PWA) ──► Vercel : site + API légère (connexion, files d'atte
   - il est **effacé dès que la tâche se termine** (réussite ou échec définitif) : rien n'est gardé entre deux tâches ;
   - jamais écrit dans les journaux.
 - **RGPD** : nouvelle ligne dans la page Données personnelles (« jeton d'accès temporaire, chiffré, supprimé à la fin
-  de la génération »), base légale = exécution du service demandé. Nouveau sous-traitant : Modal (États-Unis, DPF).
+  de la génération »), base légale = exécution du service demandé. Nouveau sous-traitant : Microsoft Azure (région France Central).
   Révocation : « Supprimer mon compte » ou myaccount.google.com/permissions coupe tout immédiatement.
 
 ## 5. Notifications

@@ -8,6 +8,7 @@ from functools import lru_cache
 from io import BytesIO
 
 from . import settings
+from .storage import make_room
 
 PROMPT = ("Recopie fidèlement tout le texte de cette page (manuscrit ou imprimé), dans l'ordre, en Markdown. "
           "Écris les formules mathématiques en LaTeX entre $…$. Si un mot est barré, ignore-le. "
@@ -19,6 +20,7 @@ def _model():
     import torch
     from transformers import AutoModelForImageTextToText, AutoProcessor
     torch.set_num_threads(settings.THREADS)
+    make_room(5.5, keep="hf")
     cache = str(settings.MODELS_DIR / "hf")
     processor = AutoProcessor.from_pretrained(settings.OCR_MODEL, cache_dir=cache)
     model = AutoModelForImageTextToText.from_pretrained(settings.OCR_MODEL, dtype=torch.bfloat16,

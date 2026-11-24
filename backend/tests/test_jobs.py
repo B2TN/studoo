@@ -57,28 +57,48 @@ def test_push_subscribe(logged):
     assert logged.post("/api/push/subscribe", json=body).status_code == 200  # idempotent
 
 
-def test_job_wakes_worker(logged, monkeypatch):
-    import httpx
+QUEUE = "https://compte.queue.core.windows.net/studoo-jobs?sv=2024&sp=a&sig=abc"
 
-    from studoo.jobcrypto import kick_token
+
+def _capture(monkeypatch):
+    import httpx
     calls = []
 
-    async def fake_post(self, url, json):
-        calls.append((url, json))
-        return httpx.Response(200, json={"ok": True})
+    async def fake_post(self, url, content, headers):
+        calls.append((url, content))
+        return httpx.Response(201, request=httpx.Request("POST", url))
 
-    monkeypatch.setattr(get_settings(), "worker_kick_url", "https://exemple--studoo-worker-kick.modal.run")
+    monkeypatch.setattr(get_settings(), "worker_queue_url", QUEUE)
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    return calls
+
+
+def test_job_wakes_worker(logged, monkeypatch):
+    calls = _capture(monkeypatch)
     assert logged.post("/api/jobs", json=_job()).status_code == 201
-    assert calls == [("https://exemple--studoo-worker-kick.modal.run", {"token": kick_token(get_settings().job_secret)})]
+    assert calls == [("https://compte.queue.core.windows.net/studoo-jobs/messages?sv=2024&sp=a&sig=abc&messagettl=86400",
+                      "<QueueMessage><MessageText>studoo</MessageText></QueueMessage>")]
+    assert "Une suite" not in calls[0][1]  # aucun contenu de cours dans la file
 
 
 def test_job_created_even_if_worker_unreachable(logged, monkeypatch):
     import httpx
 
-    async def broken_post(self, url, json):
+    async def broken_post(self, url, content, headers):
         raise httpx.ConnectError("hors ligne")
 
-    monkeypatch.setattr(get_settings(), "worker_kick_url", "https://exemple--studoo-worker-kick.modal.run")
+    monkeypatch.setattr(get_settings(), "worker_queue_url", QUEUE)
     monkeypatch.setattr(httpx.AsyncClient, "post", broken_post)
     assert logged.post("/api/jobs", json=_job()).status_code == 201
+
+
+def test_stuck_job_is_woken_again_at_most_every_5_min(logged, monkeypatch):
+    from datetime import timedelta
+    calls = _capture(monkeypatch)
+    job = logged.post("/api/jobs", json=_job()).json()["job"]
+    calls.clear()
+    with db.get_engine().begin() as conn:
+        conn.execute(db.jobs.update().where(db.jobs.c.id == job["id"]).values(created_at=db.now() - timedelta(minutes=10)))
+    logged.get("/api/jobs")
+    logged.get("/api/jobs")
+    assert len(calls) == 1

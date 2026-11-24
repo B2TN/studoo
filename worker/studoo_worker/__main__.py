@@ -1,14 +1,14 @@
 """Lancement du worker.
 
     python -m studoo_worker loop   # tourne en continu (service toujours allumé)
-    python -m studoo_worker once   # traite les tâches en attente puis s'arrête (tâche planifiée)
+    python -m studoo_worker once   # traite les tâches en attente puis s'arrête (exécution Azure)
 """
 import logging
 import sys
 import time
 import traceback
 
-from . import notify, pipelines, queue
+from . import notify, pipelines, queue, wakeups
 
 log = logging.getLogger("studoo.worker")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -49,8 +49,12 @@ def main() -> None:
     mode = sys.argv[1] if len(sys.argv) > 1 else "loop"
     queue.purge()
     if mode == "once":
-        while process_one():
-            pass
+        # Exécution Azure : on vide la file de réveil, on traite tout, puis on revide la file et on
+        # refait un tour (une tâche arrivée pendant le travail ne doit pas attendre).
+        for _ in range(2):
+            wakeups.drain()
+            while process_one():
+                pass
         return
     idle = 0
     while True:

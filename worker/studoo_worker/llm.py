@@ -12,6 +12,7 @@ import urllib.request
 import httpx
 
 from . import settings
+from .storage import make_room
 
 GROUNDING = (
     "Tu es un professeur bienveillant qui écrit en français. Règle absolue : tu utilises UNIQUEMENT "
@@ -24,7 +25,7 @@ MAX_SOURCE_CHARS = 24_000  # ≈ 6 000 jetons : ce que le modèle peut lire en u
 def model_path():
     path = settings.MODELS_DIR / settings.LLM_FILE
     if not path.exists():
-        settings.MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        make_room(3.5, keep=settings.LLM_FILE)
         url = f"https://huggingface.co/{settings.LLM_REPO}/resolve/main/{settings.LLM_FILE}"
         tmp = path.with_suffix(".part")
         urllib.request.urlretrieve(url, tmp)  # téléchargé une seule fois, puis gardé

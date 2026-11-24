@@ -24,7 +24,6 @@ COPY worker/studoo_worker worker/studoo_worker
 ENV PYTHONPATH="/app/backend:/app/worker" PYTHONUNBUFFERED=1 \
     MODELS_DIR=/tmp/models HF_HOME=/tmp/models/hf
 
-# Les modèles (≈ 3 à 7 Go selon la tâche) sont téléchargés au premier besoin (sur Modal : volume « studoo-models »).
-# Sur Modal (worker/modal_app.py), ce CMD est ignoré : la fonction « process » lance le mode « once ».
-# « once » : traite toutes les tâches en attente puis s'arrête.
+# Les modèles (≈ 3 à 7 Go selon la tâche) sont téléchargés au premier besoin (sur Azure : disque temporaire de 8 Go, effacé à l'arrêt).
+# « once » : vide la file de réveil, traite toutes les tâches en attente puis s'arrête (exécution Azure).
 CMD ["python", "-m", "studoo_worker", "once"]

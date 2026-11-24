@@ -25,8 +25,3 @@ def open_payload(secret: str, token: str) -> dict | None:
     except (InvalidToken, ValueError):
         return None
 
-
-def kick_token(secret: str) -> str:
-    """Jeton qui autorise l'API à réveiller le serveur de tâches (même calcul dans worker/modal_app.py)."""
-    import hmac
-    return hmac.new(secret.encode(), b"studoo-kick", hashlib.sha256).hexdigest()

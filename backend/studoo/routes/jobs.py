@@ -5,6 +5,8 @@ la récupère, la traite, range le résultat dans le Drive et prévient l'élèv
 """
 import logging
 import uuid
+from datetime import timedelta
+from urllib.parse import urlsplit
 from typing import Annotated, Literal
 
 import httpx
@@ -15,7 +17,7 @@ from sqlalchemy import delete, desc, func, insert, select, update
 from .. import db
 from ..config import get_settings
 from ..deps import User, current_user
-from ..jobcrypto import kick_token, seal_payload
+from ..jobcrypto import seal_payload
 from ..limits import rate_limit
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -65,16 +67,34 @@ class JobIn(BaseModel):
 log = logging.getLogger("studoo.jobs")
 
 
+def _queue_messages_url(queue_url: str) -> str:
+    """https://compte.queue.core.windows.net/studoo-jobs?<sas> → …/studoo-jobs/messages?<sas>"""
+    parts = urlsplit(queue_url)
+    return f"{parts.scheme}://{parts.netloc}{parts.path.rstrip('/')}/messages?{parts.query}&messagettl=86400"
+
+
 async def wake_worker() -> None:
-    """Réveille le serveur de tâches tout de suite (sinon il passe de lui-même toutes les 10 min)."""
+    """Dépose un message (sans aucune donnée) dans la file Azure : le serveur de tâches démarre aussitôt."""
     s = get_settings()
-    if not s.worker_kick_url:
+    if not s.worker_queue_url:
         return
     try:
         async with httpx.AsyncClient(timeout=6) as client:
-            await client.post(s.worker_kick_url, json={"token": kick_token(s.job_secret)})
-    except httpx.HTTPError as exc:  # pas grave : la vérification périodique prendra le relais
+            res = await client.post(_queue_messages_url(s.worker_queue_url),
+                                    content="<QueueMessage><MessageText>studoo</MessageText></QueueMessage>",
+                                    headers={"Content-Type": "application/xml"})
+            res.raise_for_status()
+    except httpx.HTTPError as exc:  # pas grave : la page « Mes générations » relancera le réveil
         log.warning("Réveil du serveur de tâches impossible : %s", type(exc).__name__)
+
+
+def _stuck(row, now) -> bool:
+    """Tâche qui attend depuis trop longtemps (réveil perdu) ou dont le serveur s'est arrêté en route."""
+    created = row["created_at"] if row["created_at"].tzinfo else row["created_at"].replace(tzinfo=now.tzinfo)
+    locked = row["locked_until"]
+    if locked is not None and locked.tzinfo is None:
+        locked = locked.replace(tzinfo=now.tzinfo)
+    return (row["status"] == "queued" and now - created > timedelta(minutes=3)) or            (row["status"] == "running" and locked is not None and locked < now)
 
 
 def _public(row) -> dict:
@@ -124,6 +144,13 @@ async def list_jobs(user: CurrentUser):
     with db.get_engine().connect() as conn:
         rows = conn.execute(select(db.jobs).where(db.jobs.c.sub == user.sub)
                             .order_by(desc(db.jobs.c.created_at)).limit(20)).mappings().all()
+    now = db.now()
+    if any(_stuck(r, now) for r in rows):
+        try:  # au plus un nouveau réveil toutes les 5 minutes par élève
+            rate_limit(f"rewake:{user.sub}", limit=1, window_seconds=300)
+            await wake_worker()
+        except HTTPException:
+            pass
     return {"jobs": [_public(r) for r in rows]}
 
 

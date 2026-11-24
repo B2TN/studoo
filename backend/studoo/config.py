@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # clé publique des notifications web, nombre max de tâches en attente par élève (anti-spam)
     job_secret: str = Field(default="dev-job-secret-change-me-dev-job-secret", min_length=32)
     vapid_public_key: str = ""
-    worker_kick_url: str = ""  # adresse « kick » du serveur de tâches Modal (démarrage immédiat)
+    worker_queue_url: str = ""  # file Azure « studoo-jobs » + jeton SAS d'ajout seul (réveil du serveur de tâches)
     max_pending_jobs: int = 5
 
     # Base de données (SQLite en local, Postgres Neon en production)

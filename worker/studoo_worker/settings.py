@@ -8,6 +8,9 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 APP_URL = os.environ.get("APP_URL", "https://studoo-app.vercel.app").rstrip("/")
 
+# Réveil par file Azure Storage (adresse de la file + jeton SAS « p ») ; vide = pas de file
+WORKER_QUEUE_URL = os.environ.get("WORKER_QUEUE_URL", "")
+
 # Notifications
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")  # format PEM ou base64url
 VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "https://studoo-app.vercel.app/contact")
