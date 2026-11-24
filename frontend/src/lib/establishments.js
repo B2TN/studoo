@@ -7,15 +7,15 @@
 //   le synchronise en continu (les dates des liens ADE sont mises à jour automatiquement).
 
 export const HIGH_SCHOOL_SERVICES = [
-  { id: "pronote", name: "Pronote", connector: "pronote", note: "Compte Pronote direct (sans ENT) : QR code, identifiants Pronote ou lien iCal." },
-  { id: "monlycee", name: "Monlycée.net (Île-de-France)", short: "Monlycée.net", ent: "ile_de_france", connector: "pronote", note: "Connexion avec tes identifiants Monlycée.net, ou par QR code / lien iCal depuis Pronote." },
-  { id: "mbn", name: "Mon Bureau Numérique (Grand Est)", short: "Mon Bureau Numérique", ent: "monbureaunumerique", connector: "pronote", note: "Connexion avec tes identifiants Mon Bureau Numérique, ou par QR code / lien iCal." },
-  { id: "hdf", name: "ENT Hauts-de-France", short: "ENT HDF", ent: "ent_hdf", connector: "pronote", note: "Connexion avec tes identifiants ENT HDF, ou par QR code / lien iCal." },
-  { id: "toutatice", name: "Toutatice (Bretagne)", short: "Toutatice", ent: "ac_rennes", connector: "pronote", note: "Connexion avec tes identifiants Toutatice, ou par QR code / lien iCal." },
-  { id: "eclat", name: "Éclat-BFC (Bourgogne-Franche-Comté)", short: "Éclat-BFC", ent: "eclat_bfc", connector: "pronote", note: "Connexion avec tes identifiants Éclat-BFC, ou par QR code / lien iCal." },
-  { id: "atrium", name: "Atrium (Provence-Alpes-Côte d'Azur)", short: "Atrium", ent: "atrium_sud", connector: "pronote", note: "Connexion avec tes identifiants Atrium, ou par QR code / lien iCal." },
-  { id: "autre-ent", name: "Autre ENT régional", short: "ENT", ent: "*", connector: "pronote", note: "Choisis ton ENT dans la liste (26 ENT pris en charge), ou utilise le QR code / lien iCal Pronote." },
-  { id: "skolengo", name: "Skolengo", connector: "pronote", note: "Skolengo n'est pas pris en charge par le connecteur : si ton lycée utilise Pronote, prends le QR code ou le lien iCal." },
+  { id: "pronote", name: "Pronote", connector: "pronote", note: "Compte Pronote direct (sans ENT) : QR code ou identifiants Pronote." },
+  { id: "monlycee", name: "Monlycée.net (Île-de-France)", short: "Monlycée.net", ent: "ile_de_france", connector: "pronote", note: "Connexion avec tes identifiants Monlycée.net, ou par QR code Pronote." },
+  { id: "mbn", name: "Mon Bureau Numérique (Grand Est)", short: "Mon Bureau Numérique", ent: "monbureaunumerique", connector: "pronote", note: "Connexion avec tes identifiants Mon Bureau Numérique, ou par QR code Pronote." },
+  { id: "hdf", name: "ENT Hauts-de-France", short: "ENT HDF", ent: "ent_hdf", connector: "pronote", note: "Connexion avec tes identifiants ENT HDF, ou par QR code Pronote." },
+  { id: "toutatice", name: "Toutatice (Bretagne)", short: "Toutatice", ent: "ac_rennes", connector: "pronote", note: "Connexion avec tes identifiants Toutatice, ou par QR code Pronote." },
+  { id: "eclat", name: "Éclat-BFC (Bourgogne-Franche-Comté)", short: "Éclat-BFC", ent: "eclat_bfc", connector: "pronote", note: "Connexion avec tes identifiants Éclat-BFC, ou par QR code Pronote." },
+  { id: "atrium", name: "Atrium (Provence-Alpes-Côte d'Azur)", short: "Atrium", ent: "atrium_sud", connector: "pronote", note: "Connexion avec tes identifiants Atrium, ou par QR code Pronote." },
+  { id: "autre-ent", name: "Autre ENT régional", short: "ENT", ent: "*", connector: "pronote", note: "Choisis ton ENT dans la liste (26 ENT pris en charge), ou utilise le QR code Pronote." },
+  { id: "skolengo", name: "Skolengo", connector: "pronote", note: "Skolengo n'est pas pris en charge par le connecteur : si ton lycée utilise Pronote, prends le QR code Pronote." },
   { id: "ecoledirecte", name: "ÉcoleDirecte", connector: "ics", note: "ÉcoleDirecte ne propose pas d'export iCal : importe un fichier .ics si ton établissement en fournit un." },
 ];
 
