@@ -5,16 +5,27 @@
 """
 import logging
 import sys
+import threading
 import time
 import traceback
 
 from . import notify, pipelines, queue, wakeups
 
 log = logging.getLogger("studoo.worker")
+KEEP_ALIVE_SECONDS = 300
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 # httpx écrit chaque adresse appelée, clés d'accès comprises (file Azure, Google) : jamais dans les journaux.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+def _keep_alive(job_id: str, stop: threading.Event) -> None:
+    """Toutes les 5 min, tant que la tâche tourne (un seul appel au modèle peut durer plus que le verrou)."""
+    while not stop.wait(KEEP_ALIVE_SECONDS):
+        try:
+            queue.keep_alive(job_id)
+        except Exception:  # noqa: BLE001 - coupure réseau passagère : on réessaiera au tour suivant
+            log.warning("Verrou de la tâche %s non prolongé", job_id)
 
 
 def process_one() -> bool:
@@ -29,6 +40,8 @@ def process_one() -> bool:
             raise pipelines.Cancelled()
         queue.progress(job["id"], percent, step)
 
+    stop = threading.Event()
+    threading.Thread(target=_keep_alive, args=(job["id"], stop), daemon=True).start()
     try:
         file_id, name = pipelines.run(job, payload, report)
     except pipelines.Cancelled:
@@ -42,6 +55,8 @@ def process_one() -> bool:
         if final:
             notify.job_finished(job, payload.get("email", ""), ok=False)
         return True
+    finally:
+        stop.set()
     queue.finish(job["id"], file_id, name)
     notify.job_finished(job, payload.get("email", ""), ok=True, file_id=file_id)
     log.info("Tâche %s terminée", job["id"])

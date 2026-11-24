@@ -86,3 +86,29 @@ def test_purge_failed_after_24h():
         conn.execute(db.jobs.update().where(db.jobs.c.id == jid).values(status="failed", finished_at=db.now() - timedelta(hours=30)))
     queue.purge()
     assert get(jid)["payload"] is None
+
+
+def test_lock_is_kept_alive_during_a_long_step(monkeypatch):
+    # Un appel au modèle peut durer plus que le verrou : sans prolongation, une 2e machine reprenait la tâche.
+    import time
+
+    jid = add_job()
+    calls = []
+    real = queue.keep_alive
+    monkeypatch.setattr(main, "KEEP_ALIVE_SECONDS", 0.05)
+    monkeypatch.setattr(queue, "keep_alive", lambda job_id: (calls.append(job_id), real(job_id)))
+
+    def slow(payload, report):
+        time.sleep(0.4)  # une longue étape sans aucun report()
+        return b"mp3", "Podcast — T.mp3", "audio/mpeg", "podcast", {}
+
+    monkeypatch.setattr(pipelines, "PIPELINES", {"podcast": slow})
+    monkeypatch.setattr(pipelines.drive, "access_token", lambda rt: "tok")
+    monkeypatch.setattr(pipelines.drive, "upload", lambda token, **kw: {"id": "f1", "name": kw["name"]})
+    monkeypatch.setattr(notify, "_push", lambda *a: 1)
+    assert main.process_one() is True
+    assert len(calls) >= 3 and set(calls) == {jid}
+    seen = len(calls)
+    time.sleep(0.2)
+    assert len(calls) == seen  # arrêté à la fin de la tâche
+    assert get(jid)["status"] == "done"

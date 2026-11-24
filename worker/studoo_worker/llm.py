@@ -80,13 +80,20 @@ class LLM:
                 self.proc.kill()
 
     def json(self, prompt: str, schema: dict, *, max_tokens: int = 4096, temperature: float = 0.5) -> dict:
+        start = time.time()
         res = httpx.post(f"http://127.0.0.1:{self.port}/v1/chat/completions", json={
             "messages": [{"role": "system", "content": GROUNDING}, {"role": "user", "content": prompt}],
-            "temperature": temperature, "max_tokens": max_tokens,
+            "temperature": temperature, "max_tokens": max_tokens, "cache_prompt": True,
             "response_format": {"type": "json_schema", "json_schema": {"name": "reponse", "schema": schema}},
         }, timeout=None)
         res.raise_for_status()
-        return json.loads(res.json()["choices"][0]["message"]["content"])
+        body = res.json()
+        t = body.get("timings") or {}
+        # Mesures techniques uniquement (jamais le texte) : où passe le temps sur la machine.
+        log.info("Modèle : %s jetons lus (%s déjà en cache) à %.0f/s, %s écrits à %.1f/s, %.0f s, fin=%s",
+                 t.get("prompt_n"), t.get("cache_n"), t.get("prompt_per_second") or 0, t.get("predicted_n"),
+                 t.get("predicted_per_second") or 0, time.time() - start, body["choices"][0].get("finish_reason"))
+        return json.loads(body["choices"][0]["message"]["content"])
 
 
 def sources_prompt(sources: list[dict]) -> str:

@@ -49,6 +49,13 @@ def progress(job_id: str, percent: int, step: str) -> None:
             locked_until=db.now() + timedelta(minutes=settings.LOCK_MINUTES)))
 
 
+def keep_alive(job_id: str) -> None:
+    """Prolonge le verrou pendant une longue étape (sinon une autre machine reprendrait la tâche en double)."""
+    with db.get_engine().begin() as conn:
+        conn.execute(update(db.jobs).where(db.jobs.c.id == job_id, db.jobs.c.status == "running").values(
+            locked_until=db.now() + timedelta(minutes=settings.LOCK_MINUTES)))
+
+
 def is_cancelled(job_id: str) -> bool:
     with db.get_engine().connect() as conn:
         return conn.execute(select(db.jobs.c.status).where(db.jobs.c.id == job_id)).scalar() == "cancelled"

@@ -62,13 +62,14 @@ def podcast(payload: dict, report) -> tuple[bytes, str, str, str, dict]:
                 recap_done = True
             else:
                 context += "Aborde les notions suivantes du cours.\n"
+            # Les cours d'abord, identiques à chaque partie : le modèle réutilise sa lecture (cache).
             script = llm.json(
+                sources_prompt(payload["sources"]) + "\n\n"
                 "Écris le script d'un podcast éducatif à deux voix (A et B) qui explique ces cours.\n"
                 f"Longueur de CETTE partie : environ {words} mots ({remaining:.0f} minutes), "
                 f"au moins {max(8, words // 35)} répliques.{context}\n"
                 "A et B sont deux élèves passionnés qui se relancent, donnent des exemples chiffrés, "
-                "posent des questions et reformulent. Répliques de 2 à 4 phrases.\n\n"
-                + sources_prompt(payload["sources"]),
+                "posent des questions et reformulent. Répliques de 2 à 4 phrases.",
                 _podcast_schema(max(8, words // 35)), max_tokens=5000, temperature=0.7)
             title = title or re.sub(r"\s*[–—:-]\s*(la )?(dernière|première) partie\s*$", "", script["title"], flags=re.I)
             new = script["lines"]
@@ -102,10 +103,10 @@ def video(payload: dict, report) -> tuple[bytes, str, str, str, dict]:
             if len(slides) + n >= slides_n:
                 context += "La dernière diapo est un récapitulatif.\n"
             script = llm.json(
+                sources_prompt(payload["sources"]) + "\n\n"
                 "Prépare une vidéo explicative sous forme de diaporama dessiné à la main.\n"
                 f"Écris EXACTEMENT {n} diapos. Narration d'environ {words_per_slide} mots par diapo "
-                f"(plusieurs phrases complètes, avec un exemple) ; puces très courtes (5 mots max).{context}\n"
-                + sources_prompt(payload["sources"]),
+                f"(plusieurs phrases complètes, avec un exemple) ; puces très courtes (5 mots max).{context}",
                 _video_schema(n, words_per_slide * 5), max_tokens=400 + n * (words_per_slide * 2 + 120), temperature=0.6)
             title = title or script["title"]
             new = script["slides"][:n]
