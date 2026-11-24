@@ -33,7 +33,9 @@ async def public_config():
 
 @router.get("/health")
 async def health():
-    return {"ok": True, "time": int(time.time())}
+    from importlib.util import find_spec
+    # Vérifie que les bibliothèques optionnelles sont bien installées sur l'hébergeur.
+    return {"ok": True, "time": int(time.time()), "pronote": find_spec("pronotepy") is not None}
 
 
 class EventIn(BaseModel):

@@ -26,7 +26,7 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 | 📝 **Fiches de révision** | Fiches dessinées à la main (définitions surlignées, formules encadrées, pièges, mini-quiz), exportables en PDF. |
 | 🎧 **Podcasts** | 10, 20 ou 30 min à deux voix (Gemini TTS), encodés en MP3 dans le navigateur. |
 | 🎬 **Vidéos explicatives** | Diaporama animé dessiné + voix + sous-titres, encodé en **MP4** dans le navigateur (WebCodecs) : format TikTok, YouTube ou long. |
-| 📅 **Emploi du temps** | Connecteur Pronote (QR code), parcours guidés pour les 20 plus grandes universités, ou lien/fichier `.ics`. Création des dossiers de matières en un clic. |
+| 📅 **Emploi du temps** | Pronote par QR code ou identifiants, 26 ENT régionaux (Monlycée.net, Mon Bureau Numérique, ENT HDF…), ADE de l'IUT Paris Rives de Seine et 20 universités, ou lien/fichier `.ics`. Seul un **jeton chiffré** est gardé ([détails](docs/EMPLOI_DU_TEMPS.md)). |
 
 <table>
   <tr>
@@ -51,15 +51,15 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 | Stockage | **Google Drive** de l'utilisateur, autorisation `drive.file` | Aucun cours sur nos serveurs ; Studoo ne voit que ses propres fichiers. |
 | IA | **Gemini** (Flash-Lite, Flash, TTS) via le SDK `google-genai` | Transcription audio avec rôles, OCR, fiches, scripts, voix. |
 | Base de données | **Postgres (Neon)**, SQLite en local, SQLAlchemy Core | Seulement comptes, compteurs et messages. |
-| Pronote | **Node.js + Pawnote** (bibliothèque non officielle) | Connexion par QR code, récupération du lien iCal officiel. |
-| Hébergement | **Vercel** (site + fonctions Python et Node) | Gratuit, déploiement automatique depuis GitHub, HTTPS. |
+| Pronote / ENT | **pronotepy** (Python, non officielle, MIT) | QR code, identifiants Pronote ou ENT régional, récupération du lien iCal officiel. |
+| Hébergement | **Vercel** (site statique + fonction Python) | Gratuit, déploiement automatique depuis GitHub, HTTPS. |
 
 ```
 Navigateur ──► Google Drive (direct, jeton de l'utilisateur)
     │
     └──► /api (FastAPI) ──► Gemini   (clé cachée côté serveur)
     │                  └──► Neon     (comptes, compteurs)
-    └──► /api/pronote (Node) ──► Pronote
+                       └──► Pronote / ENT / ADE (emploi du temps)
 ```
 
 Détails, limites et quotas : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -88,16 +88,14 @@ python -m venv .venv
 pip install -r requirements-dev.txt
 cp .env.example .env          # puis remplis les valeurs (voir le fichier)
 
-# Dépendances JavaScript
-npm install                   # connecteur Pronote
-npm install --prefix frontend # site
+# Dépendances JavaScript du site
+npm install --prefix frontend
 ```
 
-Dans trois terminaux :
+Dans deux terminaux :
 
 ```bash
 uvicorn studoo.main:app --app-dir backend --port 8000 --reload   # API
-node scripts/dev-pronote.js                                       # Pronote (facultatif)
 npm run dev --prefix frontend                                     # site → http://localhost:5173
 ```
 
@@ -108,8 +106,7 @@ npm run dev --prefix frontend                                     # site → htt
 ## Tests
 
 ```bash
-cd backend && python -m pytest -q     # 39 tests : sessions, CSRF, quotas, IA, .ics, anti-SSRF, admin…
-npm test                               # connecteur Pronote (jetons, chiffrement)
+cd backend && python -m pytest -q     # 48 tests : sessions, CSRF, quotas, IA, .ics, anti-SSRF, jetons chiffrés, admin…
 npm test --prefix frontend             # scanner, homographie, routeur, fiches, emploi du temps…
 ```
 
@@ -125,13 +122,13 @@ voir le guide pas à pas [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
 - Quotas Gemini gratuits **partagés entre tous les utilisateurs** (≈ 20 cours de 2 h transcrits par jour pour tout le site).
 - Voix Gemini limitée à quelques minutes par jour : au-delà, les podcasts sont lus par la voix du navigateur et les vidéos sont sous-titrées sans voix.
 - En offre gratuite, Google peut réutiliser les contenus envoyés à Gemini (indiqué dans la page RGPD).
-- Pronote et les ENT n'ont pas d'API officielle : le connecteur Pronote peut cesser de fonctionner ; le lien iCal reste toujours possible.
+- Pronote et les ENT n'ont pas d'API officielle : les connecteurs peuvent cesser de fonctionner ; le lien iCal reste toujours possible.
 
 ## Licence et crédits
 
-Code sous licence **GNU GPL v3 ou ultérieure** (voir [LICENSE.md](LICENSE.md)), compatible avec la bibliothèque Pawnote utilisée pour Pronote.
+Code sous licence **GNU GPL v3 ou ultérieure** (voir [LICENSE.md](LICENSE.md)).
 
 Icônes [Tabler](https://tabler.io/icons) (MIT) · polices Patrick Hand, Gochi Hand et Atkinson Hyperlegible (SIL OFL) ·
 [pdf-lib](https://pdf-lib.js.org) (MIT) · [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0) · [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT) ·
-[lamejs](https://github.com/breezystack/lamejs) (LGPL) · [jsQR](https://github.com/cozmo/jsQR) (Apache 2.0) · [Pawnote](https://github.com/LiterateInk/Pawnote) (GPL-3.0).
+[lamejs](https://github.com/breezystack/lamejs) (LGPL) · [jsQR](https://github.com/cozmo/jsQR) (Apache 2.0) · [pronotepy](https://github.com/bain3/pronotepy) (MIT).
 Studoo n'est affilié ni à Google, ni à Index Éducation, ni aux établissements cités.
