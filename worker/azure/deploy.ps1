@@ -96,7 +96,8 @@ $containerEnv = @(
     @{ name = "MODELS_DIR"; value = "/tmp/models" }
 )
 foreach ($key in $values.Keys) {
-    if (-not $values[$key] -or $key -eq "WORKER_QUEUE_URL") { continue }
+    # THREADS / MODELS_DIR de .env.worker sont réglés pour ton PC : sur Azure, on garde les valeurs ci-dessus.
+    if (-not $values[$key] -or $key -in "WORKER_QUEUE_URL", "THREADS", "MODELS_DIR") { continue }
     $name = ($key.ToLower() -replace "[^a-z0-9]", "-")
     $secrets += @{ name = $name; value = $values[$key] }
     $containerEnv += @{ name = $key; secretRef = $name }
