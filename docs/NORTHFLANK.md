@@ -39,8 +39,8 @@ Puis **Redeploy**.
 ## Temps de fabrication attendus (2 vCPU, mesurés sur PC le 24/11/2026)
 | Génération | Écriture (Qwen3-4B, ≈ 4-5 jetons/s) | Voix | Montage | Total approx. |
 |---|---|---|---|---|
-| Vidéo courte (2 min) | ≈ 7 min | ≈ 1,5 min (Kokoro) | < 1 min | **≈ 10 min** |
-| Podcast 10 min | ≈ 15 min | ≈ 7 min (Kokoro) / 40 s (Piper) | < 1 min | **≈ 15-25 min** |
+| Vidéo courte (≈ 1 min 45) | ≈ 2,5 min | ≈ 1 min (Kokoro) | < 1 min | **≈ 4 min mesurées (prévoir 10)** |
+| Podcast 10 min | ≈ 12 min | ≈ 6 min (Kokoro) / 40 s (Piper) | < 1 min | **≈ 18 min mesurées (prévoir 25)** |
 | Podcast 30 min | ≈ 45 min | ≈ 21 min / 2 min | 1 min | **≈ 50-70 min** |
 | Vidéo 30 min | ≈ 50 min | ≈ 21 min / 2 min | ≈ 8 min | **≈ 1 h-1 h 20** |
 | Lecture d'une page (Qwen3-VL-2B) | — | — | — | **≈ 3-6 min** |
