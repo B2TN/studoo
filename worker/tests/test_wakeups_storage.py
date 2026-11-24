@@ -1,4 +1,6 @@
 """File de réveil Azure et place disque."""
+import os
+
 import httpx
 
 from studoo_worker import settings, storage, wakeups
@@ -36,6 +38,19 @@ def test_drain_without_queue_or_when_unreachable(monkeypatch):
     real = httpx.Client
     monkeypatch.setattr(httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(broken), **kw))
     assert wakeups.drain(URL) == 0  # pas d'exception : les tâches restent lues dans la base
+
+
+def test_settings_load_online_without_session_secret(monkeypatch):
+    # Sur Azure : APP_URL en https, pas de SESSION_SECRET → la config du site ne doit pas bloquer le worker.
+    from studoo.config import get_settings
+
+    assert os.environ["SESSION_SECRET"]  # posé par studoo_worker/__init__.py
+    monkeypatch.setenv("APP_URL", "https://studoo.vercel.app")
+    get_settings.cache_clear()
+    try:
+        assert not get_settings().is_local
+    finally:
+        get_settings.cache_clear()
 
 
 def test_make_room_removes_other_big_models(tmp_path, monkeypatch):
