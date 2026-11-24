@@ -5,7 +5,9 @@ pose des questions en HTTP. La réponse est forcée au format JSON demandé (« 
 ce qui évite les réponses mal formées.
 """
 import json
+import logging
 import subprocess
+import tempfile
 import time
 import urllib.request
 
@@ -13,6 +15,8 @@ import httpx
 
 from . import settings
 from .storage import make_room
+
+log = logging.getLogger(__name__)
 
 GROUNDING = (
     "Tu es un professeur bienveillant qui écrit en français. Règle absolue : tu utilises UNIQUEMENT "
@@ -41,10 +45,12 @@ class LLM:
         self.proc = None
 
     def __enter__(self):
+        # Le journal de llama-server (technique, sans contenu de cours) sert à expliquer un échec de démarrage.
+        self.log = tempfile.TemporaryFile()
         self.proc = subprocess.Popen([
             settings.LLAMA_SERVER, "-m", str(model_path()), "--port", str(self.port), "--host", "127.0.0.1",
             "-c", str(settings.LLM_CONTEXT), "-t", str(settings.THREADS), "--no-webui",
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        ], stdout=subprocess.DEVNULL, stderr=self.log)
         deadline = time.time() + 300
         while time.time() < deadline:
             try:
@@ -53,11 +59,19 @@ class LLM:
             except httpx.HTTPError:
                 pass
             if self.proc.poll() is not None:
-                raise RuntimeError("Le modèle de langage n'a pas pu démarrer.")
+                raise RuntimeError(f"Le modèle de langage n'a pas pu démarrer ({self._last_log_line()}).")
             time.sleep(1)
         raise RuntimeError("Le modèle de langage met trop de temps à démarrer.")
 
+    def _last_log_line(self) -> str:
+        self.log.seek(0)
+        lines = [l.strip() for l in self.log.read().decode("utf-8", "replace").splitlines() if l.strip()]
+        line = lines[-1] if lines else f"code {self.proc.returncode}"
+        log.error("llama-server s'est arrêté : %s", "\n".join(lines[-20:]))
+        return line[:200]
+
     def __exit__(self, *exc):
+        self.log.close()
         if self.proc and self.proc.poll() is None:
             self.proc.terminate()
             try:

@@ -64,3 +64,18 @@ def test_make_room_removes_other_big_models(tmp_path, monkeypatch):
     assert not (tmp_path / "llm.gguf").exists()
     assert (tmp_path / "hf" / "poids.safetensors").exists() and (tmp_path / "voix.onnx").exists()
     storage.make_room(0, keep="hf")  # assez de place : rien n'est touché
+
+
+def test_llm_start_failure_shows_the_cause(monkeypatch):
+    # « python -m module_inexistant » s'arrête aussitôt en écrivant la cause : comme un llama-server qui plante.
+    import sys
+
+    import pytest
+
+    from studoo_worker import llm
+
+    monkeypatch.setattr(settings, "LLAMA_SERVER", sys.executable)
+    monkeypatch.setattr(llm, "model_path", lambda: "module_inexistant_studoo")
+    with pytest.raises(RuntimeError, match="n'a pas pu démarrer.*module_inexistant_studoo"):
+        with llm.LLM(port=8099):
+            pass
