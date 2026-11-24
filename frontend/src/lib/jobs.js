@@ -1,0 +1,68 @@
+// Tâches lourdes traitées par le serveur (podcasts, vidéos, lecture de copies).
+// Le navigateur dépose la tâche puis peut être fermé : le résultat arrive dans le Drive
+// et l'élève est prévenu (notification web, e-mail de secours, pastille sur le site).
+import { api, getConfig } from "./api.js";
+
+export const createJob = (job) => api("/api/jobs", { method: "POST", json: job }).then((r) => r.job);
+export const listJobs = () => api("/api/jobs").then((r) => r.jobs);
+export const cancelJob = (id) => api(`/api/jobs/${id}/cancel`, { method: "POST" });
+export const retryJob = (id) => api(`/api/jobs/${id}/retry`, { method: "POST" });
+export const deleteJob = (id) => api(`/api/jobs/${id}`, { method: "DELETE" });
+
+export const isActive = (job) => job.status === "queued" || job.status === "running";
+
+// ---------- Notifications web (PWA) ----------
+export function pushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+
+/** Sur iPhone, les notifications ne marchent que si Studoo est installé sur l'écran d'accueil. */
+export function needsHomeScreen() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone;
+  return ios && !standalone;
+}
+
+export async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return null;
+  try { return await navigator.serviceWorker.register("/sw.js"); } catch { return null; }
+}
+
+function urlBase64ToUint8Array(base64) {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+export async function pushStatus() {
+  if (!pushSupported()) return "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+  const sub = await reg?.pushManager.getSubscription();
+  return sub ? "on" : "off";
+}
+
+/** Demande l'autorisation et enregistre cet appareil pour recevoir les notifications. */
+export async function enablePush() {
+  const { vapidPublicKey } = await getConfig();
+  if (!vapidPublicKey) throw new Error("Les notifications ne sont pas encore configurées sur le serveur.");
+  if (!pushSupported()) throw new Error("Ce navigateur ne gère pas les notifications web.");
+  if (needsHomeScreen()) throw new Error("Sur iPhone : ajoute d'abord Studoo à l'écran d'accueil (bouton Partager → « Sur l'écran d'accueil »), puis ouvre-le depuis là.");
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("Notifications refusées : tu recevras un e-mail à la place.");
+  const reg = await registerServiceWorker();
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
+  const json = sub.toJSON();
+  await api("/api/push/subscribe", { method: "POST", json: { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth } });
+  return "on";
+}
+
+export async function disablePush() {
+  const reg = await navigator.serviceWorker?.getRegistration("/sw.js");
+  const sub = await reg?.pushManager.getSubscription();
+  if (!sub) return "off";
+  const json = sub.toJSON();
+  await api("/api/push/unsubscribe", { method: "POST", json: { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth } }).catch(() => {});
+  await sub.unsubscribe();
+  return "off";
+}

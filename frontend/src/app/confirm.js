@@ -39,6 +39,13 @@ export async function estimate(doc, tree) {
     if (lesson) hint = lesson.subject;
   } catch { /* pas d'emploi du temps */ }
   let ai = null;
+  if ((doc.excerpt || "").trim().length < 40) {
+    // Rien à lire (numérisation : le texte sera lu plus tard par le serveur) : on s'appuie sur l'emploi du temps.
+    const course = findCourse(tree, hint);
+    return { course, chapter: null, newCourse: course ? "" : hint, newChapter: "",
+      title: `Cours numérisé du ${longDate(doc.startedAt ? new Date(doc.startedAt) : new Date()).toLowerCase()}`,
+      fromTimetable: Boolean(course), confidence: null };
+  }
   try {
     ai = await api("/api/ai/classify", { method: "POST", json: {
       excerpt: doc.excerpt.slice(0, 8000), kind: doc.kind, hint,

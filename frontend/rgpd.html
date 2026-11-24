@@ -30,7 +30,7 @@
   </header>
   <main id="contenu" class="page">
     <h1>Tes données <span class="hl">personnelles</span></h1>
-    <p class="muted">Dernière mise à jour : 23 novembre 2026.</p>
+    <p class="muted">Dernière mise à jour : 24 novembre 2026.</p>
     <div class="card sketch">
       <p><strong>En bref :</strong> tes cours sont rangés dans <strong>ton</strong> Google Drive, pas chez nous. Studoo garde seulement le strict nécessaire pour te connecter et protéger le service (ton e-mail, ton nom, des compteurs). Pas de pub, pas de revente. Si tu as moins de 15 ans, lis cette page avec un parent.</p>
     </div>
@@ -46,6 +46,8 @@
         <tr><td>Identifiant Google, e-mail, nom, photo de profil</td><td>Te connecter, afficher ton compte, réserver l'admin</td><td>Exécution du service (CGU)</td><td>Jusqu'à la suppression de ton compte</td></tr>
         <tr><td>Jeton d'accès Google (« refresh token »)</td><td>Accéder à <em>tes</em> fichiers Studoo dans ton Drive</td><td>Exécution du service</td><td>Stocké <strong>chiffré dans un cookie de ton navigateur</strong> (30 jours), jamais dans notre base</td></tr>
         <tr><td>Compteurs d'utilisation de l'IA (par jour)</td><td>Respecter les quotas gratuits et éviter les abus</td><td>Intérêt légitime</td><td>Supprimés avec ton compte</td></tr>
+        <tr><td>Tâches de génération en cours (podcast, vidéo, lecture de copie) : texte des cours choisis, photos réduites, jeton Google « hors ligne »</td><td>Fabriquer le résultat sur le serveur pendant que tu es absent, puis le ranger dans ton Drive</td><td>Exécution du service demandé</td><td><strong>Chiffrés</strong>, et <strong>effacés dès la fin de la tâche</strong> (24 h au plus en cas d'échec, pour pouvoir la relancer)</td></tr>
+        <tr><td>Abonnement aux notifications (adresse technique de ton navigateur)</td><td>Te prévenir quand une génération est prête</td><td>Consentement (bouton « Activer les notifications »)</td><td>Jusqu'à la désactivation ou la suppression du compte</td></tr>
         <tr><td>Messages du formulaire de contact</td><td>Te répondre</td><td>Consentement</td><td>12 mois</td></tr>
         <tr><td>Statistiques de visite (pages vues, empreinte anonyme du jour)</td><td>Savoir quelles pages sont utiles</td><td>Consentement (bannière)</td><td>Empreintes effacées après 2 jours, totaux conservés 25 mois</td></tr>
       </tbody>
@@ -55,6 +57,7 @@
     <h2>Tes cours</h2>
     <ul>
       <li>Transcriptions, PDF, fiches, podcasts et vidéos sont enregistrés <strong>dans ton Google Drive</strong>, dans le dossier « Studoo ». Studoo utilise l'autorisation Google « drive.file » : il ne voit que les fichiers qu'il a créés, jamais le reste de ton Drive.</li>
+      <li><strong>Fabrication sur le serveur :</strong> les podcasts, vidéos et lectures de copies sont fabriqués par le serveur de tâches de Studoo avec des outils open source (Qwen, Kokoro, Piper, ffmpeg). Il lit le texte que tu as choisi, écrit le résultat dans ton Drive grâce à un jeton Google « hors ligne » chiffré, puis efface tout : ses fichiers de travail sont temporaires et supprimés automatiquement.</li>
       <li><strong>Enregistrements audio :</strong> le son est découpé en tranches de 5 minutes, envoyé à l'IA pour être transcrit, puis effacé. Aucun fichier audio n'est conservé, ni chez nous ni dans ton Drive.</li>
       <li><strong>Photos de cours :</strong> le redressement se fait dans ton navigateur ; une copie réduite est envoyée à l'IA pour lire le texte, puis oubliée.</li>
     </ul>
@@ -69,7 +72,9 @@
     <ul>
       <li><strong>Google</strong> (connexion, Drive, Gemini) — Irlande / États-Unis.</li>
       <li><strong>Vercel</strong> (hébergement du site et de l'API) — États-Unis, encadré par le Data Privacy Framework UE–États-Unis.</li>
-      <li><strong>Neon</strong> (base de données des comptes et compteurs) — région Union européenne.</li>
+      <li><strong>Neon</strong> (base de données des comptes, compteurs et tâches en cours) — région Union européenne.</li>
+      <li><strong>Northflank</strong> (serveur de tâches : fabrication des podcasts, vidéos et lectures de copies) — région Union européenne si disponible.</li>
+      <li><strong>Brevo</strong> (envoi de l'e-mail « c'est prêt » si les notifications ne sont pas activées) — Union européenne.</li>
     </ul>
 
     <h2>Cookies</h2>

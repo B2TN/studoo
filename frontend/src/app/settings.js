@@ -2,17 +2,38 @@
 import { deleteAccount, signOut } from "../lib/auth.js";
 import { h, mount } from "../lib/dom.js";
 import { icon } from "../lib/icons.js";
-import { drive, getSettings, saveSettings } from "../lib/storage.js";
+import { enablePush, disablePush, needsHomeScreen, pushStatus } from "../lib/jobs.js";
+import { drive, getSettings } from "../lib/storage.js";
 import { confirmDialog, consent, errorToast, store, themeButtons, toast } from "../lib/ui.js";
 
-const VOICES = [["Kore", "Kore (posée)"], ["Puck", "Puck (enjouée)"], ["Aoede", "Aoede (douce)"], ["Charon", "Charon (grave)"], ["Leda", "Leda (jeune)"], ["Orus", "Orus (assurée)"], ["Zephyr", "Zephyr (claire)"], ["Fenrir", "Fenrir (énergique)"]];
+/** Notifications de fin de génération (PWA) ; sinon e-mail de secours. */
+function notifySection() {
+  const state = h("p", { class: "small" }, "…");
+  const btn = h("button", { class: "btn", type: "button" });
+  const paint = async () => {
+    const st = await pushStatus().catch(() => "unsupported");
+    const labels = {
+      on: "Activées sur cet appareil.", off: "Désactivées sur cet appareil : tu recevras un e-mail à la place.",
+      denied: "Bloquées par le navigateur : tu recevras un e-mail à la place.", unsupported: "Non disponibles dans ce navigateur : tu recevras un e-mail à la place.",
+    };
+    state.textContent = labels[st];
+    btn.hidden = st === "unsupported" || st === "denied";
+    btn.replaceChildren(st === "on" ? "Désactiver" : "Activer les notifications");
+    btn.onclick = async () => {
+      try { await (st === "on" ? disablePush() : enablePush()); } catch (e) { toast(e.message, "info", 9000); }
+      paint();
+    };
+  };
+  paint();
+  return h("section", { class: "card sketch stack", style: { marginTop: "22px" } },
+    h("h2", {}, "Être prévenu quand c'est prêt"),
+    h("p", { class: "small muted" }, "Podcasts, vidéos et lectures de copies sont fabriqués sur le serveur : tu peux fermer la page, Studoo te prévient à la fin."),
+    state, h("div", {}, btn),
+    needsHomeScreen() ? h("p", { class: "small muted" }, "Sur iPhone et iPad : ajoute d'abord Studoo à l'écran d'accueil (Partager → « Sur l'écran d'accueil »), puis ouvre-le depuis l'icône.") : null);
+}
 
 export async function render({ view, user, go }) {
   const settings = await getSettings();
-  const voiceSelect = (key, id) => h("select", { class: "input", id, onchange: async (e) => {
-    await saveSettings({ voices: { ...settings.voices, [key]: e.target.value } }).catch(errorToast);
-    toast("Voix enregistrée", "success");
-  } }, VOICES.map(([v, label]) => h("option", { value: v, selected: settings.voices?.[key] === v }, label)));
   const stats = consent()?.stats;
   const root = await drive.init();
 
@@ -29,10 +50,7 @@ export async function render({ view, user, go }) {
       h("h2", {}, "Affichage"),
       h("div", { class: "row" }, ...themeButtons(), h("span", { class: "small muted" }, "Mode sombre · police plus lisible (Atkinson Hyperlegible)"))),
 
-    h("section", { class: "card sketch stack", style: { marginTop: "22px" } },
-      h("h2", {}, "Voix des podcasts et vidéos"),
-      h("div", { class: "field" }, h("label", { for: "voice-a" }, "Voix A (et narration des vidéos)"), voiceSelect("A", "voice-a")),
-      h("div", { class: "field" }, h("label", { for: "voice-b" }, "Voix B"), voiceSelect("B", "voice-b"))),
+    notifySection(),
 
     h("section", { class: "card sketch stack", style: { marginTop: "22px" } },
       h("h2", {}, "Confidentialité"),

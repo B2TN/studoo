@@ -1,0 +1,13 @@
+# Worker Studoo (serveur de tâches) — outils open source exécutés sur le processeur
+httpx==0.28.1
+SQLAlchemy==2.1.9
+psycopg[binary]==3.3.9
+cryptography==50.0.2
+pydantic-settings==2.16.3
+email-validator==2.4.0
+numpy==2.5.5
+pillow==13.0.0
+piper-tts==1.8.0
+kokoro-onnx==0.4.7
+imageio-ffmpeg==0.8.1
+pywebpush==2.5.0

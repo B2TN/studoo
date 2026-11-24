@@ -1,5 +1,4 @@
-// Audio : découpage des textes pour la synthèse vocale, appels TTS, encodage MP3.
-import { api } from "./api.js";
+// Audio : découpage des textes et lecture par la voix du navigateur (anciens podcasts « script »).
 
 const SEGMENT_CHARS = 1300;
 
@@ -20,51 +19,6 @@ export function splitLines(lines, maxChars = SEGMENT_CHARS, maxLines = 20) {
   }
   if (current.length) segments.push(current);
   return segments;
-}
-
-/** Appelle la synthèse vocale Gemini : renvoie un Int16Array (PCM mono) et la fréquence. */
-export async function tts(lines, voices) {
-  const res = await api("/api/ai/tts", { method: "POST", json: { lines, voices }, raw: true });
-  const rate = Number(res.headers.get("X-Sample-Rate") || 24000);
-  const buf = await res.arrayBuffer();
-  return { pcm: new Int16Array(buf, 0, Math.floor(buf.byteLength / 2)), rate };
-}
-
-export function concatPcm(parts, gapSamples = 0) {
-  const total = parts.reduce((n, p) => n + p.length + gapSamples, 0);
-  const out = new Int16Array(total);
-  let offset = 0;
-  for (const p of parts) {
-    out.set(p, offset);
-    offset += p.length + gapSamples;
-  }
-  return out;
-}
-
-/** Encode du PCM 16 bits mono en MP3 (bibliothèque lamejs, 100 % dans le navigateur). */
-export async function encodeMp3(pcm, rate, kbps = 64, onProgress) {
-  const { Mp3Encoder } = await import("@breezystack/lamejs");
-  const enc = new Mp3Encoder(1, rate, kbps);
-  const chunks = [];
-  const block = 1152 * 20;
-  for (let i = 0; i < pcm.length; i += block) {
-    const out = enc.encodeBuffer(pcm.subarray(i, i + block));
-    if (out.length) chunks.push(new Uint8Array(out));
-    if (i % (block * 50) === 0) {
-      onProgress?.(i / pcm.length);
-      await new Promise((r) => setTimeout(r)); // laisse respirer l'interface
-    }
-  }
-  const end = enc.flush();
-  if (end.length) chunks.push(new Uint8Array(end));
-  return new Blob(chunks, { type: "audio/mpeg" });
-}
-
-/** Convertit du PCM Int16 en Float32 (pour WebAudio / WebCodecs). */
-export function toFloat32(pcm) {
-  const out = new Float32Array(pcm.length);
-  for (let i = 0; i < pcm.length; i++) out[i] = pcm[i] / 32768;
-  return out;
 }
 
 // ---------- Voix du navigateur (repli gratuit et illimité) ----------

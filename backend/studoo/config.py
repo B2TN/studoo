@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     session_secret: str = Field(default="dev-secret-change-me-dev-secret-change-me", min_length=32)  # voir DEFAULT_SECRET
     admin_emails: str = ""
 
+    # Tâches de fond : clé de chiffrement du contenu des tâches (partagée avec le worker),
+    # clé publique des notifications web, nombre max de tâches en attente par élève (anti-spam)
+    job_secret: str = Field(default="dev-job-secret-change-me-dev-job-secret", min_length=32)
+    vapid_public_key: str = ""
+    max_pending_jobs: int = 5
+
     # Base de données (SQLite en local, Postgres Neon en production)
     database_url: str = "sqlite:///./studoo-dev.db"
 

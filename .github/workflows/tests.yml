@@ -21,6 +21,18 @@ jobs:
       - run: python -m pytest -q
         working-directory: backend
 
+  worker:
+    name: Serveur de tâches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r worker/requirements.txt pytest
+      - run: python -m pytest -q
+        working-directory: worker
+
   web:
     name: Site
     runs-on: ubuntu-latest

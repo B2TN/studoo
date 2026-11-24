@@ -2,7 +2,8 @@
 import { h, mount } from "../lib/dom.js";
 import { icon } from "../lib/icons.js";
 import { addPending } from "../lib/pending.js";
-import { canvasToBase64, ocrImages, savePdfWithText } from "../lib/pdf-tools.js";
+import { createJob } from "../lib/jobs.js";
+import { canvasToBase64, savePdfWithText } from "../lib/pdf-tools.js";
 import { detectCorners, enhance, outputSize, warp } from "../lib/scan-core.js";
 import { errorToast, toast } from "../lib/ui.js";
 
@@ -191,27 +192,6 @@ export async function render({ view, go, refreshQuota }) {
     queue.push(...[...files].filter((f) => f.type.startsWith("image/")));
     if (editor.hidden) nextInQueue();
   }
-  /** Affiche le texte lu à côté de la photo ; renvoie le texte corrigé (ou null si annulé). */
-  function reviewText(text, shots) {
-    return new Promise((resolve) => {
-      const area = h("textarea", { class: "input", id: "ocr-text", rows: 14, spellcheck: true, style: { fontFamily: "var(--font-hand)", lineHeight: "1.6" } });
-      area.value = text;
-      const thumbs = h("div", { class: "pages" }, shots.slice(0, 8).map((p, i) =>
-        h("figure", {}, h("img", { src: smallCopy(p, 240).toDataURL("image/jpeg", 0.7), alt: `Page ${i + 1}` }), h("figcaption", {}, `Page ${i + 1}`))));
-      const card = h("section", { class: "card sketch stack", style: { marginTop: "20px" } },
-        h("h2", {}, "Vérifie le texte lu"),
-        h("p", { class: "small muted" }, "La lecture automatique peut se tromper, surtout sur l'écriture manuscrite. Corrige directement ci-dessous : c'est ce texte qui servira pour tes fiches, podcasts et corrections."),
-        thumbs,
-        h("div", { class: "field" }, h("label", { for: "ocr-text" }, "Texte lu (modifiable)"), area),
-        h("div", { class: "row" },
-          h("button", { class: "btn", type: "button", onclick: () => { card.remove(); resolve(null); } }, "Annuler"),
-          h("button", { class: "btn primary", type: "button", onclick: () => { card.remove(); resolve(area.value.trim()); } }, icon("check"), "Le texte est bon, continuer")));
-      finishBtn.after(card);
-      area.focus();
-      card.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-
   camera.addEventListener("change", () => { addFiles(camera.files); camera.value = ""; });
   gallery.addEventListener("change", () => { addFiles(gallery.files); gallery.value = ""; });
 
@@ -220,21 +200,21 @@ export async function render({ view, go, refreshQuota }) {
     status.textContent = "Création du PDF…";
     try {
       const pdf = await buildPdf(pages);
-      status.textContent = "Studoo lit tes pages pour deviner le cours (IA)…";
-      let text = "";
-      try {
-        text = await ocrImages(pages.slice(0, 8).map((p) => canvasToBase64(smallCopy(p, 1100), 0.7)));
-      } catch (err) {
-        toast(`Lecture IA impossible (${err.message}). Tu peux taper le texte toi-même ou continuer sans.`, "info", 8000);
-      }
-      refreshQuota?.();
-      status.textContent = "";
-      // Étape de relecture : l'élève voit le texte lu et corrige les erreurs de lecture.
-      const checked = await reviewText(text, pages);
-      if (checked === null) { finishBtn.disabled = false; return; }
+      // La lecture du texte (Qwen3-VL, open source) se fait sur le serveur, en tâche de fond.
+      const images = pages.slice(0, 8).map((p) => canvasToBase64(smallCopy(p, 1100), 0.7));
       const id = addPending({
-        kind: "scan", excerpt: checked || "Cours numérisé (texte non lu)", startedAt: new Date().toISOString(),
-        save: (folderId, title) => savePdfWithText({ folderId, title, pdfBlob: pdf, text: checked, kind: "scan" }),
+        kind: "scan", excerpt: "", startedAt: new Date().toISOString(),
+        save: async (folderId, title) => {
+          const file = await savePdfWithText({ folderId, title, pdfBlob: pdf, text: "", kind: "scan" });
+          try {
+            await createJob({ kind: "ocr", title: `Lecture — ${title}`.slice(0, 160), images, folder_id: folderId,
+              options: { pdf_id: file.id, title } });
+            toast("PDF rangé. Le serveur lit maintenant tes pages : tu pourras vérifier le texte lu dès qu'il est prêt.", "success", 9000);
+          } catch (err) {
+            toast(`PDF rangé, mais la lecture du texte n'a pas pu être lancée : ${err.message}`, "info", 9000);
+          }
+          return file;
+        },
       });
       go(`/confirmer?id=${id}`);
     } catch (err) {
@@ -252,5 +232,5 @@ export async function render({ view, go, refreshQuota }) {
       h("button", { class: "btn primary big", type: "button", onclick: () => camera.click() }, icon("camera"), "Prendre une photo"),
       h("button", { class: "btn big", type: "button", onclick: () => gallery.click() }, icon("photo"), "Choisir des images")),
     editor, pagesBox, status, h("div", { style: { marginTop: "16px" } }, finishBtn),
-    h("p", { class: "small muted", style: { marginTop: "18px" } }, icon("shield-lock"), " Le traitement de l'image se fait dans ton navigateur. Seule une copie réduite est envoyée à l'IA pour lire le texte."));
+    h("p", { class: "small muted", style: { marginTop: "18px" } }, icon("shield-lock"), " Le traitement de l'image se fait dans ton navigateur. Une copie réduite est lue par le serveur de Studoo (modèle open source Qwen3-VL), puis effacée."));
 }

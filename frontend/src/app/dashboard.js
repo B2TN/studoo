@@ -3,6 +3,7 @@ import { h, mount } from "../lib/dom.js";
 import { longDate, plural, relativeDate, time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
 import { swr } from "../lib/cache.js";
+import { jobsPanel } from "./jobs-panel.js";
 import { drive, HIDDEN_KINDS, KINDS, kindOf } from "../lib/storage.js";
 import { eventsOfDay, lessonAt, loadEvents, nextLesson } from "../lib/timetable-data.js";
 
@@ -98,6 +99,7 @@ export async function render({ view, user }) {
   const coursesSlot = h("div", {}, skeletonCard("Mes cours", "t-courses"));
   const recentSlot = h("div", {}, h("section", { class: "card sketch", "aria-busy": "true" }, h("div", { class: "sk sk-line" }), h("div", { class: "sk sk-line" })));
 
+  const jobs = jobsPanel();
   const showEvents = (events) => { mount(todaySlot, todayCard(events)); subtitle.textContent = subtitleText(events); };
   const showTree = (tree) => mount(coursesSlot, coursesCard(tree));
   const showRecent = (recent) => mount(recentSlot, recentCard(recent));
@@ -120,6 +122,7 @@ export async function render({ view, user }) {
       h("a", { class: `postit c-${color}`, href, "data-link": "1" }, h("span", { class: "tape" }), icon(ic, { doodle: true }),
         h("strong", {}, title), h("small", {}, sub)))),
     h("div", { class: "cols" }, todaySlot, coursesSlot),
+    jobs.el,
     h("h2", { class: "section" }, h("span", { class: "hl pink" }, "Récemment")),
     recentSlot);
   performance.mark("studoo:affichage");
@@ -130,4 +133,5 @@ export async function render({ view, user }) {
     const failed = results.find((r) => r.status === "rejected");
     if (failed && !tree.cached) mount(coursesSlot, h("section", { class: "card sketch" }, h("p", { class: "error" }, failed.reason?.message || "Google Drive ne répond pas.")));
   });
+  return () => jobs.stop();
 }

@@ -78,6 +78,40 @@ messages = Table(
     Column("handled", Boolean, nullable=False, default=False),
 )
 
+# File de tâches lourdes (podcasts, vidéos, OCR…) traitées par le worker.
+# `payload` contient, CHIFFRÉS, le texte des cours et le jeton Drive hors ligne :
+# il est effacé (mis à NULL) dès que la tâche est terminée ou abandonnée.
+jobs = Table(
+    "jobs", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("sub", String(64), nullable=False, index=True),
+    Column("kind", String(20), nullable=False),
+    Column("title", String(160), nullable=False, default=""),
+    Column("status", String(12), nullable=False, default="queued", index=True),  # queued | running | done | failed | cancelled
+    Column("progress", Integer, nullable=False, default=0),
+    Column("step", String(160), nullable=False, default=""),
+    Column("attempts", Integer, nullable=False, default=0),
+    Column("payload", Text, nullable=True),
+    Column("error", String(300), nullable=False, default=""),
+    Column("result_file_id", String(128), nullable=False, default=""),
+    Column("result_name", String(200), nullable=False, default=""),
+    Column("notified", Boolean, nullable=False, default=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("started_at", DateTime(timezone=True), nullable=True),
+    Column("finished_at", DateTime(timezone=True), nullable=True),
+    Column("locked_until", DateTime(timezone=True), nullable=True),
+)
+
+# Abonnements aux notifications web (PWA). Aucune donnée personnelle hormis l'adresse technique du navigateur.
+push_subscriptions = Table(
+    "push_subscriptions", metadata,
+    Column("endpoint", String(600), primary_key=True),
+    Column("sub", String(64), nullable=False, index=True),
+    Column("p256dh", String(200), nullable=False),
+    Column("auth", String(100), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
 _engine: Engine | None = None
 
 

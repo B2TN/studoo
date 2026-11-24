@@ -171,5 +171,7 @@ async def delete_account(user: Annotated[User, Depends(current_user)], response:
     with db.get_engine().begin() as conn:
         conn.execute(delete(db.users).where(db.users.c.sub == user.sub))
         conn.execute(delete(db.user_ai_usage).where(db.user_ai_usage.c.sub == user.sub))
+        conn.execute(delete(db.jobs).where(db.jobs.c.sub == user.sub))
+        conn.execute(delete(db.push_subscriptions).where(db.push_subscriptions.c.sub == user.sub))
     clear_session(response)
     return {"ok": True}

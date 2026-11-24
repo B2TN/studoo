@@ -1,10 +1,9 @@
 // Création d'une fiche, d'un podcast ou d'une vidéo à partir des cours choisis.
-import { api, ApiError } from "../lib/api.js";
-import { concatPcm, encodeMp3, splitLines, tts } from "../lib/audio.js";
+import { api } from "../lib/api.js";
+import { createJob, enablePush, needsHomeScreen, pushStatus } from "../lib/jobs.js";
 import { h, mount } from "../lib/dom.js";
-import { duration } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
-import { drive, gatherSources, getSettings, KINDS, kindOf, safeName, SOURCE_KINDS } from "../lib/storage.js";
+import { drive, gatherSources, KINDS, kindOf, safeName, SOURCE_KINDS } from "../lib/storage.js";
 import { errorToast, toast } from "../lib/ui.js";
 
 const TYPES = {
@@ -73,37 +72,10 @@ async function generateFiche({ sources, course, chapter }) {
   return api("/api/ai/fiche", { method: "POST", json: { sources, course, chapter } });
 }
 
-async function makePodcastAudio(script, voices, progress) {
-  const lines = script.lines.map((l) => ({ speaker: l.speaker, text: l.text }));
-  const segments = splitLines(lines);
-  const quota = await api("/api/ai/quota").catch(() => null);
-  if (quota && (quota.tts.remaining < segments.length || quota.user.remaining < segments.length)) {
-    return { fallback: `il faudrait ${segments.length} requêtes de voix et il en reste ${Math.min(quota.tts.remaining, quota.user.remaining)} aujourd'hui` };
-  }
-  const parts = [];
-  let rate = 24000;
-  for (const [i, seg] of segments.entries()) {
-    progress(`Voix : segment ${i + 1} / ${segments.length}`);
-    try {
-      const res = await tts(seg, voices);
-      parts.push(res.pcm);
-      rate = res.rate;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 429) return { fallback: err.message };
-      throw err;
-    }
-  }
-  return { pcm: concatPcm(parts, Math.round(rate * 0.35)), rate };
-}
-
 async function runGeneration(type, { sourcesFiles, dest, option, tree, out, go }) {
   const course = tree.find((c) => c.id === dest.courseId);
   const chapter = course?.chapters.find((ch) => ch.id === dest.chapterId);
-  const steps = {
-    fiche: ["Lecture de tes cours", "Écriture de la fiche par l'IA", "Rangement dans ton Drive"],
-    podcast: ["Lecture de tes cours", "Écriture du script à deux voix", "Enregistrement des voix", "Fabrication du MP3", "Rangement dans ton Drive"],
-    video: ["Lecture de tes cours", "Écriture du script et des diapos", "Enregistrement de la voix", "Fabrication de la vidéo", "Rangement dans ton Drive"],
-  }[type];
+  const steps = ["Lecture de tes cours", "Écriture de la fiche par l'IA", "Rangement dans ton Drive"];
   const prog = progressList(steps);
   const bar = h("div", { class: "bar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100" }, h("span"));
   mount(out, h("section", { class: "card sketch stack" }, h("h2", {}, "C'est parti !"), prog.el, bar,
@@ -115,7 +87,6 @@ async function runGeneration(type, { sourcesFiles, dest, option, tree, out, go }
   if (!sources.length) throw new Error("Les fichiers choisis ne contiennent pas de texte utilisable.");
   const payload = { sources, course: course?.name || "", chapter: chapter?.name || "" };
   const folderId = dest.chapterId || dest.courseId;
-  const settings = await getSettings();
 
   if (type === "fiche") {
     prog.step(1); setBar(0.3);
@@ -129,54 +100,50 @@ async function runGeneration(type, { sourcesFiles, dest, option, tree, out, go }
     return file;
   }
 
-  if (type === "podcast") {
-    prog.step(1); setBar(0.1);
-    const script = await api("/api/ai/podcast", { method: "POST", json: { ...payload, minutes: option } });
-    prog.step(2); setBar(0.25);
-    const audio = await makePodcastAudio(script, settings.voices, (t) => prog.step(2, t));
-    if (audio.fallback) {
-      toast(`Voix Gemini indisponible (${audio.fallback}) : le podcast sera lu par la voix de ton appareil.`, "info", 9000);
-      prog.step(4); setBar(0.9);
-      const file = await drive.save({
-        parentId: folderId, name: `Podcast — ${safeName(script.title, 70)}.json`, mimeType: "application/json", kind: "podcast-script",
-        props: { minutes: String(option) },
-        blob: new Blob([JSON.stringify(script, null, 2)], { type: "application/json" }),
-      });
-      prog.done(); setBar(1);
-      return file;
-    }
-    prog.step(3); setBar(0.7);
-    const mp3 = await encodeMp3(audio.pcm, audio.rate, 64, (p) => setBar(0.7 + p * 0.2));
-    prog.step(4); setBar(0.92);
-    const file = await drive.save({
-      parentId: folderId, name: `Podcast — ${safeName(script.title, 70)}.mp3`, mimeType: "audio/mpeg", kind: "podcast",
-      props: { minutes: String(Math.round(audio.pcm.length / audio.rate / 60)), hosts: `${script.host_a} & ${script.host_b}`.slice(0, 100) },
-      blob: mp3,
-    });
-    prog.done(); setBar(1);
-    return file;
-  }
+  return null; // podcasts et vidéos : voir launchServerJob
+}
 
-  // ----- Vidéo -----
-  const { renderMp4, slideDurations, supportsWebCodecs } = await import("../lib/video-render.js");
-  if (!supportsWebCodecs()) throw new Error("La fabrication de vidéos nécessite un navigateur récent (Chrome, Edge, Firefox 130+, Safari 17+).");
-  prog.step(1); setBar(0.05);
-  const script = await api("/api/ai/video", { method: "POST", json: { ...payload, format: option } });
-  prog.step(2); setBar(0.15);
-  const narration = script.slides.map((s) => ({ speaker: "N", text: s.narration }));
-  const audio = await makePodcastAudio({ lines: narration }, settings.voices, (t) => prog.step(2, t));
-  if (audio.fallback) toast(`Voix indisponible (${audio.fallback}) : vidéo sous-titrée, sans voix.`, "info", 9000);
-  const pcm = audio.fallback ? null : audio.pcm;
-  const durations = slideDurations(script.slides, pcm ? pcm.length / audio.rate : null);
-  prog.step(3, `Fabrication de la vidéo (${duration(durations.reduce((a, b) => a + b, 0))})`);
-  const mp4 = await renderMp4({ script, format: option, durations, pcm, rate: audio.rate || 24000, onProgress: (p) => setBar(0.3 + p * 0.6) });
-  prog.step(4); setBar(0.92);
-  const file = await drive.save({
-    parentId: folderId, name: `Vidéo — ${safeName(script.title, 70)}.mp4`, mimeType: "video/mp4", kind: "video",
-    props: { format: option, voice: pcm ? "gemini" : "none" }, blob: mp4,
+/**
+ * Podcasts et vidéos : le travail lourd part sur le serveur de tâches.
+ * On lit les cours ici (ils sont dans ton Drive), on les envoie chiffrés, et c'est tout :
+ * tu peux fermer la page, tu seras prévenu à la fin.
+ */
+async function launchServerJob(type, { sourcesFiles, dest, option, voice, tree, out }) {
+  const course = tree.find((c) => c.id === dest.courseId);
+  const chapter = course?.chapters.find((ch) => ch.id === dest.chapterId);
+  mount(out, h("section", { class: "card sketch" }, h("div", { class: "loading" }, h("div", { class: "spinner" }), "Lecture de tes cours…")));
+  const sources = await gatherSources(sourcesFiles);
+  if (!sources.length) throw new Error("Les fichiers choisis ne contiennent pas de texte utilisable.");
+  const title = sourcesFiles.length === 1 ? sourcesFiles[0].name.replace(/\.(md|pdf|json)$/i, "") : `${course?.name || "Cours"} — ${chapter?.name || "révision"}`;
+  const job = await createJob({
+    kind: type, title: `${type === "podcast" ? "Podcast" : "Vidéo"} — ${title}`.slice(0, 160),
+    sources, options: type === "podcast" ? { minutes: option, voice } : { format: option, voice },
+    folder_id: dest.chapterId || dest.courseId, course: course?.name || "", chapter: chapter?.name || "",
   });
-  prog.done(); setBar(1);
-  return file;
+  return job;
+}
+
+function launchedCard(job, go) {
+  const notifyArea = h("div", { class: "stack" });
+  const paint = async () => {
+    const status = await pushStatus().catch(() => "unsupported");
+    if (status === "on") { mount(notifyArea, h("p", { class: "small" }, icon("check"), " Tu recevras une notification sur cet appareil.")); return; }
+    if (status === "unsupported" || status === "denied") { mount(notifyArea, h("p", { class: "small muted" }, "Tu recevras un e-mail et une pastille sur le tableau de bord à la fin.")); return; }
+    mount(notifyArea, h("button", { class: "btn", type: "button", onclick: async () => {
+      try { await enablePush(); toast("Notifications activées", "success"); } catch (e) { toast(e.message, "info", 9000); }
+      paint();
+    } }, icon("bulb"), "Me prévenir sur cet appareil"),
+    needsHomeScreen() ? h("p", { class: "small muted" }, "Sur iPhone : ajoute d'abord Studoo à l'écran d'accueil (Partager → « Sur l'écran d'accueil »).") : null);
+  };
+  paint();
+  return h("section", { class: "card sketch stack" },
+    h("span", { class: "tape" }),
+    h("h2", {}, "C'est lancé !"),
+    h("p", {}, `« ${job.title} » est en préparation sur le serveur de Studoo. `,
+      h("strong", {}, "Tu peux fermer la page ou éteindre ton téléphone"), " : le fichier arrivera dans ton Drive, dans le dossier choisi."),
+    h("p", { class: "small muted" }, "Sur le serveur gratuit (sans carte graphique), compte quelques minutes pour un format court et jusqu'à une heure pour 30 minutes de contenu."),
+    notifyArea,
+    h("div", { class: "row" }, h("a", { class: "btn primary", href: "/", "data-link": "1" }, "Suivre sur le tableau de bord")));
 }
 
 export async function render({ view, params, data, go, refreshQuota }) {
@@ -187,6 +154,7 @@ export async function render({ view, params, data, go, refreshQuota }) {
   const picker = sourcePicker(tree, files, data?.fileIds || []);
 
   const options = type === "podcast" ? choiceGroup("duree", PODCAST, 10) : type === "video" ? choiceGroup("format", VIDEO, "short") : null;
+  const voices = type === "fiche" ? null : choiceGroup("voix", [["naturelle", "Voix naturelle", "Plus agréable, un peu plus longue à fabriquer"], ["rapide", "Voix rapide", "Plus robotique, prête beaucoup plus vite"]], "naturelle");
   const destSel = h("select", { class: "input", id: "dest" }, tree.flatMap((c) => [
     h("option", { value: `${c.id}|`, }, `${c.name} (racine)`),
     ...c.chapters.map((ch) => h("option", { value: `${c.id}|${ch.id}` }, `${c.name} › ${ch.name}`)),
@@ -216,6 +184,18 @@ export async function render({ view, params, data, go, refreshQuota }) {
     const option = type === "podcast" ? Number(form.querySelector("input[name=duree]:checked").value)
       : type === "video" ? form.querySelector("input[name=format]:checked").value : null;
     form.hidden = true;
+    if (type !== "fiche") {
+      try {
+        const voice = form.querySelector("input[name=voix]:checked").value;
+        const job = await launchServerJob(type, { sourcesFiles: chosen, dest: { courseId, chapterId }, option, voice, tree, out });
+        mount(out, launchedCard(job, go));
+      } catch (e2) {
+        errorToast(e2);
+        mount(out);
+        form.hidden = false;
+      }
+      return;
+    }
     try {
       const file = await runGeneration(type, { sourcesFiles: chosen, dest: { courseId, chapterId }, option, tree, out, go });
       toast(`${meta.noun.charAt(0).toUpperCase() + meta.noun.slice(1)} prêt${type === "video" || type === "fiche" ? "e" : ""} !`, "success");
@@ -232,12 +212,12 @@ export async function render({ view, params, data, go, refreshQuota }) {
     h("p", { class: "small muted" }, "L'IA utilise uniquement le contenu de ces documents."),
     picker.el,
     options ? [h("h2", { class: "section" }, type === "podcast" ? "2. Durée" : "2. Format"), options] : null,
-    h("h2", { class: "section" }, `${options ? 3 : 2}. Où le ranger ?`),
+    voices ? [h("h2", { class: "section" }, "3. Voix"), voices] : null,
+    h("h2", { class: "section" }, `${options ? 4 : 2}. Où le ranger ?`),
     h("div", { class: "field" }, h("label", { for: "dest" }, "Dossier (par défaut : le chapitre du dernier cours coché)"), destSel),
     err,
     h("div", {}, submit),
-    type !== "fiche" ? h("p", { class: "small muted" }, "Offre gratuite : si le quota de voix Gemini du jour est épuisé, ",
-      type === "podcast" ? "le podcast sera lu par la voix de ton appareil." : "la vidéo sera sous-titrée sans voix.") : null);
+    type !== "fiche" ? h("p", { class: "small muted" }, "Fabriqué sur le serveur de Studoo avec des outils open source : tu pourras fermer la page.") : null);
 
   mount(view,
     h("h1", { class: "view-title" }, h("span", { class: `hl ${meta.color}` }, meta.title)),

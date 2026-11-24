@@ -48,9 +48,29 @@ export async function render({ view, params, go }) {
   const title = file.name.replace(/\.(md|json|pdf|mp3|mp4)$/i, "");
 
   let body;
+  let editBtn = null;
   if (kind === "transcript" || kind === "scan-text") {
-    const text = await drive.readText(file.id);
-    body = h("div", { class: "transcript-body" }, renderMarkdown(text.replace(/^# .*\n/, ""), h));
+    let text = await drive.readText(file.id);
+    const shownText = () => h("div", { class: "transcript-body" }, renderMarkdown(text.replace(/^# .*\n/, ""), h));
+    body = h("div", {}, shownText());
+    // L'élève peut corriger une erreur de lecture (OCR) ou de transcription avant de s'en servir.
+    editBtn = h("button", { class: "btn small primary", onclick: () => {
+      const area = h("textarea", { class: "input", rows: 18, "aria-label": "Texte à corriger", style: { fontFamily: "var(--font-hand)", lineHeight: "1.6" } });
+      area.value = text;
+      const save = h("button", { class: "btn primary", type: "button", onclick: async () => {
+        save.disabled = true;
+        try {
+          await drive.updateContent(file.id, new Blob([area.value], { type: "text/markdown" }), "text/markdown");
+          text = area.value;
+          mount(body, shownText());
+          toast("Texte corrigé et enregistré", "success");
+        } catch (e) { errorToast(e); save.disabled = false; }
+      } }, icon("check"), "Enregistrer");
+      mount(body, h("div", { class: "stack" },
+        h("p", { class: "small muted" }, "Corrige les mots mal lus : c'est ce texte qui sert pour tes fiches, podcasts et corrections."), area,
+        h("div", { class: "row" }, h("button", { class: "btn", type: "button", onclick: () => mount(body, shownText()) }, "Annuler"), save)));
+      area.focus();
+    } }, icon("edit"), "Corriger le texte");
   } else if (kind === "fiche") {
     body = renderFiche(await drive.readJson(file.id));
   } else if (kind === "podcast") {
@@ -75,6 +95,10 @@ export async function render({ view, params, go }) {
 
   const actions = [
     kind === "fiche" ? h("button", { class: "btn primary", onclick: () => window.print() }, icon("printer"), "Exporter en PDF") : null,
+    editBtn,
+    kind === "scan" && file.appProperties?.textId
+      ? h("a", { class: "btn small primary", href: `/fichier/${file.appProperties.textId}`, "data-link": "1" }, icon("file-text"), "Voir / corriger le texte lu")
+      : kind === "scan" ? h("span", { class: "badge" }, "Texte en cours de lecture sur le serveur…") : null,
     SOURCE_KINDS.has(kind) ? [
       h("button", { class: "btn small c-green", onclick: () => go("/creer/fiche", { data: { fileIds: [file.id] } }) }, icon("notes"), "Fiche"),
       h("button", { class: "btn small c-blue", onclick: () => go("/creer/podcast", { data: { fileIds: [file.id] } }) }, icon("headphones"), "Podcast"),

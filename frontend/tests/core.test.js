@@ -9,7 +9,6 @@ import { match } from "../src/lib/router.js";
 import { applyH, detectCorners, enhance, homography, otsu, outputSize, warp } from "../src/lib/scan-core.js";
 import { ficheToText, safeName } from "../src/lib/storage.js";
 import { eventsOfDay, lessonAt, subjectsOf } from "../src/lib/timetable-data.js";
-import { captionAt, slideDurations } from "../src/lib/video-render.js";
 import { findChapter, findCourse } from "../src/app/confirm.js";
 
 describe("scanner", () => {
@@ -91,17 +90,6 @@ describe("audio", () => {
     const segs = splitLines(lines);
     for (const s of segs) expect(s.reduce((n, l) => n + l.text.length, 0)).toBeLessThanOrEqual(1300);
     expect(segs.flat()).toHaveLength(30);
-  });
-});
-
-describe("vidéo", () => {
-  it("sous-titres et durées", () => {
-    const text = Array.from({ length: 30 }, (_, i) => `mot${i}`).join(" ");
-    expect(captionAt(text, 0)).toMatch(/^mot0 /);
-    expect(captionAt(text, 0.99)).toMatch(/mot29$/);
-    const d = slideDurations([{ narration: "a".repeat(100) }, { narration: "a".repeat(300) }], 40);
-    expect(d[0] + d[1]).toBeCloseTo(40);
-    expect(d[1]).toBeGreaterThan(d[0]);
   });
 });
 

@@ -28,6 +28,7 @@ async def public_config():
         "googleClientId": s.google_client_id,
         "devLogin": s.dev_login_enabled,
         "aiFake": s.ai_fake_enabled,
+        "vapidPublicKey": s.vapid_public_key,
     }
 
 
