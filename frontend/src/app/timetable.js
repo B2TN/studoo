@@ -6,7 +6,7 @@ import { icon } from "../lib/icons.js";
 import { drive, getSettings } from "../lib/storage.js";
 import { addSource, clearTimetableCache, loadEvents, pronoteLogin, removeSource } from "../lib/timetable-data.js";
 import {
-  detectSoftware, HIGH_SCHOOL_SERVICES, ICAL_STEPS_PRONOTE, ICAL_STEPS_UNIVERSITY, QR_STEPS_PRONOTE, UNIVERSITIES,
+  detectSoftware, HIGH_SCHOOL_SERVICES, ICAL_STEPS_UNIVERSITY, QR_STEPS_PRONOTE, UNIVERSITIES,
 } from "../lib/establishments.js";
 import { openDialog, store, toast } from "../lib/ui.js";
 
@@ -250,8 +250,7 @@ function openHighSchool(s, done) {
     return h("div", { class: "stack" }, h("p", { class: "small" }, s.note),
       h("details", { open: true }, h("summary", {}, h("strong", {}, "Méthode 1 : QR code (recommandée, aucun mot de passe)")), qr.el),
       h("details", {}, h("summary", {}, h("strong", {}, s.ent ? `Méthode 2 : identifiants ${s.short || "ENT"}` : "Méthode 2 : identifiants Pronote")), pwdSlot),
-      h("details", {}, h("summary", {}, h("strong", {}, "Méthode 3 : lien iCal depuis Pronote (aucun mot de passe)")),
-        icsForm({ steps: ICAL_STEPS_PRONOTE, onDone: finish })));
+      h("p", { class: "small muted" }, "Studoo va chercher ton emploi du temps tout seul et le garde à jour : aucun lien à copier."));
   }, { onClose: () => qr?.stop() });
 }
 
@@ -264,6 +263,8 @@ function addPanel(go) {
         icon("school"), h("span", {}, h("strong", {}, s.name)))))),
     ],
     ["Je suis étudiant·e", () => h("div", { class: "stack" },
+      h("p", { class: "card sketch small" }, icon("bulb"), " La connexion automatique aux ENT universitaires (ADE « MyPlanning ») arrive avec le serveur de tâches de Studoo. ",
+        h("strong", {}, "En attendant, dernier recours :"), " copier une fois le lien d'export de ton emploi du temps."),
       h("p", {}, "Choisis ton établissement, ou « Autre » :"),
       h("div", { class: "establishments" }, [...UNIVERSITIES, { name: "Autre établissement", city: "", url: "" }].map((u) =>
         h("button", { class: "btn", type: "button", onclick: () => openDialog(u.name, (close) => h("div", { class: "stack" },
@@ -276,7 +277,8 @@ function addPanel(go) {
           h("p", { class: "small muted" }, icon("shield-lock"), " Tu te connectes sur la page officielle de ton université : Studoo ne voit jamais ton mot de passe. Il garde seulement le lien d'export, chiffré. Studoo teste automatiquement plusieurs formats du lien (iCal forcé, période glissante) pour qu'il reste valable toute l'année."))) },
           icon("school"), h("span", {}, h("strong", {}, u.name), u.city ? h("span", { class: "small muted" }, ` · ${u.city}`) : null))))),
     ],
-    ["Lien ou fichier .ics", () => h("div", { class: "stack" },
+    ["Dernier recours : .ics", () => h("div", { class: "stack" },
+      h("p", { class: "small muted" }, "Seulement si ton service n'a pas de connexion automatique (ÉcoleDirecte, Skolengo sans Pronote…)."),
       icsForm({ onDone: done }), h("hr"), icsFileForm(done))],
   ];
   const panel = h("div", { style: { marginTop: "14px" } });

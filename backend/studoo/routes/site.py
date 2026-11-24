@@ -31,6 +31,51 @@ async def public_config():
     }
 
 
+# Services d'emploi du temps à joindre depuis l'hébergeur (certains bloquent les serveurs).
+CONNECTOR_HOSTS = {
+    "Pronote (serveur de démonstration)": "https://demo.index-education.net/pronote/eleve.html",
+    "Monlycée.net": "https://auth.monlycee.net/",
+    "Mon Bureau Numérique": "https://cas.monbureaunumerique.fr/login",
+    "ENT Hauts-de-France": "https://enthdf.fr/",
+    "Toutatice": "https://www.toutatice.fr/",
+    "Université Paris Cité (CAS)": "https://auth.u-paris.fr/idp/profile/cas/login",
+    "ADE Paris Cité": "https://adeconsult.app.u-pariscite.fr/direct/myplanning.jsp",
+}
+_connector_cache: dict = {}
+
+
+@router.get("/health/connecteurs")
+def connectors_health(request: Request):
+    """Diagnostic public : les services d'emploi du temps répondent-ils depuis ce serveur ?
+
+    Fait aussi une vraie connexion au Pronote de DÉMONSTRATION (identifiants publics
+    fournis par Index Éducation). Résultat gardé 10 minutes pour ne pas surcharger.
+    """
+    rate_limit(f"diag:{client_ip(request)}", limit=5, window_seconds=600)
+    if _connector_cache.get("at", 0) > time.time() - 600:
+        return _connector_cache["data"]
+    import httpx
+    from ..services import pronote
+    hosts = {}
+    with httpx.Client(timeout=10, follow_redirects=False, headers={"User-Agent": "Studoo-diagnostic/1.0"}) as client:
+        for name, url in CONNECTOR_HOSTS.items():
+            try:
+                hosts[name] = client.get(url).status_code
+            except httpx.HTTPError as exc:
+                hosts[name] = f"erreur : {type(exc).__name__}"
+    try:
+        t = time.perf_counter()
+        events, keep = pronote.login("password", url=CONNECTOR_HOSTS["Pronote (serveur de démonstration)"],
+                                     username="demonstration", password="pronotevs")
+        demo = {"ok": True, "cours": len(events), "lien_ical": bool(keep and keep["kind"] == "ical"),
+                "secondes": round(time.perf_counter() - t, 1)}
+    except Exception as exc:  # noqa: BLE001
+        demo = {"ok": False, "erreur": getattr(exc, "detail", None) or type(exc).__name__}
+    data = {"hotes": hosts, "pronote_demo": demo}
+    _connector_cache.update(at=time.time(), data=data)
+    return data
+
+
 @router.get("/health")
 async def health():
     from importlib.util import find_spec

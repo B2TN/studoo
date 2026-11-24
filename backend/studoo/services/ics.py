@@ -88,9 +88,10 @@ def clean_subject(summary: str) -> str:
     s = PREFIX_RE.sub("", s).strip(" -–:")
     s = re.sub(r"\s+(LV\d|LVA|LVB|SPE|SPÉ|OPT)\b.*$", "", s, flags=re.I).strip()
     if s.isupper():
-        s = s.capitalize()
-    fixes = {"Mathematiques": "Mathématiques", "Francais": "Français", "Histoire-geographie": "Histoire-Géographie",
-             "Physique-chimie": "Physique-Chimie", "Sciences economiques et sociales": "SES",
+        # « HISTOIRE-GÉOGRAPHIE » → « Histoire-Géographie » (majuscule à chaque partie)
+        s = "-".join(part.capitalize() for part in s.split("-"))
+    fixes = {"Mathematiques": "Mathématiques", "Francais": "Français", "Histoire-geographie": "Histoire-Géographie", "Histoire-Geographie": "Histoire-Géographie",
+             "Physique-chimie": "Physique-Chimie", "Sciences-Physiques": "Physique-Chimie", "Sciences economiques et sociales": "SES",
              "Education physique et sportive": "EPS", "Svt": "SVT", "Ses": "SES", "Eps": "EPS", "Nsi": "NSI",
              "Snt": "SNT", "Hggsp": "HGGSP", "Llcer": "LLCER"}
     return fixes.get(s, s)[:80] or "Cours"
