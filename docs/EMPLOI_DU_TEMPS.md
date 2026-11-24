@@ -1,52 +1,36 @@
-# Emploi du temps : ce qui est réellement faisable (vérifié le 24/11/2026)
+# Emploi du temps : récupération automatique (mis à jour le 24/11/2026)
 
-Aucun de ces services n'a d'API publique officielle, et aucun ne propose une connexion de type
-« OAuth » (comme « Se connecter avec Google ») qui renverrait un jeton à un site extérieur.
-Studoo utilise donc trois techniques, de la plus sûre à la moins sûre :
-
-| Technique | Mot de passe transite par Studoo ? | Ce qui est gardé | Durée de vie |
-|---|---|---|---|
-| **Lien iCal** (copié depuis la page officielle) | Non : tu te connectes sur le site officiel | Le lien, **chiffré** | Tant que tu ne le régénères pas (souvent toute l'année) |
-| **QR code Pronote** | Non (code PIN à 4 chiffres seulement) | Le lien iCal du compte, ou à défaut le jeton de reconnexion Pronote, **chiffré** | Jeton renouvelé à chaque synchro |
-| **Identifiants** (Pronote ou ENT régional) | **Oui, une seule fois**, en HTTPS, en mémoire | Le lien iCal du compte, **chiffré** (jamais le mot de passe) | Celle du lien iCal |
-
-**Chiffrement :** clé connue du seul serveur, jeton lié à ton compte Studoo (inutilisable par un autre compte).
-**Journaux :** les mots de passe sont typés `SecretStr`, les messages détaillés de la bibliothèque sont coupés.
-**Révocation :** « Déconnecter » supprime le jeton de ton Drive. Pour couper aussi côté école,
-régénère ton lien iCal dans Pronote/ADE (l'ancien cesse de marcher).
+Objectif : l'élève **se connecte à son service**, Studoo **va chercher lui-même** l'emploi du temps et le
+garde à jour. Aucun lien à coller, aucun identifiant ni mot de passe stocké : seulement un **jeton chiffré**
+(lié au compte Studoo), supprimé par « Déconnecter ».
 
 ## Service par service
 
-| Service | QR code | Identifiants | Lien iCal | Remarques |
+| Service | Comment Studoo récupère l'emploi du temps | Testé depuis le serveur | Fiabilité | État |
 |---|---|---|---|---|
-| **Pronote (compte direct)** | ✅ | ✅ identifiants Pronote | ✅ Pronote 2024+ | Bibliothèque non officielle `pronotepy` (MIT, en maintenance). |
-| **Monlycée.net (Île-de-France)** | ✅ | ✅ via `ent.ile_de_france` | ✅ | Le site a changé d'adresse en 2025 : risque de casse si le portail change encore. |
-| **Mon Bureau Numérique (Grand Est)** | ✅ | ✅ via `ent.monbureaunumerique` | ✅ | |
-| **ENT Hauts-de-France** | ✅ | ✅ via `ent.ent_hdf` | ✅ | |
-| **Toutatice (Bretagne)** | ✅ | ✅ via `ent.ac_rennes` | ✅ | |
-| **Éclat-BFC, Atrium, + 20 autres ENT** | ✅ | ✅ (liste « Autre ENT régional ») | ✅ | 26 ENT proposés, pris dans les 43 de `pronotepy`. |
-| **Skolengo** | ✅ si Pronote | ❌ non pris en charge | ✅ si Pronote | Pas de connecteur Skolengo dans `pronotepy`. |
-| **ÉcoleDirecte** | ❌ | ❌ | ❌ | Pas d'export iCal ; seulement l'import d'un fichier `.ics`. |
-| **IUT de Paris – Rives de Seine / Université Paris Cité (ADE)** | — | ❌ volontairement | ✅ | Connexion sur la page officielle (CAS `auth.u-paris.fr`), puis « Export Agenda → Générer URL ». Le lien `anonymous_cal.jsp` se lit sans identifiant (vérifié : le serveur ADE 6.16 répond publiquement). |
-| **19 autres universités** | — | ❌ | ✅ | Même principe (ADE, Celcat, HyperPlanning). |
+| **Pronote (compte direct)** | Bibliothèque non officielle `pronotepy` : QR code (aucun mot de passe) ou identifiant + mot de passe (utilisé une fois). Studoo garde le **lien iCal officiel** du compte (fonction Pronote 2024+), chiffré, puis le relit à chaque visite. | ✅ vraie connexion au Pronote de démonstration depuis Vercel (Paris) : 132 cours en 0,6 s, lien iCal obtenu | Bonne, mais peut casser lors d'une mise à jour de Pronote | **Automatique** |
+| **Monlycée.net (Île-de-France)** | `pronotepy` + connexion à l'ENT (`ent.ile_de_france`) avec les identifiants Monlycée.net, puis même chose que Pronote | ✅ ENT joignable | Moyenne (le portail a changé d'adresse en 2025) | **Automatique** (à confirmer avec un vrai compte) |
+| **Mon Bureau Numérique (Grand Est)** | `pronotepy` + `ent.monbureaunumerique` | ✅ joignable **depuis Paris** (bloqué depuis les États-Unis → fonctions déplacées à Paris) | Moyenne | **Automatique** (à confirmer) |
+| **ENT Hauts-de-France** | `pronotepy` + `ent.ent_hdf` | ✅ | Moyenne | **Automatique** (à confirmer) |
+| **Toutatice (Bretagne)** | `pronotepy` + `ent.ac_rennes` | ✅ **depuis Paris** (délai dépassé depuis les États-Unis) | Moyenne | **Automatique** (à confirmer) |
+| **Éclat-BFC, Atrium + 20 autres ENT** | `pronotepy` (26 ENT proposés) | non testé un par un | Variable | **Automatique** (à confirmer) |
+| **Skolengo** | Si le lycée utilise Pronote : QR code Pronote. Pas de connecteur Skolengo dans `pronotepy`. | — | — | Automatique via Pronote, sinon **dernier recours `.ics`** |
+| **ÉcoleDirecte** | Aucun export iCal, pas de connecteur fiable maintenu. | — | — | **Dernier recours `.ics`** (dit clairement dans le site) |
+| **Universités ADE** (Paris Cité / IUT Rives de Seine, Aix-Marseille, Lyon 1, Rennes, Montpellier…) | Connexion au **CAS de l'université** (mot de passe utilisé une fois), ouverture de la page personnelle **ADE « MyPlanning »**, puis export iCal. MyPlanning est une application GWT : il faut piloter un **navigateur invisible (Playwright)**, trop lourd pour Vercel → tourne sur le **serveur de tâches (C1)**. Studoo garde le lien d'export ADE (il se lit sans identifiant), chiffré. | ✅ ADE Paris Cité joignable, redirige bien vers `auth.u-paris.fr` ; MyPlanning existe à Paris Cité, Lyon 1, Rennes, Montpellier | Moyenne (même interface ADE partout) ; **impossible si l'université impose la double authentification** | **En attente du serveur de tâches** ; dernier recours `.ics` en attendant |
+| **Universités Celcat** (Bordeaux…) | Connexion CAS puis API JSON de Celcat (`GetCalendarData`) | ✅ Celcat Bordeaux joignable | Moyenne | **En attente du serveur de tâches** |
+| **Autres universités** | Même moteur générique CAS + ADE/Celcat, à activer université par université | — | — | À ajouter (il suffit de l'adresse de leur ADE / Celcat) |
 
-### Pourquoi pas de connexion par mot de passe pour les universités ?
-La connexion CAS des universités (souvent avec double authentification) changerait d'une
-université à l'autre, je ne peux pas la tester sans comptes, et elle ferait transiter ton
-mot de passe universitaire (qui ouvre aussi ta messagerie, tes notes…) par le serveur. Le lien
-d'export donne exactement le même résultat **sans aucun mot de passe**.
+Adresses ADE vérifiées le 24/11/2026 (redirection vers le CAS de l'université) :
+`adeconsult.app.u-pariscite.fr` · `ade-web-consult.univ-amu.fr` · `adelb.univ-lyon1.fr` · `planning.univ-rennes.fr` ·
+`proseconsult.umontpellier.fr` · `ade-uga-ro-vs.grenet.fr` · Celcat : `celcat.u-bordeaux.fr`.
 
-### « Teste tout » : ce que fait Studoo avec un lien ADE
-1. Le lien tel quel, avec les dates prolongées automatiquement (aujourd'hui −14 j → +180 j).
-2. Le même lien en forçant `calType=ical`.
-3. La version « 26 semaines glissantes » (`nbWeeks=26`), qui ne périme jamais.
-4. La version `https://` si le lien était en `http://`.
+## Sécurité
+- Mot de passe : type `SecretStr` (jamais affiché), utilisé en mémoire pour ouvrir la session, **jamais stocké ni journalisé**.
+- Jeton gardé : lien iCal (ou jeton de reconnexion Pronote), **chiffré** (Fernet, clé serveur) et lié au compte Studoo.
+- « Déconnecter » supprime le jeton. Pour couper aussi côté école : régénérer le lien iCal dans Pronote/ADE.
+- Diagnostic public : `/api/health/connecteurs` (joignabilité depuis le serveur + connexion au Pronote de démonstration).
 
-La première version qui renvoie un vrai calendrier est gardée (chiffrée).
-
-### Risques
-- **Conditions d'utilisation** : les connecteurs Pronote/ENT ne sont ni officiels ni autorisés
-  explicitement par Index Éducation ou les régions (zone grise). Le lien iCal, lui, est une
-  fonction officielle prévue pour être utilisée dans un agenda.
-- **Casse** : une mise à jour de Pronote ou d'un portail ENT peut casser la connexion par
-  identifiants ou QR code du jour au lendemain. Le lien iCal reste la méthode de secours.
+## Risques
+- Connecteurs **non officiels** (zone grise vis-à-vis des conditions d'Index Éducation et des régions) ;
+  une mise à jour d'un portail peut les casser du jour au lendemain.
+- Certains services filtrent les serveurs étrangers : les fonctions Studoo tournent donc **à Paris** (`cdg1`).

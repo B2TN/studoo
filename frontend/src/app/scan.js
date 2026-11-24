@@ -191,6 +191,27 @@ export async function render({ view, go, refreshQuota }) {
     queue.push(...[...files].filter((f) => f.type.startsWith("image/")));
     if (editor.hidden) nextInQueue();
   }
+  /** Affiche le texte lu à côté de la photo ; renvoie le texte corrigé (ou null si annulé). */
+  function reviewText(text, shots) {
+    return new Promise((resolve) => {
+      const area = h("textarea", { class: "input", id: "ocr-text", rows: 14, spellcheck: true, style: { fontFamily: "var(--font-hand)", lineHeight: "1.6" } });
+      area.value = text;
+      const thumbs = h("div", { class: "pages" }, shots.slice(0, 8).map((p, i) =>
+        h("figure", {}, h("img", { src: smallCopy(p, 240).toDataURL("image/jpeg", 0.7), alt: `Page ${i + 1}` }), h("figcaption", {}, `Page ${i + 1}`))));
+      const card = h("section", { class: "card sketch stack", style: { marginTop: "20px" } },
+        h("h2", {}, "Vérifie le texte lu"),
+        h("p", { class: "small muted" }, "La lecture automatique peut se tromper, surtout sur l'écriture manuscrite. Corrige directement ci-dessous : c'est ce texte qui servira pour tes fiches, podcasts et corrections."),
+        thumbs,
+        h("div", { class: "field" }, h("label", { for: "ocr-text" }, "Texte lu (modifiable)"), area),
+        h("div", { class: "row" },
+          h("button", { class: "btn", type: "button", onclick: () => { card.remove(); resolve(null); } }, "Annuler"),
+          h("button", { class: "btn primary", type: "button", onclick: () => { card.remove(); resolve(area.value.trim()); } }, icon("check"), "Le texte est bon, continuer")));
+      finishBtn.after(card);
+      area.focus();
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   camera.addEventListener("change", () => { addFiles(camera.files); camera.value = ""; });
   gallery.addEventListener("change", () => { addFiles(gallery.files); gallery.value = ""; });
 
@@ -204,12 +225,16 @@ export async function render({ view, go, refreshQuota }) {
       try {
         text = await ocrImages(pages.slice(0, 8).map((p) => canvasToBase64(smallCopy(p, 1100), 0.7)));
       } catch (err) {
-        toast(`Lecture IA impossible (${err.message}). Le PDF sera quand même rangé.`, "info", 8000);
+        toast(`Lecture IA impossible (${err.message}). Tu peux taper le texte toi-même ou continuer sans.`, "info", 8000);
       }
       refreshQuota?.();
+      status.textContent = "";
+      // Étape de relecture : l'élève voit le texte lu et corrige les erreurs de lecture.
+      const checked = await reviewText(text, pages);
+      if (checked === null) { finishBtn.disabled = false; return; }
       const id = addPending({
-        kind: "scan", excerpt: text || "Cours numérisé (texte non lu)", startedAt: new Date().toISOString(),
-        save: (folderId, title) => savePdfWithText({ folderId, title, pdfBlob: pdf, text, kind: "scan" }),
+        kind: "scan", excerpt: checked || "Cours numérisé (texte non lu)", startedAt: new Date().toISOString(),
+        save: (folderId, title) => savePdfWithText({ folderId, title, pdfBlob: pdf, text: checked, kind: "scan" }),
       });
       go(`/confirmer?id=${id}`);
     } catch (err) {
