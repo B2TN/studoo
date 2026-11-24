@@ -1,0 +1,7 @@
+# Seuls ces fichiers sont envoyés pour construire l'image du serveur de tâches (worker/Dockerfile).
+# Tout le reste — en particulier .env et .env.worker (clés secrètes) — n'est jamais envoyé.
+*
+!backend/studoo
+!worker/requirements.txt
+!worker/studoo_worker
+**/__pycache__

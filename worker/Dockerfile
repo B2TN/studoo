@@ -24,6 +24,7 @@ COPY worker/studoo_worker worker/studoo_worker
 ENV PYTHONPATH="/app/backend:/app/worker" PYTHONUNBUFFERED=1 \
     MODELS_DIR=/tmp/models HF_HOME=/tmp/models/hf
 
-# Les modèles (≈ 3 à 7 Go selon la tâche) sont téléchargés au premier besoin dans /tmp, effacé à l'arrêt.
-# « once » : traite toutes les tâches en attente puis s'arrête (tâche planifiée toutes les 5 min).
+# Les modèles (≈ 3 à 7 Go selon la tâche) sont téléchargés au premier besoin (sur Modal : volume « studoo-models »).
+# Sur Modal (worker/modal_app.py), ce CMD est ignoré : la fonction « process » lance le mode « once ».
+# « once » : traite toutes les tâches en attente puis s'arrête.
 CMD ["python", "-m", "studoo_worker", "once"]

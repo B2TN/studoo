@@ -4,8 +4,8 @@
 
 | Offre | Carte ? | Puissance gratuite | Durée max d'une tâche | Mise en veille | Tâches de fond ? | Verdict |
 |---|---|---|---|---|---|---|
-| **Modal** (serverless Python, « Starter ») | Non selon plusieurs sources ¹ | 30 $ de calcul / mois (CPU **et GPU**), 100 conteneurs | **24 h** | Aucun coût au repos (démarre à la demande) | ✅ fonctions lancées à la demande | **Recommandé** |
-| **Northflank** (« Sandbox ») | **Non** (« No card needed ») | 20 $ de ressources / mois, 2 services + 2 jobs + 1 base | Non précisé | **Jamais** (« always on ») | ✅ service toujours allumé | **Plan B** (CPU seulement, ≈ 1 vCPU / 2 Go) |
+| **Modal** (serverless Python, « Starter ») | **Oui** (vérifié) | 30 $ de calcul / mois (CPU **et GPU**), 100 conteneurs | **24 h** | Aucun coût au repos (démarre à la demande) | ✅ fonctions lancées à la demande | **Choisi** ✅ |
+| **Northflank** (« Sandbox ») | **Oui** en pratique à l'inscription (constaté le 24/11/2026) | 20 $ de ressources / mois, 2 services + 2 jobs + 1 base | Non précisé | **Jamais** (« always on ») | ✅ service toujours allumé | Écarté (carte aussi, moins de puissance) |
 | Hugging Face Spaces (CPU 2 vCPU / 16 Go) | — | Gratuit **seulement en site statique** | — | 48 h | ❌ Docker/Gradio exigent un abonnement payant depuis 2026 | Exclu |
 | Hugging Face ZeroGPU | — | 5 min de GPU / jour | 60 s par appel | — | ❌ | Exclu (trop court) |
 | GitHub Actions | Non | 4 vCPU / 16 Go | 6 h | — | ❌ **interdit** par les conditions (usage sans lien avec le code du dépôt) | Exclu |
@@ -15,7 +15,7 @@
 | Google Cloud Run / Oracle Always Free | **Oui** | élevée | 60 min / illimitée | — | ✅ | Exclu (carte) |
 | **Vercel Hobby** (actuel) | Non | 1 vCPU / 2 Go | **300 s** | — | ❌ (cron 1×/jour) | Garde le site et l'API légère |
 
-¹ La page tarifaire de Modal ne le dit pas noir sur blanc ; plusieurs guides 2026 l'affirment. **Point à vérifier à l'inscription** : si Modal demande une carte, on passe au plan B (Northflank), qui, lui, l'écrit explicitement.
+¹ **Décision du 24/11/2026** : Northflank demandait lui aussi une carte ; puisqu'une carte est nécessaire de toute façon, on prend le meilleur, **Modal** (aucun coût au repos, 30 $ offerts par mois, région UE). Guide : [MODAL.md](MODAL.md).
 
 ## 2. Combien de temps ça prend ? (mesuré sur 1 cœur, 24/11/2026)
 

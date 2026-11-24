@@ -55,3 +55,30 @@ def test_push_subscribe(logged):
     body = {"endpoint": "https://fcm.googleapis.com/fcm/send/abc123456789", "p256dh": "x" * 40, "auth": "y" * 16}
     assert logged.post("/api/push/subscribe", json=body).status_code == 200
     assert logged.post("/api/push/subscribe", json=body).status_code == 200  # idempotent
+
+
+def test_job_wakes_worker(logged, monkeypatch):
+    import httpx
+
+    from studoo.jobcrypto import kick_token
+    calls = []
+
+    async def fake_post(self, url, json):
+        calls.append((url, json))
+        return httpx.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(get_settings(), "worker_kick_url", "https://exemple--studoo-worker-kick.modal.run")
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    assert logged.post("/api/jobs", json=_job()).status_code == 201
+    assert calls == [("https://exemple--studoo-worker-kick.modal.run", {"token": kick_token(get_settings().job_secret)})]
+
+
+def test_job_created_even_if_worker_unreachable(logged, monkeypatch):
+    import httpx
+
+    async def broken_post(self, url, json):
+        raise httpx.ConnectError("hors ligne")
+
+    monkeypatch.setattr(get_settings(), "worker_kick_url", "https://exemple--studoo-worker-kick.modal.run")
+    monkeypatch.setattr(httpx.AsyncClient, "post", broken_post)
+    assert logged.post("/api/jobs", json=_job()).status_code == 201

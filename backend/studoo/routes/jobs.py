@@ -3,9 +3,11 @@
 L'API ne fait que DÉPOSER la tâche dans la base ; le worker (serveur de tâches)
 la récupère, la traite, range le résultat dans le Drive et prévient l'élève.
 """
+import logging
 import uuid
 from typing import Annotated, Literal
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, desc, func, insert, select, update
@@ -13,7 +15,7 @@ from sqlalchemy import delete, desc, func, insert, select, update
 from .. import db
 from ..config import get_settings
 from ..deps import User, current_user
-from ..jobcrypto import seal_payload
+from ..jobcrypto import kick_token, seal_payload
 from ..limits import rate_limit
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -60,6 +62,21 @@ class JobIn(BaseModel):
         return self
 
 
+log = logging.getLogger("studoo.jobs")
+
+
+async def wake_worker() -> None:
+    """Réveille le serveur de tâches tout de suite (sinon il passe de lui-même toutes les 10 min)."""
+    s = get_settings()
+    if not s.worker_kick_url:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=6) as client:
+            await client.post(s.worker_kick_url, json={"token": kick_token(s.job_secret)})
+    except httpx.HTTPError as exc:  # pas grave : la vérification périodique prendra le relais
+        log.warning("Réveil du serveur de tâches impossible : %s", type(exc).__name__)
+
+
 def _public(row) -> dict:
     out = {k: row[k] for k in PUBLIC_FIELDS}
     for k in ("created_at", "started_at", "finished_at"):
@@ -98,6 +115,7 @@ async def create_job(body: JobIn, user: CurrentUser):
             result_name="", notified=False, created_at=db.now(),
         ))
         row = conn.execute(select(db.jobs).where(db.jobs.c.id == job_id)).mappings().one()
+    await wake_worker()
     return {"job": _public(row)}
 
 
@@ -135,6 +153,7 @@ async def retry_job(job_id: str, user: CurrentUser):
             raise HTTPException(409, detail={"code": "cannot_retry", "message": "Relance-la depuis la page de création."})
         conn.execute(update(db.jobs).where(db.jobs.c.id == job_id).values(
             status="queued", attempts=0, error="", step="En attente du serveur", progress=0))
+    await wake_worker()
     return {"ok": True}
 
 
