@@ -73,9 +73,15 @@ $queueUrl = "https://$account.queue.core.windows.net/$Queue"
 
 Write-Host "3/5 Environnement Container Apps…"
 $envId = Invoke-AzCli containerapp env list --resource-group $Group --query "[?name=='$Environment'].id | [0]" -o tsv
+# Le mode « Express » (parfois choisi par défaut) n'accepte pas les jobs : on le remplace (il ne contient rien).
+if ($envId -and (Invoke-AzCli containerapp env show --name $Environment --resource-group $Group --query properties.environmentMode -o tsv) -eq "Express") {
+    Write-Host "    Environnement « Express » (sans jobs) : remplacement…"
+    Invoke-AzCli containerapp env delete --name $Environment --resource-group $Group --yes --only-show-errors | Out-Null
+    $envId = $null
+}
 if (-not $envId) {
     Invoke-AzCli containerapp env create --name $Environment --resource-group $Group --location $Location `
-        --enable-workload-profiles --logs-destination none --only-show-errors | Out-Null
+        --environment-mode WorkloadProfiles --enable-workload-profiles --logs-destination none --only-show-errors | Out-Null
     $envId = Invoke-AzCli containerapp env show --name $Environment --resource-group $Group --query id -o tsv
 }
 
