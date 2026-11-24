@@ -79,14 +79,18 @@ Puis **Redeploy**.
   pour ne pas consommer le crédit.
 
 ## Temps et crédit
-Mesuré sur PC avec 2 cœurs le 24/11/2026 : vidéo courte (≈ 1 min 45) **4 min**, podcast 10 min **18 min**.
-La machine Azure a 4 vCPU : un peu plus rapide (pas encore mesuré sur Azure), plus 1 à 2 min de téléchargement.
+Mesuré sur Azure le 24/11/2026 (Intel Xeon Platinum 8573C, 4 vCPU ≈ 2 vrais cœurs) :
+- modèle de langage : lecture ≈ 37 jetons/s, écriture ≈ 5 à 7 jetons/s ;
+- **podcast 10 min : 48 à 64 min** de machine (téléchargement des modèles compris).
+
+C'est environ 3 fois plus lent que sur PC (podcast 10 min en 18 min avec 2 cœurs).
+Les journaux du job notent la vitesse de chaque appel au modèle (« Modèle : … jetons »).
 
 Crédit (pages Azure du 24/11/2026) :
 - **gratuit chaque mois, pour toujours** : 180 000 vCPU-secondes et 360 000 Go-secondes → ≈ **12 h** de la machine 4 vCPU / 8 Go ;
 - au-delà : sur les 100 $ annuels — environ 0,43 $ par heure de machine (prix à confirmer sur la page tarifaire),
   soit ≈ **19 h de plus par mois** si le crédit est réparti sur l'année.
-- Total ≈ **30 h de calcul par mois**, soit de l'ordre de 100 podcasts de 10 min.
+- Total ≈ **30 h de calcul par mois**, soit de l'ordre de **30 podcasts de 10 min** (≈ 1 par jour).
 - La file de réveil coûte moins d'un centime par mois.
 
 ## En cas de problème
