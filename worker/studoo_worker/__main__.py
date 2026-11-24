@@ -12,6 +12,9 @@ from . import notify, pipelines, queue, wakeups
 
 log = logging.getLogger("studoo.worker")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# httpx écrit chaque adresse appelée, clés d'accès comprises (file Azure, Google) : jamais dans les journaux.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def process_one() -> bool:
