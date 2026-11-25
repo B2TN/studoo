@@ -76,7 +76,8 @@ def test_video_render_and_mp3():
     audios = [tts.silence(2.0)]
     mp4 = media.mp4(slides, audios, "short")
     assert mp4[4:8] == b"ftyp" and len(mp4) > 5000
-    assert media.mp3(np.zeros(24000, dtype=np.float32))[:3] in (b"ID3", b"\xff\xfb", b"\xff\xf3")
+    head = media.mp3(np.zeros(24000, dtype=np.float32))
+    assert head[:3] == b"ID3" or head[:2] in (b"\xff\xfb", b"\xff\xf3")  # en-tête ID3 ou trame MP3
 
 
 def test_purge_failed_after_24h():

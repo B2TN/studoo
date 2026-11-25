@@ -1,7 +1,13 @@
 # Mettre en ligne le serveur de tâches (Azure for Students — gratuit, sans carte)
 
-Le serveur de tâches fabrique les podcasts, vidéos et lectures de copies avec des outils open source
-(Qwen3-4B pour écrire, Kokoro/Piper pour les voix, ffmpeg pour le montage, Qwen3-VL pour lire).
+Le serveur de tâches fabrique les podcasts, vidéos et lectures de copies :
+
+| Étape | Service (gratuit) | Secours 1 | Secours 2 |
+|---|---|---|---|
+| Écrire le script | **Groq** (modèle open source `openai/gpt-oss-120b`, quelques secondes) | Gemini avec la clé **de l'élève** (s'il en a mis une dans ses réglages) | Qwen3-4B sur le serveur (≈ 1 h par podcast) |
+| Voix | **Azure AI Speech** (voix Vivienne/Rémy ou Denise/Henri, offre F0 : 500 000 caractères/mois ≈ 55 podcasts de 10 min) | Gemini TTS avec la clé de l'élève | Kokoro/Piper sur le serveur |
+| Vidéo | animée **dans le navigateur** (rien à monter sur le serveur), export MP4 sur l'appareil | | |
+| Lire une copie | Qwen3-VL sur le serveur | | |
 
 ## Comment ça marche
 ```
@@ -52,6 +58,13 @@ Ce fichier (à la racine, jamais envoyé sur GitHub) contient déjà `JOB_SECRET
 Complète `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (les mêmes valeurs que dans Vercel).
 Facultatif : `BREVO_API_KEY` et `MAIL_FROM` pour l'e-mail de secours.
 
+**Clé Groq (gratuite, sans carte, 2 min)** — indispensable pour des podcasts rapides :
+1. <https://console.groq.com> → connecte-toi (compte Google ou e-mail).
+2. **API Keys** → **Create API Key** → nom « studoo » → copie la clé (elle commence par `gsk_`).
+3. Ajoute dans `.env.worker` la ligne `GROQ_API_KEY=gsk_…`.
+
+La clé du service de voix (Azure AI Speech) n'est pas à copier : le script la récupère tout seul.
+
 ## 5. Lancer le script de mise en place
 À la racine du projet :
 
@@ -59,7 +72,8 @@ Facultatif : `BREVO_API_KEY` et `MAIL_FROM` pour l'e-mail de secours.
 powershell -ExecutionPolicy Bypass -File worker\azure\deploy.ps1
 ```
 
-Il crée tout (file, environnement, job) et transforme les lignes de `.env.worker` en secrets Azure, sans les afficher.
+Il crée tout (file, service de voix gratuit « studoo-voix », environnement, job) et transforme les lignes de
+`.env.worker` en secrets Azure, sans les afficher.
 À la fin, il affiche la valeur de **`WORKER_QUEUE_URL`** à copier dans Vercel.
 On peut le relancer sans risque (par exemple après avoir changé `.env.worker`).
 
@@ -75,22 +89,26 @@ Puis **Redeploy**.
   (le temps qu'Azure voie le message et télécharge l'image).
 - Portail Azure → groupe `studoo` → `studoo-worker` → **Historique d'exécution** : une exécution *En cours*,
   puis *Réussie*. Les journaux ne contiennent jamais le contenu des cours ni de jeton.
-- Chaque exécution télécharge les modèles (≈ 3 Go, 1 à 2 min) : il n'y a pas de stockage permanent,
-  pour ne pas consommer le crédit.
+- Les modèles locaux (≈ 3 Go) ne sont téléchargés que s'ils servent (secours, lecture de copies).
 
 ## Temps et crédit
-Mesuré sur Azure le 24/11/2026 (Intel Xeon Platinum 8573C, 4 vCPU ≈ 2 vrais cœurs) :
-- modèle de langage : lecture ≈ 37 jetons/s, écriture ≈ 5 à 7 jetons/s ;
-- **podcast 10 min : 48 à 64 min** de machine (téléchargement des modèles compris).
+Avec Groq + Azure AI Speech (mesuré le 25/11/2026) :
+- voix : 30 s de dialogue en 2 à 3 s ; vidéo d'une minute (voix + calage des diapos) en 7 s ;
+- export MP4 d'une vidéo d'une minute dans le navigateur : 8 s ;
+- attente attendue pour un podcast de 10 min : **≈ 1 à 3 min** (dont ≈ 1 min de réveil de la machine Azure).
 
-C'est environ 3 fois plus lent que sur PC (podcast 10 min en 18 min avec 2 cœurs).
-Les journaux du job notent la vitesse de chaque appel au modèle (« Modèle : … jetons »).
+Avant (tout sur le processeur du serveur, 24/11/2026) : podcast 10 min en 48 à 64 min, car le modèle local
+n'écrit qu'à 5 à 7 jetons/s sur 4 vCPU (≈ 2 vrais cœurs). Ce chemin ne sert plus qu'en dernier secours.
 
 Crédit (pages Azure du 24/11/2026) :
 - **gratuit chaque mois, pour toujours** : 180 000 vCPU-secondes et 360 000 Go-secondes → ≈ **12 h** de la machine 4 vCPU / 8 Go ;
 - au-delà : sur les 100 $ annuels — environ 0,43 $ par heure de machine (prix à confirmer sur la page tarifaire),
   soit ≈ **19 h de plus par mois** si le crédit est réparti sur l'année.
-- Total ≈ **30 h de calcul par mois**, soit de l'ordre de **30 podcasts de 10 min** (≈ 1 par jour).
+- Une génération ne garde la machine que quelques minutes : le crédit de calcul n'est plus la limite.
+  La limite devient la voix Azure gratuite : **500 000 caractères par mois ≈ 55 podcasts de 10 min**
+  (au-delà : Gemini avec la clé de l'élève, sinon les voix locales).
+- Groq gratuit : limites par minute et par jour (voir console.groq.com → *Settings → Limits*) ; en cas de dépassement,
+  le serveur attend un peu, puis passe au secours.
 - La file de réveil coûte moins d'un centime par mois.
 
 ## En cas de problème

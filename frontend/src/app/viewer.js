@@ -6,7 +6,9 @@ import { renderFiche } from "../lib/fiche-render.js";
 import { icon } from "../lib/icons.js";
 import { drive, KINDS, kindOf, SOURCE_KINDS } from "../lib/storage.js";
 import { confirmDialog, errorToast, toast } from "../lib/ui.js";
+import { renderMp4, supportsMp4Export } from "../lib/video-anim.js";
 import { askName } from "./explorer.js";
+import { videoPlayer } from "./video-player.js";
 
 function download(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -15,6 +17,25 @@ function download(blob, name) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/** « Télécharger en MP4 » : la vidéo est fabriquée sur l'appareil (sinon : la voix seule en MP3). */
+function exportButton(doc, audioBlob, title) {
+  if (!supportsMp4Export()) {
+    return h("button", { class: "btn small", onclick: () => download(audioBlob, `${title} (voix).mp3`) }, icon("download"), "Télécharger la voix (MP3)");
+  }
+  const btn = h("button", { class: "btn small", type: "button" }, icon("download"), "Télécharger en MP4");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try {
+      const blob = await renderMp4(doc, audioBlob, { onProgress: (p) => { btn.lastChild.textContent = `Fabrication du MP4… ${Math.round(p * 100)} %`; } });
+      download(blob, `${title}.mp4`);
+      toast("MP4 prêt", "success");
+    } catch (e) { errorToast(e); }
+    btn.disabled = false;
+    btn.lastChild.textContent = "Télécharger en MP4";
+  });
+  return btn;
 }
 
 function scriptPlayer(script) {
@@ -49,6 +70,8 @@ export async function render({ view, params, go }) {
 
   let body;
   let editBtn = null;
+  let animDoc = null;
+  let animAudio = null;
   if (kind === "transcript" || kind === "scan-text") {
     let text = await drive.readText(file.id);
     const shownText = () => h("div", { class: "transcript-body" }, renderMarkdown(text.replace(/^# .*\n/, ""), h));
@@ -81,6 +104,13 @@ export async function render({ view, params, go }) {
     body = player.el;
   } else if (kind === "video") {
     body = h("video", { controls: true, playsinline: true, src: objectUrl(await drive.readBlob(file.id)), style: { maxHeight: "75vh", background: "#000" } });
+  } else if (kind === "video-anim") {
+    // Vidéo animée dans le navigateur : script des diapos (ce fichier) + voix (fichier MP3 relié, caché)
+    animDoc = await drive.readJson(file.id);
+    animAudio = await drive.readBlob(file.appProperties.audioId);
+    const player = videoPlayer(animDoc, objectUrl(animAudio));
+    stopAudio = player.destroy;
+    body = player.el;
   } else if (file.mimeType === "application/pdf") {
     body = h("iframe", { src: objectUrl(await drive.readBlob(file.id)), title: `Aperçu de ${title}` });
   } else {
@@ -104,7 +134,7 @@ export async function render({ view, params, go }) {
       h("button", { class: "btn small c-blue", onclick: () => go("/creer/podcast", { data: { fileIds: [file.id] } }) }, icon("headphones"), "Podcast"),
       h("button", { class: "btn small c-orange", onclick: () => go("/creer/video", { data: { fileIds: [file.id] } }) }, icon("movie"), "Vidéo"),
     ] : null,
-    h("button", { class: "btn small", onclick: async () => {
+    kind === "video-anim" ? exportButton(animDoc, animAudio, title) : h("button", { class: "btn small", onclick: async () => {
       try { download(await drive.readBlob(file.id), file.name); } catch (e) { errorToast(e); }
     } }, icon("download"), "Télécharger"),
     h("button", { class: "btn small", onclick: async () => {
@@ -118,6 +148,7 @@ export async function render({ view, params, go }) {
       if (!(await confirmDialog("Mettre à la corbeille ?", "Le fichier ira dans la corbeille de ton Google Drive (récupérable 30 jours).", { ok: "Supprimer", danger: true }))) return;
       await drive.trash(file.id);
       if (file.appProperties?.textId) await drive.trash(file.appProperties.textId).catch(() => {});
+      if (file.appProperties?.audioId) await drive.trash(file.appProperties.audioId).catch(() => {});
       toast("Mis à la corbeille", "success");
       go(backHref, { replace: true });
     } }, icon("trash"), "Supprimer"),

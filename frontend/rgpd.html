@@ -57,7 +57,8 @@
     <h2>Tes cours</h2>
     <ul>
       <li>Transcriptions, PDF, fiches, podcasts et vidéos sont enregistrés <strong>dans ton Google Drive</strong>, dans le dossier « Studoo ». Studoo utilise l'autorisation Google « drive.file » : il ne voit que les fichiers qu'il a créés, jamais le reste de ton Drive.</li>
-      <li><strong>Fabrication sur le serveur :</strong> les podcasts, vidéos et lectures de copies sont fabriqués par le serveur de tâches de Studoo avec des outils open source (Qwen, Kokoro, Piper, ffmpeg). Il lit le texte que tu as choisi, écrit le résultat dans ton Drive grâce à un jeton Google « hors ligne » chiffré, puis efface tout : ses fichiers de travail sont temporaires et supprimés automatiquement.</li>
+      <li><strong>Fabrication sur le serveur :</strong> les podcasts, vidéos et lectures de copies sont fabriqués par le serveur de tâches de Studoo. Pour les podcasts et vidéos, le texte des cours choisis est envoyé à <strong>Groq</strong> (qui fait tourner des modèles d'IA open source) pour écrire le script, puis le script est lu par les voix de <strong>Microsoft Azure AI Speech</strong>. Selon leurs conditions, ces textes ne servent pas à entraîner leurs modèles. Le serveur écrit ensuite le résultat dans ton Drive grâce à un jeton Google « hors ligne » chiffré, puis efface tout. Les vidéos sont animées directement dans ton navigateur.</li>
+      <li><strong>Ta clé Gemini (facultative) :</strong> si tu enregistres ta propre clé Gemini dans les réglages, elle est gardée chiffrée et ne sert qu'en secours (quand Groq ou les voix d'Azure sont indisponibles). Les textes envoyés avec ta clé relèvent alors de ton propre compte Google et de ses conditions. Tu peux la supprimer à tout moment.</li>
       <li><strong>Enregistrements audio :</strong> le son est découpé en tranches de 5 minutes, envoyé à l'IA pour être transcrit, puis effacé. Aucun fichier audio n'est conservé, ni chez nous ni dans ton Drive.</li>
       <li><strong>Photos de cours :</strong> le redressement se fait dans ton navigateur ; une copie réduite est envoyée à l'IA pour lire le texte, puis oubliée.</li>
     </ul>
@@ -73,7 +74,8 @@
       <li><strong>Google</strong> (connexion, Drive, Gemini) — Irlande / États-Unis.</li>
       <li><strong>Vercel</strong> (hébergement du site et de l'API) — États-Unis, encadré par le Data Privacy Framework UE–États-Unis.</li>
       <li><strong>Neon</strong> (base de données des comptes, compteurs et tâches en cours) — région Union européenne.</li>
-      <li><strong>Microsoft Azure</strong> (serveur de tâches : fabrication des podcasts, vidéos et lectures de copies) — région Italy North (Milan, Union européenne).</li>
+      <li><strong>Microsoft Azure</strong> (serveur de tâches et voix Azure AI Speech : fabrication des podcasts, vidéos et lectures de copies) — région Italy North (Milan, Union européenne).</li>
+      <li><strong>Groq</strong> (écriture des scripts de podcasts et vidéos par des modèles d'IA open source) — États-Unis.</li>
       <li><strong>Brevo</strong> (envoi de l'e-mail « c'est prêt » si les notifications ne sont pas activées) — Union européenne.</li>
     </ul>
 

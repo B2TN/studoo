@@ -25,6 +25,9 @@ import link from "@tabler/icons/outline/link.svg?raw";
 import logout from "@tabler/icons/outline/logout.svg?raw";
 import mail from "@tabler/icons/outline/mail.svg?raw";
 import microphone from "@tabler/icons/outline/microphone.svg?raw";
+import key from "@tabler/icons/outline/key.svg?raw";
+import maximize from "@tabler/icons/outline/maximize.svg?raw";
+import message from "@tabler/icons/outline/message.svg?raw";
 import moon from "@tabler/icons/outline/moon.svg?raw";
 import movie from "@tabler/icons/outline/movie.svg?raw";
 import notes from "@tabler/icons/outline/notes.svg?raw";
@@ -54,7 +57,7 @@ const ICONS = {
   "calendar-week": calendarWeek, camera, "chart-bar": chartBar, check, "chevron-right": chevronRight,
   download, edit, "external-link": externalLink, file, "file-text": fileText, "file-type-pdf": fileTypePdf, "file-upload": fileUpload,
   folder, "folder-plus": folderPlus, folders, headphones, "layout-dashboard": layoutDashboard, link,
-  logout, mail, microphone, moon, movie, notes, photo, "player-pause": playerPause, "player-play": playerPlay,
+  key, logout, mail, maximize, message, microphone, moon, movie, notes, photo, "player-pause": playerPause, "player-play": playerPlay,
   "player-stop": playerStop, plus, printer, qrcode, refresh, rotate, school, search, settings,
   "shield-lock": shieldLock, sparkles, sun, "text-size": textSize, trash, upload, user, x,
 };

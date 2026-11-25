@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from .config import get_settings
 from .deps import csrf_guard
-from .routes import admin, ai, auth, jobs, site, timetable
+from .routes import admin, ai, auth, jobs, keys, site, timetable
 
 app = FastAPI(
     title="Studoo API",
@@ -15,7 +15,7 @@ app = FastAPI(
     dependencies=[Depends(csrf_guard)],
 )
 
-for module in (auth, site, ai, timetable, jobs, admin):
+for module in (auth, site, ai, timetable, jobs, keys, admin):
     app.include_router(module.router)
 
 

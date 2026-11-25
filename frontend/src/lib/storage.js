@@ -60,6 +60,7 @@ export const KINDS = {
   podcast: { label: "Podcast", icon: "headphones", color: "blue" },
   "podcast-script": { label: "Podcast (voix du navigateur)", icon: "headphones", color: "blue" },
   video: { label: "Vidéo", icon: "movie", color: "orange" },
+  "video-anim": { label: "Vidéo", icon: "movie", color: "orange" },
   settings: { label: "Réglages", icon: "settings", color: "yellow" },
   timetable: { label: "Emploi du temps", icon: "calendar-week", color: "lilac" },
 };
@@ -165,7 +166,7 @@ export function ficheToText(fiche) {
   return lines.join("\n");
 }
 
-export const HIDDEN_KINDS = new Set(["settings", "timetable", "scan-text"]);
+export const HIDDEN_KINDS = new Set(["settings", "timetable", "scan-text", "video-audio"]); // voix d'une vidéo : ouverte via la vidéo
 export const SOURCE_KINDS = new Set(["transcript", "scan", "scan-text", "pdf", "fiche"]);
 
 /** Nettoie un nom de fichier pour Drive. */

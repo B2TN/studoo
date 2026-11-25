@@ -102,6 +102,15 @@ jobs = Table(
     Column("locked_until", DateTime(timezone=True), nullable=True),
 )
 
+# Clé Gemini PERSONNELLE de l'élève (facultative, secours des podcasts/vidéos), chiffrée : jamais renvoyée en clair.
+user_keys = Table(
+    "user_keys", metadata,
+    Column("sub", String(64), primary_key=True),
+    Column("gemini_key", Text, nullable=False),  # chiffrée (services/user_keys.py)
+    Column("hint", String(8), nullable=False, default=""),  # 4 derniers caractères, pour la reconnaître
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
 # Abonnements aux notifications web (PWA). Aucune donnée personnelle hormis l'adresse technique du navigateur.
 push_subscriptions = Table(
     "push_subscriptions", metadata,

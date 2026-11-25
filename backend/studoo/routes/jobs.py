@@ -19,6 +19,7 @@ from ..config import get_settings
 from ..deps import User, current_user
 from ..jobcrypto import seal_payload
 from ..limits import rate_limit
+from ..services import user_keys
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 CurrentUser = Annotated[User, Depends(current_user)]
@@ -54,7 +55,8 @@ class JobIn(BaseModel):
             raise ValueError("Choisis au moins un cours.")
         if sum(len(s.text) for s in self.sources) > 400_000:
             raise ValueError("Trop de texte : sélectionne moins de cours à la fois.")
-        allowed = {"minutes": {10, 20, 30}, "format": {"short", "medium", "long"}, "voice": {"naturelle", "rapide"}}
+        allowed = {"minutes": {10, 20, 30}, "format": {"short", "medium", "long"},
+                   "voice": {"vivienne-remy", "denise-henri", "naturelle", "rapide"}}  # 2 dernières : anciennes pages
         for key, value in self.options.items():
             if key in {"pdf_id", "title"}:  # OCR : fichier PDF à relier, titre
                 if not isinstance(value, str) or len(value) > 160:
@@ -126,6 +128,8 @@ async def create_job(body: JobIn, user: CurrentUser):
         "refresh_token": user.refresh_token, "email": user.email,
         "sources": [x.model_dump() for x in body.sources], "images": body.images,
         "options": body.options, "folder_id": body.folder_id, "course": body.course, "chapter": body.chapter,
+        # Clé Gemini personnelle (facultative) : secours si l'IA ou les voix du site sont indisponibles.
+        "gemini_key": user_keys.load(user.sub) if body.kind in {"podcast", "video", "fiche"} else "",
     })
     titles = {"podcast": "Podcast", "video": "Vidéo", "fiche": "Fiche", "ocr": "Lecture de copie"}
     with db.get_engine().begin() as conn:

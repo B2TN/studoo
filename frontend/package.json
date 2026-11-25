@@ -20,6 +20,7 @@
     "@fontsource/patrick-hand": "^5.3.0",
     "@tabler/icons": "^3.52.0",
     "jsqr": "^1.4.0",
+    "mp4-muxer": "^5.2.2",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.5.438"
   }

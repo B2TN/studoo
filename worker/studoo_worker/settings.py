@@ -17,6 +17,19 @@ VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "https://studoo-app.vercel.app/c
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")  # e-mail de secours (facultatif)
 MAIL_FROM = os.environ.get("MAIL_FROM", "")
 
+# Écriture des scripts : Groq (modèles open source hébergés, offre gratuite, très rapide).
+# Secours : Gemini avec la clé personnelle de l'élève (s'il en a mis une), puis le modèle local (lent).
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+GROQ_URL = os.environ.get("GROQ_URL", "https://api.groq.com/openai/v1/chat/completions")
+GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-flash-latest")
+GEMINI_TTS_MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts")
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+
+# Voix : Azure AI Speech (offre gratuite F0 : 500 000 caractères par mois), région du service « studoo-voix »
+SPEECH_KEY = os.environ.get("SPEECH_KEY", "")
+SPEECH_REGION = os.environ.get("SPEECH_REGION", "italynorth")
+
 # Modèles open source (téléchargés au premier usage, gardés dans MODELS_DIR)
 MODELS_DIR = Path(os.environ.get("MODELS_DIR", "/models"))
 LLAMA_SERVER = os.environ.get("LLAMA_SERVER", "llama-server")

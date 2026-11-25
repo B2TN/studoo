@@ -141,7 +141,7 @@ function launchedCard(job, go) {
     h("h2", {}, "C'est lancé !"),
     h("p", {}, `« ${job.title} » est en préparation sur le serveur de Studoo. `,
       h("strong", {}, "Tu peux fermer la page ou éteindre ton téléphone"), " : le fichier arrivera dans ton Drive, dans le dossier choisi."),
-    h("p", { class: "small muted" }, "Sur le serveur gratuit (sans carte graphique), compte quelques minutes pour un format court et jusqu'à une heure pour 30 minutes de contenu."),
+    h("p", { class: "small muted" }, "Compte en général 2 à 5 minutes (un peu plus pour 30 minutes de contenu)."),
     notifyArea,
     h("div", { class: "row" }, h("a", { class: "btn primary", href: "/", "data-link": "1" }, "Suivre sur le tableau de bord")));
 }
@@ -154,7 +154,9 @@ export async function render({ view, params, data, go, refreshQuota }) {
   const picker = sourcePicker(tree, files, data?.fileIds || []);
 
   const options = type === "podcast" ? choiceGroup("duree", PODCAST, 10) : type === "video" ? choiceGroup("format", VIDEO, "short") : null;
-  const voices = type === "fiche" ? null : choiceGroup("voix", [["naturelle", "Voix naturelle", "Plus agréable, un peu plus longue à fabriquer"], ["rapide", "Voix rapide", "Plus robotique, prête beaucoup plus vite"]], "naturelle");
+  const voices = type === "fiche" ? null : choiceGroup("voix", type === "podcast"
+    ? [["vivienne-remy", "Vivienne et Rémy", "Voix vivantes et chaleureuses"], ["denise-henri", "Denise et Henri", "Voix plus posées"]]
+    : [["vivienne-remy", "Vivienne", "Voix vivante et chaleureuse"], ["denise-henri", "Denise", "Voix plus posée"]], "vivienne-remy");
   const destSel = h("select", { class: "input", id: "dest" }, tree.flatMap((c) => [
     h("option", { value: `${c.id}|`, }, `${c.name} (racine)`),
     ...c.chapters.map((ch) => h("option", { value: `${c.id}|${ch.id}` }, `${c.name} › ${ch.name}`)),
@@ -217,7 +219,7 @@ export async function render({ view, params, data, go, refreshQuota }) {
     h("div", { class: "field" }, h("label", { for: "dest" }, "Dossier (par défaut : le chapitre du dernier cours coché)"), destSel),
     err,
     h("div", {}, submit),
-    type !== "fiche" ? h("p", { class: "small muted" }, "Fabriqué sur le serveur de Studoo avec des outils open source : tu pourras fermer la page.") : null);
+    type !== "fiche" ? h("p", { class: "small muted" }, "Fabriqué sur le serveur de Studoo en quelques minutes : tu pourras fermer la page.") : null);
 
   mount(view,
     h("h1", { class: "view-title" }, h("span", { class: `hl ${meta.color}` }, meta.title)),

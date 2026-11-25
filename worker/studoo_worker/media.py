@@ -41,12 +41,49 @@ def font(kind: str, size: int):
     return ImageFont.truetype(str(path), size)
 
 
+# Tous les morceaux de voix sont en MP3 24 kHz mono 96 kbit/s constant (comme Azure) :
+# on peut les mettre bout à bout sans réencoder, et la durée se déduit de la taille.
+# Sans en-tête (Xing/ID3) : seulement des trames de son, comme Azure, pour que taille ÷ débit = durée exacte.
+MP3_ARGS = ["-ar", "24000", "-ac", "1", "-codec:a", "libmp3lame", "-b:a", "96k", "-write_xing", "0", "-id3v2_version", "0"]
+MP3_BYTES_PER_SECOND = 96_000 / 8
+
+
 def mp3(audio) -> bytes:
-    """Son (float32 24 kHz) → MP3 64 kbit/s."""
+    """Son (float32 24 kHz) → MP3 96 kbit/s."""
     with tempfile.TemporaryDirectory() as tmp:  # dossier temporaire supprimé automatiquement
         wav, out = Path(tmp) / "in.wav", Path(tmp) / "out.mp3"
         wav.write_bytes(to_wav_bytes(audio))
-        subprocess.run([ffmpeg(), "-y", "-loglevel", "error", "-i", str(wav), "-codec:a", "libmp3lame", "-b:a", "64k", str(out)], check=True)
+        subprocess.run([ffmpeg(), "-y", "-loglevel", "error", "-i", str(wav), *MP3_ARGS, str(out)], check=True)
+        return out.read_bytes()
+
+
+def pcm_to_mp3(pcm: bytes, rate: int = 24000) -> bytes:
+    """Son brut 16 bits mono (réponse de Gemini TTS) → MP3 96 kbit/s."""
+    res = subprocess.run([ffmpeg(), "-loglevel", "error", "-f", "s16le", "-ar", str(rate), "-ac", "1", "-i", "pipe:0",
+                          *MP3_ARGS, "-f", "mp3", "pipe:1"], input=pcm, capture_output=True, check=True)
+    return res.stdout
+
+
+def silence_mp3(seconds: float) -> bytes:
+    return pcm_to_mp3(b"\0\0" * int(24000 * seconds))
+
+
+def seconds(mp3_bytes: bytes) -> float:
+    return len(mp3_bytes) / MP3_BYTES_PER_SECOND
+
+
+def join_mp3(chunks: list[bytes]) -> bytes:
+    """Met des morceaux MP3 bout à bout en un fichier propre (sans réencodage : rapide et sans perte)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        names = []
+        for i, chunk in enumerate(chunks):
+            path = Path(tmp) / f"{i:05d}.mp3"
+            path.write_bytes(chunk)
+            names.append(f"file '{path.as_posix()}'")
+        (Path(tmp) / "liste.txt").write_text("\n".join(names))
+        out = Path(tmp) / "out.mp3"
+        subprocess.run([ffmpeg(), "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(Path(tmp) / "liste.txt"),
+                        "-c", "copy", str(out)], check=True)
         return out.read_bytes()
 
 
