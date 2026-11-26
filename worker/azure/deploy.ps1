@@ -9,7 +9,8 @@
 #      pas de journal Log Analytics payant) ;
 #   3. un « job » « studoo-worker » (4 vCPU / 8 Go) qui démarre tout seul dès qu'un message arrive dans la file,
 #      avec l'image publiée gratuitement sur ghcr.io par GitHub Actions ;
-#   4. les clés de .env.worker deviennent des « secrets » du job (lues sur TON PC, jamais affichées).
+#   4. les services « studoo-voix » (Azure AI Speech, gratuit) et « studoo-ecriture-… » (Azure OpenAI, crédit étudiant) ;
+#   5. les clés de .env.worker deviennent des « secrets » du job (lues sur TON PC, jamais affichées).
 # On peut le relancer sans risque (après une mise à jour du code, par exemple).
 param(
     [string]$Location = "",   # vide = choisie automatiquement parmi les régions autorisées par l'abonnement
@@ -35,9 +36,6 @@ foreach ($line in Get-Content $EnvFile -Encoding UTF8) {
 }
 foreach ($needed in "DATABASE_URL", "JOB_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET") {
     if (-not $values[$needed]) { throw "$needed est vide dans $EnvFile : complète-le d'abord." }
-}
-if (-not $values["GROQ_API_KEY"]) {
-    Write-Warning "GROQ_API_KEY est vide dans $EnvFile : les scripts seront écrits par le modèle local (≈ 1 h par podcast). Voir docs/AZURE.md."
 }
 
 Write-Host "1/5 Préparation de l'abonnement Azure…"
@@ -99,12 +97,36 @@ if (-not $speech) {
 $speechName, $speechRegion = "$speech".Split("`t")
 $speechKey = Invoke-AzCli cognitiveservices account keys list --name $speechName --resource-group $Group --query key1 -o tsv
 
+Write-Host "    Écriture des scripts (Azure OpenAI, GPT-4.1 mini, payé par le crédit étudiant : ≈ 1 centime par podcast)…"
+$openaiKey = ""; $openaiUrl = ""
+try {
+    $openai = Invoke-AzCli cognitiveservices account list --resource-group $Group --query "[?kind=='OpenAI'] | [0].name" -o tsv
+    if (-not $openai) {
+        $openai = "studoo-ecriture-" + ($account -replace "^studoo", "")
+        Invoke-AzCli cognitiveservices account create --name $openai --resource-group $Group --kind OpenAI --sku S0 `
+            --location $Location --custom-domain $openai --yes --only-show-errors | Out-Null
+    }
+    $deployed = Invoke-AzCli cognitiveservices account deployment list --name $openai --resource-group $Group --query "[?name=='gpt-4.1-mini'].name" -o tsv
+    if (-not $deployed) {
+        # « GlobalStandard » : le seul mode ouvert aux comptes étudiants ; 100 = 100 000 jetons par minute au plus.
+        Invoke-AzCli cognitiveservices account deployment create --name $openai --resource-group $Group `
+            --deployment-name "gpt-4.1-mini" --model-name "gpt-4.1-mini" --model-version "2025-04-14" --model-format OpenAI `
+            --sku-name GlobalStandard --sku-capacity 100 --only-show-errors | Out-Null
+    }
+    $endpoint = Invoke-AzCli cognitiveservices account show --name $openai --resource-group $Group --query properties.endpoint -o tsv
+    $openaiUrl = $endpoint.TrimEnd("/") + "/openai/v1/chat/completions"
+    $openaiKey = Invoke-AzCli cognitiveservices account keys list --name $openai --resource-group $Group --query key1 -o tsv
+} catch {
+    Write-Warning "Azure OpenAI indisponible ($($_.Exception.Message)) : les scripts seront écrits par Groq (si GROQ_API_KEY est rempli) ou par le modèle local (≈ 1 h par podcast)."
+}
+
 Write-Host "4/5 Serveur de tâches (job)…"
 $secrets = @(
     @{ name = "queue-connection"; value = $env:AZURE_STORAGE_CONNECTION_STRING },
     @{ name = "worker-queue-url"; value = "${queueUrl}?$sasProcess" },
     @{ name = "speech-key"; value = "$speechKey" }
 )
+if ($openaiKey) { $secrets += @{ name = "azure-openai-key"; value = "$openaiKey" } }
 $containerEnv = @(
     @{ name = "WORKER_QUEUE_URL"; secretRef = "worker-queue-url" },
     @{ name = "SPEECH_KEY"; secretRef = "speech-key" },
@@ -112,9 +134,15 @@ $containerEnv = @(
     @{ name = "THREADS"; value = "4" },
     @{ name = "MODELS_DIR"; value = "/tmp/models" }
 )
+if ($openaiKey) {
+    $containerEnv += @{ name = "AZURE_OPENAI_KEY"; secretRef = "azure-openai-key" }
+    $containerEnv += @{ name = "AZURE_OPENAI_URL"; value = $openaiUrl }
+    $containerEnv += @{ name = "AZURE_OPENAI_MODEL"; value = "gpt-4.1-mini" }
+}
 foreach ($key in $values.Keys) {
     # THREADS / MODELS_DIR de .env.worker sont réglés pour ton PC : sur Azure, on garde les valeurs ci-dessus.
-    if (-not $values[$key] -or $key -in "WORKER_QUEUE_URL", "THREADS", "MODELS_DIR", "SPEECH_KEY", "SPEECH_REGION") { continue }
+    if (-not $values[$key] -or $key -in "WORKER_QUEUE_URL", "THREADS", "MODELS_DIR", "SPEECH_KEY", "SPEECH_REGION",
+        "AZURE_OPENAI_KEY", "AZURE_OPENAI_URL", "AZURE_OPENAI_MODEL") { continue }
     $name = ($key.ToLower() -replace "[^a-z0-9]", "-")
     $secrets += @{ name = $name; value = $values[$key] }
     $containerEnv += @{ name = $key; secretRef = $name }

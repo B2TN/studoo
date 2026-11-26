@@ -1,4 +1,4 @@
-"""Écriture (Groq → Gemini de l'élève → modèle local) et voix (Azure → Gemini de l'élève → voix locales)."""
+"""Écriture (Azure OpenAI / Groq → Gemini de l'élève → modèle local) et voix (Azure → Gemini de l'élève → voix locales)."""
 import base64
 import json
 
@@ -45,6 +45,41 @@ def test_student_gemini_key_is_the_fallback(monkeypatch):
     mock_http(monkeypatch, handler)
     assert writer.write("cours", SCHEMA, gemini_key="cle-eleve") == {"ok": False}
     assert seen == ["api.groq.com", "generativelanguage.googleapis.com"]
+
+
+def test_azure_openai_first_then_groq(monkeypatch):
+    monkeypatch.setattr(settings, "AZURE_OPENAI_KEY", "ak")
+    monkeypatch.setattr(settings, "AZURE_OPENAI_URL", "https://studoo.openai.azure.com/openai/v1/chat/completions")
+    monkeypatch.setattr(settings, "GROQ_API_KEY", "gk")
+    seen = []
+
+    def handler(req):
+        seen.append(req.url.host)
+        if req.url.host == "studoo.openai.azure.com":
+            assert req.headers["api-key"] == "ak" and json.loads(req.content)["model"] == settings.AZURE_OPENAI_MODEL
+            return httpx.Response(500)
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"ok": true}'}}]})
+
+    mock_http(monkeypatch, handler)
+    assert writer.write("cours", SCHEMA) == {"ok": True}
+    assert seen == ["studoo.openai.azure.com", "api.groq.com"]
+
+
+def test_schema_refused_falls_back_to_free_json(monkeypatch):
+    monkeypatch.setattr(settings, "AZURE_OPENAI_KEY", "ak")
+    monkeypatch.setattr(settings, "AZURE_OPENAI_URL", "https://studoo.openai.azure.com/openai/v1/chat/completions")
+    formats = []
+
+    def handler(req):
+        body = json.loads(req.content)
+        formats.append(body["response_format"]["type"])
+        if body["response_format"]["type"] == "json_schema":
+            return httpx.Response(400, json={"error": {"message": "Invalid schema"}})
+        assert "schéma" in body["messages"][-1]["content"]
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"ok": true}'}}]})
+
+    mock_http(monkeypatch, handler)
+    assert writer.write("cours", SCHEMA) == {"ok": True} and formats == ["json_schema", "json_object"]
 
 
 def test_local_model_when_nothing_else(monkeypatch):

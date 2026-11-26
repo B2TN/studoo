@@ -1,7 +1,7 @@
 """Écriture des scripts (podcasts, vidéos, fiches) par une IA, au format JSON demandé.
 
 Ordre d'essai :
-1. Groq : modèles open source hébergés sur des puces spécialisées → quelques secondes (clé du site) ;
+1. Azure OpenAI (GPT-4.1 mini, crédit Azure for Students) et/ou Groq, selon les clés présentes → quelques secondes ;
 2. Gemini avec la clé PERSONNELLE de l'élève, seulement s'il en a enregistré une (secours) ;
 3. le modèle open source local du serveur (Qwen3-4B) : marche toujours, mais ≈ 1 h pour 10 min de podcast.
 Les journaux ne contiennent jamais le texte des cours ni les clés.
@@ -29,23 +29,36 @@ def _retry_after(res: httpx.Response, default: float) -> float:
         return default
 
 
-def _groq(prompt: str, schema: dict, max_tokens: int, temperature: float) -> dict:
+def _providers() -> list[dict]:
+    """Services compatibles avec l'API « chat/completions » d'OpenAI, dans l'ordre d'essai."""
+    found = []
+    if settings.AZURE_OPENAI_KEY and settings.AZURE_OPENAI_URL:
+        found.append({"name": "Azure OpenAI", "url": settings.AZURE_OPENAI_URL, "model": settings.AZURE_OPENAI_MODEL,
+                      "headers": {"api-key": settings.AZURE_OPENAI_KEY}})
+    if settings.GROQ_API_KEY:
+        found.append({"name": "Groq", "url": settings.GROQ_URL, "model": settings.GROQ_MODEL,
+                      "headers": {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}})
+    return found
+
+
+def _chat(provider: dict, prompt: str, schema: dict, max_tokens: int, temperature: float) -> dict:
+    name = provider["name"]
     body = {
-        "model": settings.GROQ_MODEL, "temperature": temperature, "max_completion_tokens": max_tokens,
+        "model": provider["model"], "temperature": temperature, "max_completion_tokens": max_tokens,
         "messages": [{"role": "system", "content": GROUNDING}, {"role": "user", "content": prompt}],
         "response_format": {"type": "json_schema", "json_schema": {"name": "reponse", "schema": schema, "strict": False}},
     }
-    if settings.GROQ_MODEL.startswith("openai/gpt-oss"):
+    if provider["model"].startswith("openai/gpt-oss"):
         body["reasoning_effort"] = "low"  # le modèle réfléchit peu : plus rapide, et assez pour un script
-    headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
-    with httpx.Client(timeout=180) as client:
+    started = time.monotonic()
+    with httpx.Client(timeout=240) as client:
         for attempt in range(4):
-            res = client.post(settings.GROQ_URL, json=body, headers=headers)
+            res = client.post(provider["url"], json=body, headers=provider["headers"])
             if res.status_code == 429 and attempt < 3:  # quota par minute : on attend un peu
                 time.sleep(_retry_after(res, 10))
                 continue
-            if res.status_code == 400 and "json_validate_failed" in res.text and body["response_format"]["type"] != "json_object":
-                # Réponse légèrement hors format : on redemande un JSON libre, le schéma étant rappelé dans la consigne.
+            if res.status_code == 400 and body["response_format"]["type"] == "json_schema":
+                # Réponse hors format (Groq) ou schéma refusé : on redemande un JSON libre, le schéma étant rappelé dans la consigne.
                 body["response_format"] = {"type": "json_object"}
                 body["messages"][-1]["content"] = (prompt + "\n\nRéponds uniquement par un objet JSON conforme à ce schéma :\n"
                                                    + json.dumps(schema, ensure_ascii=False))
@@ -53,10 +66,10 @@ def _groq(prompt: str, schema: dict, max_tokens: int, temperature: float) -> dic
             res.raise_for_status()
             data = res.json()
             usage = data.get("usage") or {}
-            log.info("Groq : %s jetons lus, %s écrits, %.1f s", usage.get("prompt_tokens"), usage.get("completion_tokens"),
-                     usage.get("total_time") or 0)
+            log.info("%s : %s jetons lus, %s écrits, %.1f s", name, usage.get("prompt_tokens"),
+                     usage.get("completion_tokens"), time.monotonic() - started)
             return json.loads(data["choices"][0]["message"]["content"])
-    raise WriterError("Groq : trop de demandes en ce moment.")
+    raise WriterError(f"{name} : trop de demandes en ce moment.")
 
 
 def _gemini(key: str, prompt: str, schema: dict, max_tokens: int, temperature: float) -> dict:
@@ -83,11 +96,11 @@ def _why(exc: Exception) -> str:
 
 def write(prompt: str, schema: dict, *, gemini_key: str = "", max_tokens: int = 8000, temperature: float = 0.6) -> dict:
     """Renvoie le JSON écrit par la première IA disponible."""
-    if settings.GROQ_API_KEY:
+    for provider in _providers():
         try:
-            return _groq(prompt, schema, max_tokens, temperature)
-        except Exception as exc:  # noqa: BLE001 - on passe au secours
-            log.warning("Groq indisponible (%s) : secours", _why(exc))
+            return _chat(provider, prompt, schema, max_tokens, temperature)
+        except Exception as exc:  # noqa: BLE001 - on passe au suivant
+            log.warning("%s indisponible (%s) : secours", provider["name"], _why(exc))
     if gemini_key:
         try:
             return _gemini(gemini_key, prompt, schema, max_tokens, temperature)
