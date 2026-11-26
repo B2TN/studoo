@@ -99,3 +99,13 @@ describe("cas limites", () => {
     expect(weekDays(monday, [ev("Colle", 28, [9, 0], [10, 0])], thursday).map((d) => d.index)).toEqual([0, 1, 2, 3, 4, 5]);
   });
 });
+
+describe("variables CSS de la grille", () => {
+  it("h() pose les variables CSS (--tt-cols, --tt-h) en plus des styles normaux", async () => {
+    const { h } = await import("../src/lib/dom.js");
+    const el = h("div", { style: { "--tt-cols": "5", "--tt-h": "660px", marginTop: "4px" } });
+    expect(el.style.getPropertyValue("--tt-cols")).toBe("5");
+    expect(el.style.getPropertyValue("--tt-h")).toBe("660px");
+    expect(el.style.marginTop).toBe("4px");
+  });
+});

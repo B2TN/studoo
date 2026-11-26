@@ -14,7 +14,11 @@ export function h(tag, attrs = {}, ...children) {
     } else if (key === "class") {
       el.className = value;
     } else if (key === "style" && typeof value === "object") {
-      Object.assign(el.style, value);
+      for (const [prop, v] of Object.entries(value)) {
+        // Variables CSS (« --tt-cols ») : seules setProperty les pose ; Object.assign les ignorerait.
+        if (prop.startsWith("--")) el.style.setProperty(prop, v);
+        else el.style[prop] = v;
+      }
     } else if (key === "dataset") {
       Object.assign(el.dataset, value);
     } else if (key in el && typeof value !== "string") {
