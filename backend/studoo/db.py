@@ -157,8 +157,12 @@ def _add_missing_columns(engine: Engine) -> None:
         have = {c["name"] for c in insp.get_columns(table)}
         for name, ddl in columns.items():
             if name not in have:
-                with engine.begin() as conn:
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                except Exception:  # noqa: BLE001 - ajoutée au même instant par un autre serveur : rien à faire
+                    if name not in {c["name"] for c in inspect(engine).get_columns(table)}:
+                        raise
 
 
 def reset_engine() -> None:
