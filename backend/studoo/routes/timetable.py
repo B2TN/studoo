@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from .. import db
 from ..deps import User, current_user
 from ..limits import rate_limit
-from ..services import ade, higher, pronote
+from ..services import ade, aurion, higher, hyperplanning, pronote
 from ..services.ics import _check_host, fetch_working, parse_ics
 from ..services.sealed import seal, unseal
 
@@ -203,16 +203,28 @@ def ade_login(body: AdeLoginIn, user: CurrentUser):
     uni = ade.UNIVERSITIES.get(body.university) or ({"base": _public_https(body.base)} if body.base else None)
     if not uni:
         raise HTTPException(422, detail={"code": "invalid", "message": "Université non prise en charge par le robot."})
+    experimental = False
     with _ade_guard("connexion"):
-        client, base = ade.login(uni["base"], body.username, body.password.get_secret_value())
         try:
-            gwt = ade.discover(client, base)
-            ade.register(client, gwt)
-            projects = ade.projects(client, gwt)
+            client, base = ade.login(uni["base"], body.username, body.password.get_secret_value())
+            native = None
+        except HTTPException as exc:
+            if not (isinstance(exc.detail, dict) and exc.detail.get("code") == "ade_native"):
+                raise
+            # ADE avec ses propres identifiants (pas la page de l'université) : robot EXPÉRIMENTAL
+            native = ade.login_native(uni["base"], body.username, body.password.get_secret_value())
+            client, base, experimental = native[0], uni["base"], True
+        try:
+            if native:
+                gwt, projects = native[1], native[2]
+            else:
+                gwt = ade.discover(client, base)
+                ade.register(client, gwt)
+                projects = ade.projects(client, gwt)
             state = {"kind": "ade-session", **ade.dump(client, base, gwt)}
         finally:
             client.close()
-    return {"session": seal(user.sub, state), "projects": projects}
+    return {"session": seal(user.sub, state), "projects": projects, "experimental": experimental}
 
 
 @router.post("/ade/tree")
@@ -338,6 +350,109 @@ def celcat_choose(body: CelcatIn, user: CurrentUser):
     out["method"] = "celcat" if keep else "snapshot"
     out["label"] = body.label or body.group
     return out
+
+
+# ---------- Robots EXPÉRIMENTAUX (itération 6) : HyperPlanning et Aurion ----------
+# Construits sans compte de test (voir services/hyperplanning.py et services/aurion.py) : l'interface les
+# présente comme expérimentaux. Mêmes règles que les autres robots : le mot de passe ne vit que dans cette
+# requête (SecretStr, jamais journalisé), puis disparaît, que ça marche ou non.
+class RobotLoginIn(BaseModel):
+    base: str = Field(min_length=10, max_length=200)
+    username: str = Field(min_length=1, max_length=120)
+    password: SecretStr = Field(min_length=1, max_length=200)
+    label: str = Field(default="", max_length=200)
+
+
+def _robot_guard(service: str):
+    """Erreur inattendue d'un robot → message clair (« page modifiée »), journal sans contenu."""
+    import contextlib
+    import logging
+
+    @contextlib.contextmanager
+    def guard():
+        try:
+            yield
+        except HTTPException:
+            raise
+        except httpx.TimeoutException:
+            raise HTTPException(504, detail={"code": "timeout", "message": f"{service} met trop de temps à répondre."}) from None
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger("studoo.robots").warning("Robot %s : %s", service, type(exc).__name__)
+            raise HTTPException(502, detail={"code": "page_changed", "message": f"Le robot n'a pas compris la réponse de {service}. "
+                                             "Utilise le dernier recours (.ics) et signale-nous ton établissement."}) from None
+    return guard()
+
+
+@router.post("/hyperplanning")
+async def hyperplanning_login(body: RobotLoginIn, user: CurrentUser):
+    """HyperPlanning : connexion → adresse iCal personnelle (vérifiée), gardée chiffrée : mises à jour sans mot de passe."""
+    rate_limit(f"ade:{user.sub}", limit=8, window_seconds=600)
+    base = _public_https(body.base)
+    with _robot_guard("HyperPlanning"):
+        url = await run_in_threadpool(hyperplanning.robot, base, body.username, body.password.get_secret_value())
+    start, end = _window()
+    working_url, data = await fetch_working(url, start, end)
+    out = _result(data, user.sub, {"kind": "ical", "url": working_url})
+    out.update(method="ical", experimental=True, label=body.label or "HyperPlanning")
+    return out
+
+
+@router.post("/aurion")
+def aurion_login(body: RobotLoginIn, user: CurrentUser):
+    """Aurion : connexion → cours des prochaines semaines (pas de lien iCal dans Aurion : copie + rappel de reconnexion)."""
+    rate_limit(f"ade:{user.sub}", limit=8, window_seconds=600)
+    base = _public_https(body.base)
+    with _robot_guard("Aurion"):
+        events = aurion.robot(base, body.username, body.password.get_secret_value())
+    out = _result({"events": events, "subjects": pronote.subjects(events)}, user.sub, None)
+    out.update(method="snapshot", experimental=True, label=body.label or "Aurion")
+    return out
+
+
+# ---------- Signaler un établissement (itération 6, C4) ----------
+# Après une erreur du robot ou un établissement non reconnu : l'élève peut nous dire QUEL établissement pose
+# problème, pour qu'il soit pris en charge ensuite. Jamais d'identifiant, de mot de passe ni de cours.
+REPORT_SOFTWARE = {"ade", "celcat", "hyperplanning", "aurion", "pronote", "ent", "autre", "inconnu"}
+REPORT_ERRORS = {"bad_credentials", "two_factor", "page_changed", "timeout", "blocked", "unavailable", "not_recognized",
+                 "ade_native_refused", "login_page", "login_loop", "ade_robot", "other"}
+
+
+class ReportIn(BaseModel):
+    establishment: str = Field(min_length=2, max_length=200)
+    software: str = Field(default="inconnu", max_length=40)
+    error_code: str = Field(default="other", max_length=40)
+    website: str = Field(default="", max_length=200)  # pot de miel : un humain ne le voit pas
+    elapsed_ms: int = Field(default=0, ge=0)
+
+
+def _reporter(sub: str) -> str:
+    import hashlib
+    import hmac
+    from ..config import get_settings
+    return hmac.new(get_settings().session_secret.encode(), b"school-report|" + sub.encode(), hashlib.sha256).hexdigest()[:48]
+
+
+@router.post("/report")
+def report_school(body: ReportIn, user: CurrentUser):
+    rate_limit(f"report:{user.sub}", limit=6, window_seconds=3600)
+    name = " ".join("".join(ch for ch in body.establishment if ch.isprintable()).split())[:200]
+    if len(name) < 2:
+        raise HTTPException(422, detail={"code": "invalid", "message": "Indique le nom de ton établissement."})
+    if body.website or body.elapsed_ms < 1500:  # robot : on fait comme si de rien n'était, sans rien garder
+        return {"ok": True, "duplicate": False}
+    software = body.software if body.software in REPORT_SOFTWARE else "autre"
+    error = body.error_code if body.error_code in REPORT_ERRORS else "other"
+    who = _reporter(user.sub)
+    with db.get_engine().begin() as conn:
+        from sqlalchemy import func, insert, select
+        recent = conn.execute(select(func.count()).select_from(db.school_reports).where(
+            db.school_reports.c.reporter == who, db.school_reports.c.software == software,
+            func.lower(db.school_reports.c.establishment) == name.lower(),
+            db.school_reports.c.created_at > db.now() - timedelta(days=1))).scalar_one()
+        if not recent:
+            conn.execute(insert(db.school_reports).values(created_at=db.now(), establishment=name, software=software,
+                                                          error_code=error, reporter=who))
+    return {"ok": True, "duplicate": bool(recent)}
 
 
 @router.get("/ents")

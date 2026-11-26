@@ -54,7 +54,11 @@ function barChart(series, key, label) {
 }
 
 async function renderAdmin(view, go) {
-  const [ov, users, msgs] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/messages")]);
+  const [ov, users, msgs, reports] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/messages"),
+    api("/api/admin/school-reports").catch(() => ({ reports: [] }))]);
+  const SOFT = { ade: "ADE", celcat: "Celcat", hyperplanning: "HyperPlanning", aurion: "Aurion", pronote: "Pronote", ent: "ENT", autre: "Autre", inconnu: "Inconnu" };
+  const ERR = { not_recognized: "non reconnu", bad_credentials: "identifiants", two_factor: "double auth.", page_changed: "page changée",
+    timeout: "délai", blocked: "bloqué", unavailable: "indisponible", ade_native_refused: "ADE refusé", other: "autre" };
   const q = ov.quota;
   mount(view,
     h("h1", { class: "view-title" }, h("span", { class: "hl pink" }, "Admin")),
@@ -72,6 +76,16 @@ async function renderAdmin(view, go) {
       h("span", {}, h("strong", {}, m.subject), h("br"), h("span", { class: "small muted" }, `${m.email} · ${relativeDate(m.createdAt)}`), h("p", { class: "small", style: { whiteSpace: "pre-wrap", margin: "6px 0 0" } }, m.body)),
       m.handled ? h("span", { class: "meta" }, "traité") : h("span", { class: "meta" }, h("button", { class: "btn small", onclick: async () => { await api(`/api/admin/messages/${m.id}/handled`, { method: "POST" }); go("/admin", { replace: true }); } }, icon("check"), "Traité")))))
       : h("p", { class: "empty" }, "Aucun message.")),
+    h("h2", { class: "section" }, "Établissements signalés"),
+    h("p", { class: "small muted" }, "Envoyés après une erreur du robot ou un établissement non reconnu. Les plus demandés en premier : ce sont eux à prendre en charge."),
+    h("section", { class: "card sketch table-wrap" }, reports.reports.length ? h("table", { class: "data" },
+      h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Établissement"), h("th", { scope: "col" }, "Logiciel"),
+        h("th", { scope: "col" }, "Demandes"), h("th", { scope: "col" }, "Élèves"), h("th", { scope: "col" }, "Erreurs"), h("th", { scope: "col" }, "Dernière"))),
+      h("tbody", {}, reports.reports.map((r) => h("tr", {}, h("td", {}, r.establishment), h("td", {}, SOFT[r.software] || r.software),
+        h("td", {}, h("strong", {}, String(r.count))), h("td", {}, String(r.people)),
+        h("td", { class: "small" }, Object.entries(r.errors).map(([k, n]) => `${ERR[k] || k} ×${n}`).join(", ")),
+        h("td", { class: "small" }, r.last ? relativeDate(r.last) : "")))))
+      : h("p", { class: "empty" }, "Aucun signalement pour l'instant.")),
     h("h2", { class: "section" }, "Comptes"),
     h("section", { class: "card sketch table-wrap" }, h("table", { class: "data" },
       h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Nom"), h("th", { scope: "col" }, "E-mail"), h("th", { scope: "col" }, "Inscription"), h("th", { scope: "col" }, "Dernière visite"), h("th", { scope: "col" }, h("span", { class: "sr-only" }, "Actions")))),

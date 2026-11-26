@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<!-- Page d'exemple imitant le menu principal de webAurion (PrimeFaces, menu latéral « form:sidebar »). -->
+<html><head><title>Accueil</title></head>
+<body>
+<form id="form" name="form" method="post" action="/faces/MainMenuPage.xhtml" enctype="application/x-www-form-urlencoded">
+  <input type="hidden" name="form" value="form">
+  <input type="hidden" name="form:largeurDivCenter" value="">
+  <div class="ui-slidemenu-content">
+    <ul class="ui-menu-list">
+      <li class="ui-widget ui-menuitem ui-corner-all ui-menu-parent sidebar-menu-1_0">
+        <a href="#" class="ui-menuitem-link" onclick="PrimeFaces.addSubmitParam('form',{'form:sidebar':'form:sidebar','form:sidebar_menuid':'1_0'}).submit('form');return false;"><span class="ui-menuitem-text">Mes notes</span></a>
+      </li>
+      <li class="ui-widget ui-menuitem ui-corner-all sidebar-menu-1_3">
+        <a href="#" class="ui-menuitem-link" onclick="PrimeFaces.addSubmitParam('form',{'form:sidebar':'form:sidebar','form:sidebar_menuid':'1_3'}).submit('form');return false;"><span class="ui-menuitem-text">Mon planning</span></a>
+      </li>
+    </ul>
+  </div>
+  <input type="hidden" name="javax.faces.ViewState" id="j_id1:javax.faces.ViewState:0" value="-1234567890123456789:987654321" autocomplete="off">
+</form>
+</body></html>

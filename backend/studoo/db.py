@@ -78,6 +78,19 @@ messages = Table(
     Column("handled", Boolean, nullable=False, default=False),
 )
 
+# Signalements d'établissements dont l'emploi du temps n'a pas pu être récupéré (itération 6, C4).
+# Jamais d'identifiant, de mot de passe ni de contenu d'emploi du temps : établissement, logiciel, type d'erreur,
+# heure, et une empreinte du compte (HMAC) seulement pour ne pas compter deux fois le même élève. Gardés 12 mois.
+school_reports = Table(
+    "school_reports", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("establishment", String(200), nullable=False),
+    Column("software", String(40), nullable=False),
+    Column("error_code", String(40), nullable=False),
+    Column("reporter", String(48), nullable=False, default=""),
+)
+
 # File de tâches lourdes (podcasts, vidéos, OCR…) traitées par le worker.
 # `payload` contient, CHIFFRÉS, le texte des cours et le jeton Drive hors ligne :
 # il est effacé (mis à NULL) dès que la tâche est terminée ou abandonnée.

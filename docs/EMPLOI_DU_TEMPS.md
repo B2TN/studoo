@@ -42,13 +42,38 @@ de démonstration d'Index Éducation (0,7 s, lien iCal obtenu).
    Toulouse III (connexion) → Celcat. Non reconnus automatiquement : Lille, Nantes, Strasbourg, Lorraine,
    Sorbonne, Saclay, UPEC… → dernier recours guidé (liste d'adresses connues à compléter dans `services/higher.py`).
 3. **Robots** :
-   - **ADE** (connexion CAS/Shibboleth/SAML, voir ci-dessous) ; les ADE à identifiants propres (Grenoble,
-     Montpellier) sont reconnus mais pas encore pris en charge ;
+   - **ADE** (connexion CAS/Shibboleth/SAML, voir ci-dessous) — **vérifié sur un vrai compte** (Paris Cité) ;
+     ADE à identifiants propres (Grenoble, Montpellier) : **robot EXPÉRIMENTAL** (voir plus bas) ;
    - **Celcat Calendar** : recherche du groupe (`Home/ReadResourceListItems`, type 103) et cours
      (`Home/GetCalendarData`) — sans identifiant quand l'établissement les publie (Bordeaux), sinon après connexion
      (copie des cours + rappel de reconnexion, la session ne dure pas) ;
-   - **HyperPlanning, Aurion** : reconnus, pas de robot (protocoles propriétaires non testables sans compte) →
-     dernier recours avec les étapes propres au logiciel.
+   - **HyperPlanning, Aurion** : **robots EXPÉRIMENTAUX** (itération 6, voir plus bas) ; le dernier recours
+     avec les étapes propres au logiciel reste proposé à chaque échec.
+
+## Robots expérimentaux (itération 6, 27/11/2026) — jamais testés sur un vrai compte
+
+> ⚠️ Aucun compte n'était disponible pour ces services. Les robots ont été construits d'après la documentation
+> publique et des projets open source (lus pour comprendre les échanges, aucun code recopié), puis testés
+> **uniquement sur des pages d'exemple** (`backend/tests/fixtures/`). Ils sont marqués « Expérimental » dans
+> l'interface. Ne pas les considérer comme fonctionnels tant qu'un étudiant ne les a pas validés.
+
+| Robot | Ce qui est sûr | Ce qui est supposé | Résultat gardé |
+|---|---|---|---|
+| **HyperPlanning** (`services/hyperplanning.py`) | Un étudiant peut obtenir une adresse iCal personnelle `…/hp/Telechargements/ical/Edt_….ics?version=…&idICal=…&param=…` (doc Index Éducation ; projets publics [epsIcal](https://github.com/AirKyzzZ/epsIcal), [IUTime](https://github.com/gamer3001/IUTime)). | La façon de la demander une fois connecté : même moteur que Pronote, donc session chiffrée via **pronotepy** (MIT) puis `PageInfosPerso` → `paramICal`/`paramSuppl`. Chaque adresse candidate est **vérifiée** (doit commencer par `BEGIN:VCALENDAR`). | Lien iCal chiffré (mise à jour automatique). |
+| **Aurion** (`services/aurion.py`) | webAurion est une application JSF/PrimeFaces : `/faces/Login.xhtml`, menu `MainMenuPage.xhtml` (`form:sidebar_menuid`), `Planning.xhtml` + demande « ajax » du calendrier (`<id>_start`/`<id>_end` en ms) dont la réponse XML contient `{"events": […]}` (projets ISENpy, MIT, et Python-Planning-Aurion, Apache 2.0). | Les identifiants de formulaire (`form:j_idt…`) et le format des titres changent selon les écoles : ils sont relus dans la page, les titres sont découpés prudemment. | Copie des cours + rappel de reconnexion (Aurion n'a pas d'iCal). |
+| **ADE, identifiants propres** (`ade.login_native`) | Même interface GWT que l'ADE vérifié ; la demande de connexion contient deux textes vides. | Qu'il s'agit de l'identifiant et du mot de passe : trois positions sont essayées, une seule est retenue si ADE renvoie ensuite la liste des années. | Lien d'export de la classe (comme l'ADE vérifié). |
+
+Erreurs distinguées pour tous les robots (`services/robot_errors.py`) : identifiants refusés, double
+authentification, page modifiée, délai dépassé, adresse du serveur bloquée (403/429, anti-robot), service
+indisponible. À chaque échec : **dernier recours .ics** + **signalement de l'établissement** (ci-dessous).
+
+## Signaler un établissement (itération 6, C4)
+Après une erreur du robot ou un établissement non reconnu, l'élève peut envoyer en un clic : nom de
+l'établissement, logiciel, type d'erreur (pré-remplis, modifiables) ; l'heure est celle de l'envoi. Jamais
+d'identifiant, de mot de passe ni d'emploi du temps. Anti-spam : champ piège, temps minimal, 6 envois par heure,
+et un même élève n'est compté qu'une fois par jour et par établissement (empreinte HMAC du compte). Gardé
+12 mois. Page **Admin → Établissements signalés** : regroupés par établissement et logiciel, les plus demandés
+en premier, avec le détail des erreurs.
 
 ## Robot ADE (26/11/2026)
 ADE ne donne pas l'emploi du temps de l'étudiant : il faut choisir l'**année** (« projet »), puis descendre

@@ -7,7 +7,8 @@
    l'établissement (ade., edt., planning., celcat., hp.…) et reconnaît le logiciel à sa réponse :
    - ADE Campus (`/direct/`, interface « Ade Web Direct Planning ») → robot ADE (services/ade.py) ;
    - Celcat Calendar (`/calendar/`, « CELCAT Calendar ») → recherche du groupe + cours (ce module) ;
-   - HyperPlanning (Index Éducation), Aurion… → reconnus, mais pas de robot : dernier recours guidé.
+   - HyperPlanning (Index Éducation) et Aurion → robots EXPÉRIMENTAUX (services/hyperplanning.py, aurion.py),
+     construits sans compte de test ; le dernier recours guidé reste proposé.
 3. Celcat : les groupes sont souvent consultables sans connexion (recherche + cours en JSON). Sinon, le robot
    se connecte par la page de l'université (même code que pour ADE) puis lit les cours de l'étudiant.
 """
@@ -90,8 +91,14 @@ async def _probe(client: httpx.AsyncClient, host: str) -> list[dict]:
     checks = [("ade", f"https://{host}/direct/", _is_ade)]
     for path in ("/calendar", "/Calendar", "/calendar2"):
         checks.append(("celcat", f"https://{host}{path}/", _is_celcat))
-    checks += [("hyperplanning", f"https://{host}/hp/", lambda r: r.status_code < 400 and "hyperplanning" in r.text.lower()),
-               ("aurion", f"https://{host}/faces/Login.xhtml", lambda r: r.status_code < 400 and "aurion" in r.text.lower())]
+    sso = lambda r: r.status_code in (301, 302, 303, 307) and any(  # noqa: E731 - renvoi vers la page de l'université
+        w in r.headers.get("location", "").lower() for w in ("cas", "idp", "sso", "shibboleth", "wayf"))
+    checks += [("hyperplanning", f"https://{host}/hp/", lambda r: (r.status_code < 400 and "hyperplanning" in r.text.lower())
+                or ("hp" in host.split(".")[0] and sso(r))),
+               ("aurion", f"https://{host}/faces/Login.xhtml", lambda r: (r.status_code < 400 and "aurion" in r.text.lower())
+                or ("aurion" in host.split(".")[0] and sso(r))),
+               ("aurion", f"https://{host}/webAurion/faces/Login.xhtml", lambda r: (r.status_code < 400 and "aurion" in r.text.lower())
+                or ("aurion" in host.split(".")[0] and sso(r)))]
     for software, url, test in checks:
         try:
             res = await client.get(url)
@@ -101,8 +108,10 @@ async def _probe(client: httpx.AsyncClient, host: str) -> list[dict]:
             continue
         if test(res):
             base = url.rsplit("/", 2)[0] if software == "ade" else url.rstrip("/")
-            if software in ("hyperplanning", "aurion"):
+            if software == "hyperplanning":
                 base = f"https://{host}"
+            if software == "aurion":  # Aurion peut être installé à la racine ou sous /webAurion
+                base = url.split("/faces/")[0]
             login = software == "ade" or res.status_code in (301, 302, 303, 307)
             item = {"software": software, "base": base, "login": login}
             if software == "ade" and res.status_code == 200:

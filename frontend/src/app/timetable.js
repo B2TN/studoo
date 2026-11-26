@@ -9,8 +9,9 @@ import { time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
 import { drive, getSettings } from "../lib/storage.js";
 import {
-  adeChoose, adeLogin, adeTree, addSource, celcatChoose, celcatGroups, celcatLogin, clearTimetableCache, guessProject,
-  higherDetect, higherSearch, loadEvents, removeSource, RECONNECT_DAYS, robotConnect, staleSources, subjectsOf,
+  adeChoose, adeLogin, adeTree, addSource, celcatChoose, celcatGroups, celcatLogin, clearTimetableCache, experimentalRobot,
+  guessProject, higherDetect, higherSearch, loadEvents, removeSource, RECONNECT_DAYS, reportSchool, robotConnect,
+  ROBOT_SERVICE_NAMES, staleSources, subjectsOf,
 } from "../lib/timetable-data.js";
 import {
   blocksOfDay, dayKey, hourLabel, layoutColumns, visibleRange, wallMinutes, weekDays,
@@ -175,6 +176,113 @@ function scheduleView(events, monday, offset, wantedDay, go) {
   return { el, stop: () => mq?.removeEventListener?.("change", onChange) };
 }
 
+// ---------- En cas d'échec : dernier recours + nous signaler l'établissement (itération 6, C4) ----------
+const SOFTWARE_LABELS = { ade: "ADE", celcat: "Celcat", hyperplanning: "HyperPlanning", aurion: "Aurion", pronote: "Pronote",
+  ent: "ENT (lycée)", autre: "Autre logiciel", inconnu: "Je ne sais pas" };
+const ERROR_LABELS = { not_recognized: "Établissement non reconnu", bad_credentials: "Identifiants refusés",
+  two_factor: "Double authentification", page_changed: "Page non comprise par le robot", timeout: "Délai dépassé",
+  blocked: "Connexion bloquée", unavailable: "Service indisponible", other: "Autre problème" };
+
+/**
+ * Petit formulaire de signalement : établissement, logiciel, type d'erreur (pré-remplis, modifiables) et heure.
+ * Anti-spam : champ piège invisible + temps minimal ; le serveur limite aussi le nombre d'envois.
+ */
+function reportForm({ establishment = "", software = "inconnu", error = "other" } = {}) {
+  const openedAt = Date.now();
+  const name = h("input", { class: "input", id: "rp-name", value: establishment, maxlength: "200", autocomplete: "organization" });
+  const soft = h("select", { class: "input", id: "rp-soft" }, Object.entries(SOFTWARE_LABELS).map(([v, l]) =>
+    h("option", { value: v, selected: v === software }, l)));
+  const code = ERROR_LABELS[error] ? error : "other";
+  const kind = h("select", { class: "input", id: "rp-kind" }, Object.entries(ERROR_LABELS).map(([v, l]) =>
+    h("option", { value: v, selected: v === code }, l)));
+  const trap = h("input", { type: "text", name: "website", id: "rp-website", tabindex: "-1", autocomplete: "off" });
+  const err = h("p", { class: "error", role: "alert" });
+  const submit = h("button", { class: "btn primary", type: "submit" }, icon("mail"), "Envoyer le signalement");
+  const box = h("div", { class: "report-box card sketch" });
+  const now = new Date();
+  mount(box, h("form", { class: "stack", novalidate: true, onsubmit: async (e) => {
+    e.preventDefault();
+    err.textContent = "";
+    const value = name.value.trim();
+    if (value.length < 2) { err.textContent = "Indique le nom de ton établissement."; name.focus(); return; }
+    submit.disabled = true;
+    try {
+      const res = await reportSchool({ establishment: value, software: soft.value, error_code: kind.value,
+        website: trap.value, elapsed_ms: Date.now() - openedAt });
+      mount(box, h("div", { class: "stack", role: "status" }, h("h3", {}, icon("check"), " Merci, c'est reçu !"),
+        h("p", {}, res.duplicate ? "Tu nous avais déjà signalé cet établissement aujourd'hui : c'est bien noté, pas besoin de recommencer."
+          : `On sait maintenant que « ${value} »${["inconnu", "autre"].includes(soft.value) ? "" : ` (${SOFTWARE_LABELS[soft.value]})`} pose problème. Les établissements les plus signalés sont pris en charge en premier.`),
+        h("p", { class: "small muted" }, "En attendant, le dernier recours (.ics) marche pour tout le monde.")));
+    } catch (e2) { err.textContent = e2.message; submit.disabled = false; }
+  } },
+    h("h3", {}, icon("message"), " Nous signaler ton établissement"),
+    h("p", { class: "small" }, "Pour qu'on sache quel établissement prendre en charge. Envoyé : le nom de l'établissement, le logiciel, "
+      + "le type d'erreur et l'heure (", now.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }), "). ",
+    h("strong", {}, "Jamais ton identifiant, ton mot de passe ni ton emploi du temps.")),
+    h("div", { class: "field" }, h("label", { for: "rp-name" }, "Établissement"), name),
+    h("div", { class: "row" },
+      h("div", { class: "field", style: { flex: "1 1 160px" } }, h("label", { for: "rp-soft" }, "Logiciel d'emploi du temps"), soft),
+      h("div", { class: "field", style: { flex: "1 1 160px" } }, h("label", { for: "rp-kind" }, "Ce qui s'est passé"), kind)),
+    h("div", { class: "sr-only", "aria-hidden": "true" }, h("label", { for: "rp-website" }, "Ne pas remplir ce champ"), trap),
+    err, h("div", {}, submit),
+    h("p", { class: "small muted" }, "Gardé 12 mois, voir la page ", h("a", { href: "/rgpd" }, "Données personnelles"), ".")));
+  setTimeout(() => name.focus(), 0);
+  return box;
+}
+
+/** Après une erreur du robot (ou un établissement non reconnu) : le message, le dernier recours, et le signalement. */
+function failurePanel({ message = "", establishment = "", software = "inconnu", error = "other", useLastResort }) {
+  const slot = h("div");
+  return h("div", { class: "failure stack", role: "alert" },
+    message ? h("p", { class: "error" }, message) : null,
+    h("div", { class: "row" },
+      useLastResort ? h("button", { class: "btn primary", type: "button", onclick: useLastResort }, icon("arrow-right"), "Dernier recours : .ics") : null,
+      h("button", { class: "btn", type: "button", onclick: (e) => { e.currentTarget.disabled = true; mount(slot, reportForm({ establishment, software, error })); } },
+        icon("mail"), "Signaler mon établissement")),
+    slot);
+}
+
+// ---------- Robots EXPÉRIMENTAUX : HyperPlanning et Aurion (itération 6, C3) ----------
+// Construits sans compte de test : on le dit clairement, et chaque échec propose le dernier recours + le signalement.
+function experimentalRobotForm(software, school, sys, done, useLastResort) {
+  const service = ROBOT_SERVICE_NAMES[software];
+  const user = h("input", { class: "input", id: "xr-user", autocomplete: "username", autocapitalize: "none", spellcheck: false });
+  const pass = h("input", { class: "input", id: "xr-pass", type: "password", autocomplete: "current-password" });
+  const out = h("div");
+  const submit = h("button", { class: "btn primary", type: "submit" }, icon("check"), "Essayer le robot");
+  setTimeout(() => user.focus(), 0);
+  return h("form", { class: "stack", novalidate: true, onsubmit: async (e) => {
+    e.preventDefault();
+    mount(out);
+    if (!user.value.trim() || !pass.value) { mount(out, h("p", { class: "error", role: "alert" }, "Identifiant et mot de passe requis.")); return; }
+    submit.disabled = true;
+    submit.replaceChildren(h("span", { class: "spinner", style: { width: "22px", height: "22px" } }), `Connexion à ${service}… (10 à 40 s)`);
+    try {
+      const res = await experimentalRobot(software, { base: sys.base, username: user.value.trim(), password: pass.value }, school);
+      toast(res.method === "ical" ? `${res.events.length} cours trouvés : ton emploi du temps se mettra à jour tout seul.`
+        : `${res.events.length} cours récupérés. ${service} ne permet pas la mise à jour automatique : Studoo te rappellera de te reconnecter dans ${RECONNECT_DAYS} jours.`,
+      "success", 9000);
+      done(res.subjects);
+    } catch (e2) {
+      mount(out, failurePanel({ message: e2.message, establishment: school.name, software, error: e2.code, useLastResort }));
+    } finally {
+      pass.value = ""; // le mot de passe est effacé du formulaire dans tous les cas
+      submit.disabled = false;
+      submit.replaceChildren(icon("check"), "Essayer le robot");
+    }
+  } },
+    h("p", { class: "notice warn", role: "note" }, h("span", { class: "badge exp" }, "Expérimental"), " ",
+      `Le robot ${service} a été construit d'après la documentation publique et des exemples, mais n'a encore jamais pu être testé sur un vrai compte. `
+      + "S'il échoue, le dernier recours marche à coup sûr, et ton signalement nous aide à le terminer."),
+    h("p", { class: "notice", role: "note" }, icon("shield-lock"), " ", PRIVACY_NOTE),
+    h("div", { class: "field" }, h("label", { for: "xr-user" }, `Identifiant ${service} (ou de ton ENT)`), user),
+    h("div", { class: "field" }, h("label", { for: "xr-pass" }, "Mot de passe"), pass),
+    h("div", {}, submit), out,
+    h("p", { class: "small muted" }, software === "hyperplanning"
+      ? "Le robot se connecte, demande à HyperPlanning ton adresse iCal personnelle, vérifie qu'elle marche, puis oublie ton mot de passe. Studoo garde seulement cette adresse, chiffrée."
+      : "Le robot se connecte, lit ton planning des prochaines semaines, puis oublie ton mot de passe. Aurion n'a pas de lien iCal : Studoo te rappellera de te reconnecter toutes les 2 semaines."));
+}
+
 // ---------- Dernier recours : lien ou fichier .ics ----------
 function icsForm({ steps, label = "Lien de ton emploi du temps", onDone, extra = {}, open = null }) {
   const input = h("input", { class: "input", id: "ics-url", type: "url", inputmode: "url", placeholder: "https://…/calendar.ics", autocomplete: "off" });
@@ -258,15 +366,15 @@ function schoolSearch(onPick) {
     results);
 }
 
-function robotForm(school, onDone, onBack) {
+function robotForm(school, onDone, onBack, useLastResort) {
   const user = h("input", { class: "input", id: "rb-user", autocomplete: "username", autocapitalize: "none", spellcheck: false });
   const pass = h("input", { class: "input", id: "rb-pass", type: "password", autocomplete: "current-password" });
-  const err = h("p", { class: "error", role: "alert" });
+  const err = h("div", { role: "alert" });
   const submit = h("button", { class: "btn primary", type: "submit" }, icon("check"), "Récupérer mon emploi du temps");
   const form = h("form", { class: "stack", novalidate: true, onsubmit: async (e) => {
     e.preventDefault();
-    err.textContent = "";
-    if (!user.value.trim() || !pass.value) { err.textContent = "Identifiant et mot de passe requis."; return; }
+    mount(err);
+    if (!user.value.trim() || !pass.value) { mount(err, h("p", { class: "error" }, "Identifiant et mot de passe requis.")); return; }
     submit.disabled = true;
     submit.replaceChildren(h("span", { class: "spinner", style: { width: "22px", height: "22px" } }), "Le robot se connecte… (10 à 30 s)");
     try {
@@ -277,7 +385,9 @@ function robotForm(school, onDone, onBack) {
       "success", 9000);
       onDone(res.subjects);
     } catch (e2) {
-      err.textContent = e2.message;
+      mount(err, ["bad_credentials", "offline"].includes(e2.code) ? h("p", { class: "error" }, e2.message)
+        : failurePanel({ message: e2.message, establishment: `${school.name}${school.city ? ` (${school.city})` : ""}`, software: "pronote", error: e2.code,
+          useLastResort: useLastResort ? () => useLastResort({ name: school.name, steps: ICAL_STEPS_PRONOTE }) : null }));
     } finally {
       pass.value = ""; // le mot de passe est effacé du formulaire dans tous les cas
       submit.disabled = false;
@@ -297,9 +407,9 @@ function robotForm(school, onDone, onBack) {
   return form;
 }
 
-function highSchoolTab(done, preset) {
+function highSchoolTab(done, preset, useLastResort) {
   const slot = h("div");
-  const pick = (school) => mount(slot, robotForm(school, done, () => mount(slot, schoolSearch(pick))));
+  const pick = (school) => mount(slot, robotForm(school, done, () => mount(slot, schoolSearch(pick)), useLastResort));
   if (preset) pick(preset); else mount(slot, schoolSearch(pick));
   return h("div", { class: "stack" }, slot,
     h("p", { class: "small muted" }, "ÉcoleDirecte, Skolengo sans Pronote, double authentification obligatoire ? Le robot ne peut pas s'y connecter : utilise le dernier recours."));
@@ -316,13 +426,13 @@ function adeRobot(u, done, useLastResort) {
   const loginForm = () => {
     const user = h("input", { class: "input", id: "ade-user", autocomplete: "username", autocapitalize: "none", spellcheck: false });
     const pass = h("input", { class: "input", id: "ade-pass", type: "password", autocomplete: "current-password" });
-    const err = h("p", { class: "error", role: "alert" });
+    const err = h("div", { role: "alert" });
     const submit = h("button", { class: "btn primary", type: "submit" }, icon("check"), "Me connecter");
     setTimeout(() => user.focus(), 0);
     return h("form", { class: "stack", novalidate: true, onsubmit: async (e) => {
       e.preventDefault();
-      err.textContent = "";
-      if (!user.value.trim() || !pass.value) { err.textContent = "Identifiant et mot de passe requis."; return; }
+      mount(err);
+      if (!user.value.trim() || !pass.value) { mount(err, h("p", { class: "error" }, "Identifiant et mot de passe requis.")); return; }
       submit.disabled = true;
       submit.replaceChildren(h("span", { class: "spinner", style: { width: "22px", height: "22px" } }), "Connexion à ton université… (10 à 20 s)");
       try {
@@ -331,7 +441,8 @@ function adeRobot(u, done, useLastResort) {
         session = res.session;
         mount(slot, projectStep(res.projects));
       } catch (e2) {
-        err.textContent = e2.message;
+        mount(err, e2.code === "bad_credentials" ? h("p", { class: "error" }, e2.message)
+          : failurePanel({ message: e2.message, establishment: u.name, software: "ade", error: e2.code, useLastResort }));
       } finally {
         pass.value = ""; // le mot de passe est effacé du formulaire dans tous les cas
         submit.disabled = false;
@@ -339,9 +450,12 @@ function adeRobot(u, done, useLastResort) {
       }
     } },
       h("p", { class: "notice", role: "note" }, icon("shield-lock"), " ", PRIVACY_NOTE),
-      ROBOT_TESTED.has(u.robot) || u.tested ? null : h("p", { class: "small muted" }, icon("info"),
-        " Robot en test pour cette université : s'il n'y arrive pas, utilise le dernier recours."),
-      h("div", { class: "field" }, h("label", { for: "ade-user" }, "Identifiant de ton université (ENT)"), user),
+      u.native ? h("p", { class: "notice warn", role: "note" }, h("span", { class: "badge exp" }, "Expérimental"), " ",
+        "Ton établissement utilise des identifiants propres à ADE (pas ceux de l'université). Cette connexion n'a jamais pu être testée "
+        + "sur un vrai compte : si elle échoue, le dernier recours marche à coup sûr.")
+        : ROBOT_TESTED.has(u.robot) || u.tested ? null : h("p", { class: "small muted" }, icon("info"),
+          " Robot en test pour cette université : s'il n'y arrive pas, utilise le dernier recours."),
+      h("div", { class: "field" }, h("label", { for: "ade-user" }, u.native ? "Identifiant ADE" : "Identifiant de ton université (ENT)"), user),
       h("div", { class: "field" }, h("label", { for: "ade-pass" }, "Mot de passe"), pass),
       err, h("div", {}, submit),
       h("p", { class: "small muted" }, "Le robot se connecte par la page officielle de ton université, ouvre ADE, puis te laisse choisir ta classe. "
@@ -418,7 +532,7 @@ function adeRobot(u, done, useLastResort) {
 }
 
 // ---------- Robot : Celcat ----------
-function celcatRobot(school, sys, done) {
+function celcatRobot(school, sys, done, useLastResort) {
   const slot = h("div", { class: "stack" });
   let session = "";
   const search = () => {
@@ -457,17 +571,20 @@ function celcatRobot(school, sys, done) {
   const loginForm = () => {
     const user = h("input", { class: "input", id: "cc-user", autocomplete: "username", autocapitalize: "none", spellcheck: false });
     const pass = h("input", { class: "input", id: "cc-pass", type: "password", autocomplete: "current-password" });
-    const err = h("p", { class: "error", role: "alert" });
+    const err = h("div", { role: "alert" });
     const submit = h("button", { class: "btn primary", type: "submit" }, icon("check"), "Me connecter");
     return h("form", { class: "stack", novalidate: true, onsubmit: async (e) => {
       e.preventDefault();
-      err.textContent = "";
-      if (!user.value.trim() || !pass.value) { err.textContent = "Identifiant et mot de passe requis."; return; }
+      mount(err);
+      if (!user.value.trim() || !pass.value) { mount(err, h("p", { class: "error" }, "Identifiant et mot de passe requis.")); return; }
       submit.disabled = true;
       try {
         session = await celcatLogin({ base: sys.base, username: user.value.trim(), password: pass.value });
         mount(slot, search());
-      } catch (e2) { err.textContent = e2.message; } finally { pass.value = ""; submit.disabled = false; }
+      } catch (e2) {
+        mount(err, e2.code === "bad_credentials" ? h("p", { class: "error" }, e2.message)
+          : failurePanel({ message: e2.message, establishment: school.name, software: "celcat", error: e2.code, useLastResort }));
+      } finally { pass.value = ""; submit.disabled = false; }
     } },
       h("p", { class: "notice", role: "note" }, icon("shield-lock"), " ", PRIVACY_NOTE),
       h("p", { class: "small muted" }, icon("info"), " Robot Celcat en test : s'il n'y arrive pas, utilise le dernier recours."),
@@ -490,20 +607,24 @@ function universityTab(useLastResort, done) {
     let systems = [];
     try { systems = await higherDetect(school.domain); } catch (e) { toast(e.message, "error"); }
     const sys = systems.find((x) => x.software === "ade" && !x.native) || systems.find((x) => x.software === "celcat") || systems[0];
-    if (sys?.software === "ade" && !sys.native) {
-      mount(slot, head, h("p", { class: "small muted" }, icon("check"), ` Emploi du temps trouvé : ${sys.name}.`),
-        adeRobot({ name: school.name, base: sys.base, tested: sys.base.includes("u-pariscite.fr") }, done, () => useLastResort({ name: school.name, software: sys })));
+    const last = () => useLastResort({ name: school.name, software: sys });
+    const found = sys ? h("p", { class: "small muted" }, icon("check"), ` Emploi du temps trouvé : ${sys.name}.`) : null;
+    if (sys?.software === "ade") {
+      mount(slot, head, found, adeRobot({ name: school.name, base: sys.base, native: Boolean(sys.native),
+        tested: sys.base.includes("u-pariscite.fr") }, done, last));
       return;
     }
     if (sys?.software === "celcat") {
-      mount(slot, head, h("p", { class: "small muted" }, icon("check"), ` Emploi du temps trouvé : ${sys.name}.`), celcatRobot(school, sys, done));
+      mount(slot, head, found, celcatRobot(school, sys, done, last));
       return;
     }
-    const why = !sys ? "Studoo n'a pas reconnu le logiciel d'emploi du temps de ton établissement."
-      : sys.native ? `Ton établissement utilise ${sys.name} avec des identifiants propres à ADE : le robot ne sait pas encore s'y connecter.`
-        : `Ton établissement utilise ${sys.name} : le robot ne sait pas encore s'y connecter.`;
-    mount(slot, head, h("p", { class: "card sketch small" }, icon("info"), " ", why, " Le dernier recours prend 2 minutes : Studoo te guide."),
-      h("div", {}, h("button", { class: "btn primary", type: "button", onclick: () => useLastResort({ name: school.name, software: sys }) }, icon("arrow-right"), "Continuer avec le dernier recours")));
+    if (sys?.software === "hyperplanning" || sys?.software === "aurion") {
+      mount(slot, head, found, experimentalRobotForm(sys.software, school, sys, done, last));
+      return;
+    }
+    mount(slot, head, h("p", { class: "card sketch small" }, icon("info"), " Studoo n'a pas reconnu automatiquement le logiciel d'emploi du temps "
+      + "de ton établissement. Le dernier recours prend 2 minutes (Studoo te guide), et tu peux nous signaler ton établissement pour qu'on le prenne en charge."),
+    failurePanel({ establishment: school.name, software: "inconnu", error: "not_recognized", useLastResort: last }));
   }
 
   function finder() {
@@ -523,7 +644,9 @@ function universityTab(useLastResort, done) {
           if (mine !== seq) return;
           mount(results, schools.length ? schools.map((sc) => h("button", { class: "btn", type: "button", onclick: () => chosen(sc) },
             icon("school"), h("span", {}, h("strong", {}, sc.name), sc.city ? h("span", { class: "small muted" }, ` · ${sc.city}`) : null)))
-            : h("p", { class: "small muted" }, "Aucun établissement trouvé : essaie avec la ville ou le sigle."));
+            : h("div", { class: "stack" }, h("p", { class: "small muted" }, "Aucun établissement trouvé : essaie avec la ville ou le sigle. "
+              + "Toujours rien ? Utilise le dernier recours, et signale-nous ton établissement."),
+            failurePanel({ establishment: q, software: "inconnu", error: "not_recognized", useLastResort: () => useLastResort({ name: q }) })));
         } catch (e) { if (mine === seq) mount(results, h("p", { class: "error" }, e.message)); }
       }, 350);
     });
@@ -532,7 +655,7 @@ function universityTab(useLastResort, done) {
       h("div", { class: "field" }, h("label", { for: "uni-q" }, "Ton université ou ton école (nom, sigle ou ville)"), input,
         h("span", { class: "hint" }, "Annuaire officiel de l'Enseignement supérieur.")),
       results,
-      h("p", { class: "small muted" }, "Studoo reconnaît ADE et Celcat et s'y connecte pour toi. HyperPlanning, Aurion et les autres : dernier recours guidé."));
+      h("p", { class: "small muted" }, "Studoo reconnaît ADE et Celcat et s'y connecte pour toi. HyperPlanning et Aurion : robots expérimentaux. Les autres : dernier recours guidé."));
   }
 
   mount(slot, finder());
@@ -566,7 +689,7 @@ function addPanel(go, { reconnect = null } = {}) {
   const done = afterImport(go);
   let establishment = null;
   const tabs = [
-    ["Je suis au lycée", () => highSchoolTab(done, reconnect)],
+    ["Je suis au lycée", () => highSchoolTab(done, reconnect, (u) => { establishment = u; select(2); })],
     ["Je suis étudiant·e", () => universityTab((u) => { establishment = u; select(2); }, done)],
     ["Dernier recours : .ics", () => lastResortTab(done, establishment)],
   ];

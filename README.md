@@ -27,7 +27,7 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 | 🎧 **Podcasts** | 10, 20 ou 30 min, dialogue Vivienne + Henri (voix Azure, allure radio), script écrit par GPT-4.1 mini sur le serveur de tâches. |
 | 🎬 **Vidéos explicatives** | Diaporama animé dessiné + voix (Vivienne) + sous-titres, animé dans le navigateur et exportable en **MP4** (WebCodecs) : format TikTok, YouTube ou long. |
 | ✏️ **Feuilles d'exercices** | Entraînement (TD), mise en pratique (TP), contrôle blanc (DST) ou questions flash (QCM), tirés des cours ; corrigé masqué ; **correction de la copie en photo** (note /20, erreurs, notions à revoir). |
-| 📅 **Emploi du temps** | **Robot** : l'élève choisit son lycée et se connecte ; Studoo trouve Pronote et l'ENT régional tout seul, récupère l'emploi du temps et oublie le mot de passe. Universités et autres services : dernier recours `.ics` ([détails](docs/EMPLOI_DU_TEMPS.md)). |
+| 📅 **Emploi du temps** | Grille aux **vraies heures** (vue semaine, vue jour sur téléphone). **Robots** : lycée → Pronote et l'ENT régional trouvés tout seuls ; supérieur → ADE (vérifié sur un vrai compte) et Celcat. **Expérimentaux, jamais testés sur un vrai compte** : HyperPlanning, Aurion, ADE à identifiants propres. Le mot de passe est oublié après la connexion. À chaque échec : dernier recours `.ics` + signalement de l'établissement ([détails](docs/EMPLOI_DU_TEMPS.md)). |
 
 <table>
   <tr>

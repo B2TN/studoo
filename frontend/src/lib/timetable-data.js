@@ -67,6 +67,32 @@ export async function celcatChoose(base, group, session, school) {
   }
   return res;
 }
+// ---------- Robots EXPÉRIMENTAUX (itération 6) : HyperPlanning et Aurion ----------
+export const ROBOT_SERVICE_NAMES = { hyperplanning: "HyperPlanning", aurion: "Aurion" };
+
+/** HyperPlanning → lien iCal vérifié, chiffré (mise à jour automatique) ; Aurion → copie + rappel de reconnexion. */
+export async function experimentalRobot(software, body, school) {
+  const res = await api(`/api/timetable/${software}`, { method: "POST", json: { ...body, label: school.name } });
+  const label = `${ROBOT_SERVICE_NAMES[software]} · ${school.name}`;
+  const higher = { domain: school.domain, name: school.name, city: school.city || "" };
+  if (res.sealed) {
+    await addSource({ type: "sealed", sealed: res.sealed, label, establishment: school.name, experimental: true });
+  } else {
+    const root = await drive.init();
+    const saved = await drive.save({ parentId: root, name: `Emploi du temps — ${school.name}.json`, mimeType: "application/json",
+      kind: "timetable", blob: new Blob([JSON.stringify({ events: res.events })], { type: "application/json" }) });
+    await addSource({ type: "snapshot", fileId: saved.id, label, syncedAt: new Date().toISOString(), establishment: school.name,
+      experimental: true, higher });
+  }
+  return res;
+}
+
+/**
+ * Signaler un établissement (itération 6, C4) : nom, logiciel, type d'erreur. L'heure est celle de l'envoi.
+ * Jamais d'identifiant, de mot de passe ni de cours.
+ */
+export const reportSchool = (body) => api("/api/timetable/report", { method: "POST", json: body });
+
 export const adeTree = (session, project, node = null) => api("/api/timetable/ade/tree", { method: "POST", json: { session, project, node } });
 
 export async function adeChoose(session, project, node, university) {

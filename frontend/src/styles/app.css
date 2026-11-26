@@ -290,3 +290,11 @@ table.data th, table.data td { border-bottom: 1.5px dashed var(--grid-strong); p
 .tt-col .lesson { animation: page-in .3s ease-out backwards; }
 .files li { transition: transform .15s ease; }
 .files li:hover { transform: translateX(3px); }
+
+/* Robots expérimentaux et signalement d'établissement (itération 6) */
+.badge.exp { background: var(--fluo-orange); color: var(--on-fluo); border-color: var(--ink); font-weight: 700; transform: rotate(-2deg); }
+.notice.warn { background: var(--paper-2); color: var(--ink); border: 2px dashed var(--fluo-orange); display: block; }
+.failure { padding: 10px 12px; border: 2px dashed var(--danger); border-radius: 12px 6px 14px 8px; }
+.failure .error { margin: 0; }
+.report-box { margin-top: 10px; animation: page-in .25s ease-out backwards; }
+.report-box h3 { font-size: 22px; }

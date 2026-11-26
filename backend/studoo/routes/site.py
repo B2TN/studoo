@@ -116,6 +116,7 @@ def purge_old_data() -> None:
     with db.get_engine().begin() as conn:
         conn.execute(delete(db.visitors).where(db.visitors.c.day < db.today() - timedelta(days=2)))
         conn.execute(delete(db.messages).where(db.messages.c.created_at < db.now() - timedelta(days=365)))
+        conn.execute(delete(db.school_reports).where(db.school_reports.c.created_at < db.now() - timedelta(days=365)))
         conn.execute(delete(db.page_views).where(db.page_views.c.day < db.today() - timedelta(days=760)))
         conn.execute(delete(db.rate_limits).where(db.rate_limits.c.window < int(time.time()) - 2 * 86400))
 

@@ -94,3 +94,25 @@ async def mark_handled(msg_id: int, _: Admin):
     with db.get_engine().begin() as conn:
         conn.execute(update(db.messages).where(db.messages.c.id == msg_id).values(handled=True))
     return {"ok": True}
+
+
+@router.get("/school-reports")
+async def school_reports(_: Admin):
+    """Établissements signalés (C4) : regroupés par établissement et logiciel, les plus demandés d'abord."""
+    t = db.school_reports
+    with db.get_engine().connect() as conn:
+        rows = conn.execute(select(
+            func.lower(t.c.establishment).label("key"), func.min(t.c.establishment).label("establishment"), t.c.software,
+            func.count().label("n"),
+            func.count(func.distinct(t.c.reporter)).label("people"), func.max(t.c.created_at).label("last"),
+        ).group_by(func.lower(t.c.establishment), t.c.software).order_by(desc("n"), desc("last")).limit(200)).mappings().all()
+        errors = conn.execute(select(func.lower(t.c.establishment).label("e"), t.c.software, t.c.error_code, func.count().label("n"))
+                              .group_by(func.lower(t.c.establishment), t.c.software, t.c.error_code)).mappings().all()
+    by = {}
+    for e in errors:
+        by.setdefault((e["e"], e["software"]), {})[e["error_code"]] = int(e["n"])
+    return {"reports": [
+        {"establishment": r["establishment"], "software": r["software"], "count": int(r["n"]), "people": int(r["people"]),
+         "last": r["last"].isoformat() if r["last"] else None, "errors": by.get((r["key"], r["software"]), {})}
+        for r in rows
+    ]}

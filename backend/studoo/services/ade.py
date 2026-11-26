@@ -23,6 +23,8 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from fastapi import HTTPException
 
+from . import robot_errors
+
 UA = "Mozilla/5.0 (Studoo; robot d'emploi du temps)"
 TIMEOUT = 25
 
@@ -136,6 +138,8 @@ def sso_login(start_url: str, username: str, password: str, *, back=None) -> tup
         idp_host = None
         for _ in range(7):
             host = urlparse(str(res.url)).hostname
+            if robot_errors.is_blocked(res):
+                raise robot_errors.blocked("Le service de ton établissement")
             page = _parse(res.text)
             has_pwd = any(i["type"] == "password" for f in page.forms for i in f["inputs"])
             saml = next((f for f in page.forms if any(i["name"] == "SAMLResponse" for i in f["inputs"])), None)
@@ -178,6 +182,9 @@ def sso_login(start_url: str, username: str, password: str, *, back=None) -> tup
     except HTTPException:
         client.close()
         raise
+    except httpx.TimeoutException:
+        client.close()
+        raise robot_errors.timeout("La page de connexion de ton établissement") from None
     except httpx.HTTPError:
         client.close()
         raise _unavailable() from None
@@ -280,9 +287,44 @@ def projects(client: httpx.Client, gwt: dict) -> list[dict]:
     return [{"id": int(i), "name": n} for i, n in re.findall(r'\{"(\d+)""([^"]*)"', text)]
 
 
-def register(client: httpx.Client, gwt: dict) -> None:
+# Connexion avec les identifiants PROPRES à ADE (EXPÉRIMENTAL, itération 6) : sans compte de test, on ne connaît
+# pas l'ordre exact des champs de la demande de connexion. Après une connexion par l'université, ADE reçoit deux
+# textes vides (« 10|10 ») : on y place l'identifiant (12) et le mot de passe (13), en essayant quelques positions.
+# Une position n'est retenue que si ADE renvoie ensuite la liste des années.
+NATIVE_FIELDS = ("9|0|10|0|1|1|12|13|-1|0|0|11|0|", "9|0|12|0|1|1|13|10|-1|0|0|11|0|", "9|0|12|0|1|1|10|13|-1|0|0|11|0|")
+
+
+def login_native(base: str, username: str, password: str) -> tuple[httpx.Client, dict, list[dict]]:
+    """ADE ouvert sans passer par l'université : connexion par la demande GWT d'ADE. Renvoie (client, gwt, années)."""
+    client = httpx.Client(follow_redirects=True, timeout=TIMEOUT, headers={"User-Agent": UA})
+    try:
+        gwt = discover(client, base)
+        for fields in NATIVE_FIELDS:
+            gwt["cid"] = _ts()
+            try:
+                register(client, gwt, credentials=(username, password), fields=fields)
+                found = projects(client, gwt)
+            except HTTPException:
+                continue
+            if found:
+                return client, gwt, found
+        raise _error(401, "ade_native_refused", "ADE a refusé la connexion : vérifie ton identifiant et ton mot de passe ADE. "
+                                                "(Robot expérimental : si tes identifiants sont bons, utilise le dernier recours et signale-nous ton établissement.)")
+    except httpx.TimeoutException:
+        client.close()
+        raise robot_errors.timeout("ADE") from None
+    except httpx.HTTPError:
+        client.close()
+        raise _unavailable() from None
+    except Exception:
+        client.close()
+        raise
+
+
+def register(client: httpx.Client, gwt: dict, *, credentials: tuple[str, str] | None = None, fields: str = "") -> None:
     """Enregistre l'identifiant du client auprès d'ADE, comme l'interface au démarrage (session déjà connectée
-    par l'université : la demande de connexion ADE est vide). Sans cela, ADE répond « identifiant invalide »."""
+    par l'université : la demande de connexion ADE est vide). Sans cela, ADE répond « identifiant invalide ».
+    `credentials` : identifiants propres à ADE (expérimental, voir NATIVE_FIELDS)."""
     s = gwt["sigs"]
     conf = gwt["names"].get("ConfigurationServiceProxy")
     if conf:
@@ -293,10 +335,15 @@ def register(client: httpx.Client, gwt: dict) -> None:
         except (HTTPException, ValueError, httpx.HTTPError):
             pass  # facultatif selon les versions : la suite dira si ADE accepte le client
     sn = gwt["names"]["DirectPlanningServiceProxy"]
+    extra, count, tail = "", 11, "9|0|10|0|1|1|10|10|-1|0|0|11|0|"
+    if credentials:
+        def gwt_text(v: str) -> str:  # caractères spéciaux du format GWT-RPC
+            return v.replace("\\", "\\\\").replace("|", "\\!")
+        extra, count, tail = f"{gwt_text(credentials[0])}|{gwt_text(credentials[1])}|", 13, fields
     _call(client, gwt, "DirectPlanningServiceProxy", "login", lambda m: (
-        f"7|0|11|{gwt['module']}|{sn}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningServiceProxy|{m}|J|"
-        f"{s['LoginRequest']}|{JRE_SIGS['String']}|Z|{s['DirectLoginRequest']}||fr|1|2|3|4|4|5|6|7|8|{gwt['cid']}|"
-        f"9|0|10|0|1|1|10|10|-1|0|0|11|0|"))
+        f"7|0|{count}|{gwt['module']}|{sn}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningServiceProxy|{m}|J|"
+        f"{s['LoginRequest']}|{JRE_SIGS['String']}|Z|{s['DirectLoginRequest']}||fr|{extra}1|2|3|4|4|5|6|7|8|{gwt['cid']}|"
+        f"{tail}"))
 
 
 def load_project(client: httpx.Client, gwt: dict, project_id: int) -> None:
