@@ -52,10 +52,22 @@ def _azure_one(lines: list[tuple[str, str]], voices: tuple[str, str], client: ht
     url = f"https://{settings.SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
     headers = {"Ocp-Apim-Subscription-Key": settings.SPEECH_KEY, "Content-Type": "application/ssml+xml",
                "X-Microsoft-OutputFormat": "audio-24khz-96kbitrate-mono-mp3", "User-Agent": "studoo-worker"}
-    for attempt in range(6):
-        res = client.post(url, content=ssml.encode(), headers=headers)
-        if res.status_code == 429 and attempt < 5:  # offre gratuite : 20 demandes par minute
+    hangs = 0
+    for attempt in range(8):
+        try:
+            res = client.post(url, content=ssml.encode(), headers=headers)
+        except httpx.TransportError:  # demande restée bloquée (vu le 26/11/2026) : on la renvoie
+            hangs += 1
+            if hangs > 3:
+                raise
+            log.info("Voix Azure : morceau sans réponse, nouvel essai")
+            continue
+        if res.status_code == 429 and attempt < 7:  # offre gratuite : 20 demandes par minute
             time.sleep(min(30.0, float(res.headers.get("retry-after", 5) or 5)))
+            continue
+        if res.status_code >= 500 and hangs < 3:
+            hangs += 1
+            time.sleep(2)
             continue
         res.raise_for_status()
         return res.content
@@ -63,7 +75,8 @@ def _azure_one(lines: list[tuple[str, str]], voices: tuple[str, str], client: ht
 
 
 def _azure(groups: list[list[tuple[str, str]]], voices: tuple[str, str]) -> list[bytes]:
-    with httpx.Client(timeout=120) as client, ThreadPoolExecutor(4) as pool:
+    # Un morceau de 2 500 caractères se fabrique en 10 à 15 s : au-delà de 60 s, la demande est bloquée.
+    with httpx.Client(timeout=httpx.Timeout(60, connect=10)) as client, ThreadPoolExecutor(4) as pool:
         return list(pool.map(lambda g: _azure_one(g, voices, client), groups))
 
 

@@ -138,6 +138,22 @@ def test_azure_voices_then_student_gemini(monkeypatch):
     assert 0.4 < media.seconds(voices.synthesize(lines, gemini_key="cle-eleve")) < 0.7
 
 
+def test_azure_voice_request_that_hangs_is_sent_again(monkeypatch):
+    clip = media.silence_mp3(0.5)
+    monkeypatch.setattr(settings, "SPEECH_KEY", "sk")
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("bloquée", request=req)
+        return httpx.Response(200, content=clip)
+
+    mock_http(monkeypatch, handler)
+    audio = voices.synthesize([("A", "Bonjour")])  # sans clé Gemini ni voix locales : Azure doit réussir
+    assert len(calls) == 2 and 0.4 < media.seconds(audio) < 0.7
+
+
 def test_long_dialogue_is_split_in_order():
     lines = [("A" if i % 2 else "B", "mot " * 200) for i in range(30)]
     groups = voices._chunks(lines)
