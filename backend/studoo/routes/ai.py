@@ -59,7 +59,8 @@ async def transcribe(
 ):
     """Transcrit une tranche d'audio (≈5 min) avec les rôles des intervenants.
 
-    L'audio est lu en mémoire (jamais écrit sur disque), envoyé à Gemini,
+    L'audio est lu en mémoire (jamais écrit sur disque), envoyé à Azure AI Speech
+    (ou Gemini en secours),
     puis supprimé dès la réponse reçue.
     """
     rate_limit(f"transcribe:{user.sub}", limit=30, window_seconds=600)
