@@ -9,10 +9,10 @@ import { time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
 import { drive, getSettings } from "../lib/storage.js";
 import {
-  adeChoose, adeLogin, adeTree, addSource, clearTimetableCache, guessProject, loadEvents, removeSource, RECONNECT_DAYS,
-  robotConnect, staleSources,
+  adeChoose, adeLogin, adeTree, addSource, celcatChoose, celcatGroups, celcatLogin, clearTimetableCache, guessProject,
+  higherDetect, higherSearch, loadEvents, removeSource, RECONNECT_DAYS, robotConnect, staleSources,
 } from "../lib/timetable-data.js";
-import { detectSoftware, ICAL_STEPS_PRONOTE, ICAL_STEPS_UNIVERSITY, ROBOT_TESTED, UNIVERSITIES } from "../lib/establishments.js";
+import { detectSoftware, ICAL_STEPS_PRONOTE, ICAL_STEPS_UNIVERSITY, LAST_RESORT_STEPS, ROBOT_TESTED } from "../lib/establishments.js";
 import { openDialog, toast } from "../lib/ui.js";
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
@@ -198,7 +198,8 @@ function adeRobot(u, done, useLastResort) {
       submit.disabled = true;
       submit.replaceChildren(h("span", { class: "spinner", style: { width: "22px", height: "22px" } }), "Connexion à ton université… (10 à 20 s)");
       try {
-        const res = await adeLogin({ university: u.robot, username: user.value.trim(), password: pass.value });
+        const res = await adeLogin(u.base ? { base: u.base, username: user.value.trim(), password: pass.value }
+          : { university: u.robot, username: user.value.trim(), password: pass.value });
         session = res.session;
         mount(slot, projectStep(res.projects));
       } catch (e2) {
@@ -210,7 +211,7 @@ function adeRobot(u, done, useLastResort) {
       }
     } },
       h("p", { class: "notice", role: "note" }, icon("shield-lock"), " ", PRIVACY_NOTE),
-      ROBOT_TESTED.has(u.robot) ? null : h("p", { class: "small muted" }, icon("info"),
+      ROBOT_TESTED.has(u.robot) || u.tested ? null : h("p", { class: "small muted" }, icon("info"),
         " Robot en test pour cette université : s'il n'y arrive pas, utilise le dernier recours."),
       h("div", { class: "field" }, h("label", { for: "ade-user" }, "Identifiant de ton université (ENT)"), user),
       h("div", { class: "field" }, h("label", { for: "ade-pass" }, "Mot de passe"), pass),
@@ -288,17 +289,125 @@ function adeRobot(u, done, useLastResort) {
   return slot;
 }
 
+// ---------- Robot : Celcat ----------
+function celcatRobot(school, sys, done) {
+  const slot = h("div", { class: "stack" });
+  let session = "";
+  const search = () => {
+    const input = h("input", { class: "input", id: "celcat-q", type: "search", autocomplete: "off", placeholder: "Ex. : L1 INFO, TD2, M1 Droit…" });
+    const results = h("div", { class: "establishments", "aria-live": "polite" });
+    let timer = 0;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2) { mount(results); return; }
+      timer = setTimeout(async () => {
+        mount(results, h("p", { class: "small muted" }, "Recherche…"));
+        try {
+          const groups = await celcatGroups(sys.base, q, session);
+          mount(results, groups.length ? groups.map((g) => h("button", { class: "btn", type: "button", onclick: async (e) => {
+            e.currentTarget.disabled = true;
+            try {
+              const res = await celcatChoose(sys.base, g, session, school);
+              toast(res.method === "celcat" ? `${res.events.length} cours trouvés : ton emploi du temps se mettra à jour tout seul.`
+                : `${res.events.length} cours récupérés. Studoo te rappellera de te reconnecter dans ${RECONNECT_DAYS} jours.`, "success", 9000);
+              done(res.subjects);
+            } catch (e2) { toast(e2.message, "error", 8000); }
+          } }, icon("check"), h("span", {}, h("strong", {}, g.name), g.dept ? h("span", { class: "small muted" }, ` · ${g.dept}`) : null)))
+            : h("p", { class: "small muted" }, "Aucun groupe trouvé : essaie un autre mot (sigle de la formation, n° de TD…)."));
+        } catch (e) {
+          if (/connexion/i.test(e.message) && !session) mount(slot, loginForm()); else mount(results, h("p", { class: "error" }, e.message));
+        }
+      }, 350);
+    });
+    setTimeout(() => input.focus(), 0);
+    return h("div", { class: "stack" },
+      h("div", { class: "field" }, h("label", { for: "celcat-q" }, "Ton groupe (formation, année, TD…)"), input,
+        h("span", { class: "hint" }, "Cherche dans l'emploi du temps Celcat de ton établissement.")),
+      results);
+  };
+  const loginForm = () => {
+    const user = h("input", { class: "input", id: "cc-user", autocomplete: "username", autocapitalize: "none", spellcheck: false });
+    const pass = h("input", { class: "input", id: "cc-pass", type: "password", autocomplete: "current-password" });
+    const err = h("p", { class: "error", role: "alert" });
+    const submit = h("button", { class: "btn primary", type: "submit" }, icon("check"), "Me connecter");
+    return h("form", { class: "stack", novalidate: true, onsubmit: async (e) => {
+      e.preventDefault();
+      err.textContent = "";
+      if (!user.value.trim() || !pass.value) { err.textContent = "Identifiant et mot de passe requis."; return; }
+      submit.disabled = true;
+      try {
+        session = await celcatLogin({ base: sys.base, username: user.value.trim(), password: pass.value });
+        mount(slot, search());
+      } catch (e2) { err.textContent = e2.message; } finally { pass.value = ""; submit.disabled = false; }
+    } },
+      h("p", { class: "notice", role: "note" }, icon("shield-lock"), " ", PRIVACY_NOTE),
+      h("p", { class: "small muted" }, icon("info"), " Robot Celcat en test : s'il n'y arrive pas, utilise le dernier recours."),
+      h("div", { class: "field" }, h("label", { for: "cc-user" }, "Identifiant de ton établissement (ENT)"), user),
+      h("div", { class: "field" }, h("label", { for: "cc-pass" }, "Mot de passe"), pass),
+      err, h("div", {}, submit));
+  };
+  mount(slot, sys.login ? loginForm() : search());
+  return slot;
+}
+
+// ---------- Supérieur : chercher son établissement, détecter son logiciel, lancer le bon robot ----------
 function universityTab(useLastResort, done) {
   const slot = h("div", { class: "stack" });
-  const list = () => h("div", { class: "stack" },
-    h("p", {}, "Choisis ton université :"),
-    h("div", { class: "establishments" }, [...UNIVERSITIES, { name: "Autre établissement", city: "", url: "" }].map((u) =>
-      h("button", { class: "btn", type: "button", onclick: () => (u.robot ? mount(slot, h("p", {}, icon("school"), " ", h("strong", {}, u.name), " ",
-        h("button", { class: "btn small ghost", type: "button", onclick: () => mount(slot, list()) }, "Changer")), adeRobot(u, done, useLastResort)) : useLastResort(u)) },
-        icon("school"), h("span", {}, h("strong", {}, u.name), u.city ? h("span", { class: "small muted" }, ` · ${u.city}`) : null,
-          u.robot ? h("span", { class: "small" }, ROBOT_TESTED.has(u.robot) ? " · connexion automatique" : " · connexion automatique (en test)") : null)))),
-    h("p", { class: "small muted" }, "Les autres universités n'ont pas encore de robot : Studoo te guide pour le dernier recours (lien d'export à copier une fois)."));
-  mount(slot, list());
+
+  async function chosen(school) {
+    const head = h("p", {}, icon("school"), " ", h("strong", {}, school.name), school.city ? h("span", { class: "small muted" }, ` · ${school.city} `) : " ",
+      h("button", { class: "btn small ghost", type: "button", onclick: () => mount(slot, finder()) }, "Changer"));
+    mount(slot, head, h("div", { class: "loading" }, h("div", { class: "spinner" }), "Studoo cherche le logiciel d'emploi du temps de ton établissement…"));
+    let systems = [];
+    try { systems = await higherDetect(school.domain); } catch (e) { toast(e.message, "error"); }
+    const sys = systems.find((x) => x.software === "ade" && !x.native) || systems.find((x) => x.software === "celcat") || systems[0];
+    if (sys?.software === "ade" && !sys.native) {
+      mount(slot, head, h("p", { class: "small muted" }, icon("check"), ` Emploi du temps trouvé : ${sys.name}.`),
+        adeRobot({ name: school.name, base: sys.base, tested: sys.base.includes("u-pariscite.fr") }, done, () => useLastResort({ name: school.name, software: sys })));
+      return;
+    }
+    if (sys?.software === "celcat") {
+      mount(slot, head, h("p", { class: "small muted" }, icon("check"), ` Emploi du temps trouvé : ${sys.name}.`), celcatRobot(school, sys, done));
+      return;
+    }
+    const why = !sys ? "Studoo n'a pas reconnu le logiciel d'emploi du temps de ton établissement."
+      : sys.native ? `Ton établissement utilise ${sys.name} avec des identifiants propres à ADE : le robot ne sait pas encore s'y connecter.`
+        : `Ton établissement utilise ${sys.name} : le robot ne sait pas encore s'y connecter.`;
+    mount(slot, head, h("p", { class: "card sketch small" }, icon("info"), " ", why, " Le dernier recours prend 2 minutes : Studoo te guide."),
+      h("div", {}, h("button", { class: "btn primary", type: "button", onclick: () => useLastResort({ name: school.name, software: sys }) }, icon("arrow-right"), "Continuer avec le dernier recours")));
+  }
+
+  function finder() {
+    const input = h("input", { class: "input", id: "uni-q", type: "search", autocomplete: "off", placeholder: "Ex. : Paris Cité, IUT Rives de Seine, INSA Lyon…" });
+    const results = h("div", { class: "establishments", "aria-live": "polite" });
+    let timer = 0;
+    let seq = 0;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 3) { mount(results); return; }
+      timer = setTimeout(async () => {
+        const mine = ++seq;
+        mount(results, h("p", { class: "small muted" }, "Recherche…"));
+        try {
+          const schools = await higherSearch(q);
+          if (mine !== seq) return;
+          mount(results, schools.length ? schools.map((sc) => h("button", { class: "btn", type: "button", onclick: () => chosen(sc) },
+            icon("school"), h("span", {}, h("strong", {}, sc.name), sc.city ? h("span", { class: "small muted" }, ` · ${sc.city}`) : null)))
+            : h("p", { class: "small muted" }, "Aucun établissement trouvé : essaie avec la ville ou le sigle."));
+        } catch (e) { if (mine === seq) mount(results, h("p", { class: "error" }, e.message)); }
+      }, 350);
+    });
+    setTimeout(() => input.focus(), 0);
+    return h("div", { class: "stack" },
+      h("div", { class: "field" }, h("label", { for: "uni-q" }, "Ton université ou ton école (nom, sigle ou ville)"), input,
+        h("span", { class: "hint" }, "Annuaire officiel de l'Enseignement supérieur.")),
+      results,
+      h("p", { class: "small muted" }, "Studoo reconnaît ADE et Celcat et s'y connecte pour toi. HyperPlanning, Aurion et les autres : dernier recours guidé."));
+  }
+
+  mount(slot, finder());
   return slot;
 }
 
@@ -309,7 +418,7 @@ function lastResortTab(done, establishment) {
     u ? h("p", {}, icon("school"), " ", h("strong", {}, u.name),
       u.url ? [" · ", h("a", { href: u.url, target: "_blank", rel: "noopener" }, u.url.replace("https://", ""))] : null) : null,
     icsForm({
-      steps: u ? u.steps || ICAL_STEPS_UNIVERSITY : ICAL_STEPS_PRONOTE,
+      steps: u ? u.steps || LAST_RESORT_STEPS[u.software?.software] || ICAL_STEPS_UNIVERSITY : ICAL_STEPS_PRONOTE,
       open: u?.ade ? { url: u.ade, label: "Ouvrir l'emploi du temps ADE (connexion officielle)" } : null,
       onDone: done, extra: u ? { establishment: u.name } : {},
     }),
@@ -359,8 +468,12 @@ export async function render({ view, query, go }) {
   const stale = staleSources(sources);
   const reconnectOf = (s) => (s.uai ? { uai: s.uai, name: s.school || s.label, city: s.city || "" } : null);
   const reconnect = (s) => {
-    const preset = reconnectOf(s);
-    openDialog("Mettre à jour ton emploi du temps", (close) => highSchoolTab((x) => { close(); afterImport(go)(x); }, preset));
+    const finish = (close) => (x) => { close(); afterImport(go)(x); };
+    if (s.higher) { // source Celcat protégée : on refait le parcours étudiant
+      openDialog("Mettre à jour ton emploi du temps", (close) => universityTab(() => { close(); go("/emploi-du-temps#ajouter"); }, finish(close)));
+      return;
+    }
+    openDialog("Mettre à jour ton emploi du temps", (close) => highSchoolTab(finish(close), reconnectOf(s)));
   };
 
   mount(view,

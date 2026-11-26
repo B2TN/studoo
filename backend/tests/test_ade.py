@@ -124,8 +124,9 @@ def test_university_login(monkeypatch, password, mfa, code):
     real = httpx.Client
     monkeypatch.setattr(ade.httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(idp(mfa=mfa)), **kw))
     if code is None:
-        client = ade.login(BASE, "etu", password)
-        state = ade.dump(client, BASE, GWT)
+        client, base = ade.login(BASE, "etu", password)
+        assert base == BASE
+        state = ade.dump(client, base, GWT)
         assert any(c["name"] == "JSESSIONID" for c in state["cookies"]) and "bon" not in json.dumps(state)
     else:
         with pytest.raises(HTTPException) as err:
@@ -145,7 +146,7 @@ def test_routes_keep_only_the_sealed_session_then_the_link(logged, monkeypatch, 
         def close(self):
             pass
 
-    monkeypatch.setattr(ade, "login", lambda base, u, p: FakeClient())
+    monkeypatch.setattr(ade, "login", lambda base, u, p: (FakeClient(), base))
     monkeypatch.setattr(ade, "discover", lambda c, base: GWT)
     monkeypatch.setattr(ade, "register", lambda c, g: None)
     monkeypatch.setattr(ade, "projects", lambda c, g: [{"id": 4, "name": "UPCité 2026-2027"}])
@@ -222,3 +223,30 @@ def test_javascript_escapes_from_gwt_are_read():
         return httpx.Response(200, text=raw)
     nodes = ade.children(client_for(handler), GWT, 32464, "IUT Paris - Rives de Seine", 1)
     assert [n["name"] for n in nodes] == ["0-IUT PRS remontée d'APOGEE", "Département INFO"]
+
+
+def test_saml_return_and_new_ade_address_after_login(monkeypatch):
+    """Shibboleth SAML (Toulouse) : formulaire SAMLResponse envoyé tout seul ; ADE peut changer d'adresse (Aix-Marseille)."""
+    other = "https://agenda-web-consult.univ-amu.fr"
+
+    def handler(req):
+        url = str(req.url)
+        if url.startswith("https://ade-web-consult.univ-amu.fr/direct/"):
+            return httpx.Response(302, headers={"location": "https://idp.univ-amu.fr/login"})
+        if url == "https://idp.univ-amu.fr/login" and req.method == "GET":
+            return httpx.Response(200, text='<form action="/login" method="post"><input name="username"><input type="password" name="password">'
+                                            '<input type="hidden" name="execution" value="e1"></form>')
+        if url == "https://idp.univ-amu.fr/login":
+            return httpx.Response(200, text=f'<form action="{other}/Shibboleth.sso/SAML2/POST" method="post">'
+                                            '<input type="hidden" name="SAMLResponse" value="PHNhbWw+"><input type="hidden" name="RelayState" value="r"></form>')
+        if url.endswith("/Shibboleth.sso/SAML2/POST"):
+            assert b"SAMLResponse=PHNhbWw" in req.content
+            return httpx.Response(302, headers={"location": f"{other}/direct/"})
+        if url.startswith(f"{other}/direct/"):
+            return httpx.Response(200, text="<html>gwt</html>")
+        return httpx.Response(404)
+
+    real = httpx.Client
+    monkeypatch.setattr(ade.httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    client, base = ade.login("https://ade-web-consult.univ-amu.fr", "etu", "mdp")
+    assert base == other

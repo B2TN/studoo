@@ -33,7 +33,24 @@ de démonstration d'Index Éducation (0,7 s, lien iCal obtenu).
 - Certains ENT bloquent les adresses de serveurs étrangers : les fonctions du site tournent à **Paris** (Vercel `cdg1`).
 - Les comptes avec **double authentification obligatoire** ne passent pas.
 
-## Universités : robot ADE (26/11/2026)
+## Supérieur : chercher son établissement, le robot fait le reste (26/11/2026)
+1. **Recherche** dans l'annuaire officiel du ministère (`fr-esr-principaux-etablissements-enseignement-superieur`,
+   245 établissements, champ `url`) + composantes connues (IUT de Paris – Rives de Seine…).
+2. **Détection du logiciel** : essais en parallèle d'adresses habituelles sur le domaine de l'établissement
+   (`ade.`, `adeconsult.app.`, `edt.`, `planning.`, `celcat.`, `hp.`…) ; reconnaissance par la réponse.
+   Relevé réel : Paris Cité, Aix-Marseille, Lyon 1, Rennes, Côte d'Azur, INSA Lyon → ADE ; Bordeaux (public),
+   Toulouse III (connexion) → Celcat. Non reconnus automatiquement : Lille, Nantes, Strasbourg, Lorraine,
+   Sorbonne, Saclay, UPEC… → dernier recours guidé (liste d'adresses connues à compléter dans `services/higher.py`).
+3. **Robots** :
+   - **ADE** (connexion CAS/Shibboleth/SAML, voir ci-dessous) ; les ADE à identifiants propres (Grenoble,
+     Montpellier) sont reconnus mais pas encore pris en charge ;
+   - **Celcat Calendar** : recherche du groupe (`Home/ReadResourceListItems`, type 103) et cours
+     (`Home/GetCalendarData`) — sans identifiant quand l'établissement les publie (Bordeaux), sinon après connexion
+     (copie des cours + rappel de reconnexion, la session ne dure pas) ;
+   - **HyperPlanning, Aurion** : reconnus, pas de robot (protocoles propriétaires non testables sans compte) →
+     dernier recours avec les étapes propres au logiciel.
+
+## Robot ADE (26/11/2026)
 ADE ne donne pas l'emploi du temps de l'étudiant : il faut choisir l'**année** (« projet »), puis descendre
 **établissement → filière → classe**. Le robot reproduit ce parcours avec l'étudiant :
 1. **Connexion** par la page officielle de l'université (CAS Apereo ou Shibboleth : page « Loading Session »,

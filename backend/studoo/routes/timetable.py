@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from .. import db
 from ..deps import User, current_user
 from ..limits import rate_limit
-from ..services import ade, pronote
+from ..services import ade, higher, pronote
 from ..services.ics import _check_host, fetch_working, parse_ics
 from ..services.sealed import seal, unseal
 
@@ -78,6 +78,12 @@ async def sync(body: SyncIn, user: CurrentUser):
     if keep.get("kind") == "ical":
         _, data = await fetch_working(keep["url"], start, end)
         return {**data, "sealed": None, "method": "ical"}
+    if keep.get("kind") == "celcat":
+        def read():
+            with httpx.Client(timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA}) as client:
+                return higher.celcat_events(client, _public_https(keep["base"]), keep["fid"])
+        events = await run_in_threadpool(read)
+        return {"events": events, "subjects": pronote.subjects(events), "sealed": None, "method": "celcat"}
     if keep.get("kind") == "pronote-token":
         events, new_keep = await run_in_threadpool(
             pronote.login, "token", url=keep["url"], username=keep["username"], password=keep["token"], uuid=keep["uuid"],
@@ -131,8 +137,18 @@ def robot_connect(body: ConnectIn, user: CurrentUser):
 
 
 # ---------- Robot des universités (ADE) ----------
+def _public_https(url: str) -> str:
+    """Adresse d'un logiciel d'emploi du temps : HTTPS, hôte public (jamais une adresse interne)."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise HTTPException(422, detail={"code": "bad_url", "message": "Adresse d'emploi du temps invalide."})
+    _check_host(parsed.hostname)
+    return f"https://{parsed.hostname}{parsed.path.rstrip('/')}"
+
+
 class AdeLoginIn(BaseModel):
-    university: str = Field(min_length=2, max_length=40)
+    university: str = Field(default="", max_length=40)
+    base: str = Field(default="", max_length=200)  # adresse ADE détectée (recherche d'établissement)
     username: str = Field(min_length=1, max_length=120)
     password: SecretStr = Field(min_length=1, max_length=200)
 
@@ -184,16 +200,16 @@ async def universities():
 def ade_login(body: AdeLoginIn, user: CurrentUser):
     """Étape 1 : connexion à l'université (le SEUL moment où le mot de passe sert), puis liste des années ADE."""
     rate_limit(f"ade:{user.sub}", limit=8, window_seconds=600)
-    uni = ade.UNIVERSITIES.get(body.university)
+    uni = ade.UNIVERSITIES.get(body.university) or ({"base": _public_https(body.base)} if body.base else None)
     if not uni:
         raise HTTPException(422, detail={"code": "invalid", "message": "Université non prise en charge par le robot."})
     with _ade_guard("connexion"):
-        client = ade.login(uni["base"], body.username, body.password.get_secret_value())
+        client, base = ade.login(uni["base"], body.username, body.password.get_secret_value())
         try:
-            gwt = ade.discover(client, uni["base"])
+            gwt = ade.discover(client, base)
             ade.register(client, gwt)
             projects = ade.projects(client, gwt)
-            state = {"kind": "ade-session", **ade.dump(client, uni["base"], gwt)}
+            state = {"kind": "ade-session", **ade.dump(client, base, gwt)}
         finally:
             client.close()
     return {"session": seal(user.sub, state), "projects": projects}
@@ -228,6 +244,99 @@ async def ade_choose(body: AdeChooseIn, user: CurrentUser):
     working_url, data = await fetch_working(ade.export_url(state["base"], body.project, body.resource), start, end)
     out = _result(data, user.sub, {"kind": "ical", "url": working_url})
     out["label"] = body.label
+    return out
+
+
+# ---------- Supérieur : recherche, détection du logiciel, Celcat ----------
+@router.get("/higher")
+async def higher_search(user: CurrentUser, q: str = Query(min_length=2, max_length=80)):
+    """Universités et écoles (annuaire officiel du ministère de l'Enseignement supérieur)."""
+    rate_limit(f"schools:{user.sub}", limit=60, window_seconds=600)
+    try:
+        return {"schools": await higher.search(q)}
+    except httpx.HTTPError:
+        raise HTTPException(503, detail={"code": "unavailable", "message": "L'annuaire des établissements ne répond pas : réessaie."}) from None
+
+
+class DetectIn(BaseModel):
+    domain: str = Field(min_length=4, max_length=120)
+
+
+@router.post("/higher/detect")
+async def higher_detect(body: DetectIn, user: CurrentUser):
+    """Quel logiciel d'emploi du temps utilise cet établissement ? (ADE, Celcat, HyperPlanning, Aurion…)"""
+    rate_limit(f"detect:{user.sub}", limit=20, window_seconds=600)
+    systems = await higher.detect(body.domain)
+    return {"systems": [{**x, "name": higher.SOFTWARE_NAMES[x["software"]]} for x in systems]}
+
+
+class CelcatIn(BaseModel):
+    base: str = Field(min_length=10, max_length=200)
+    session: str = Field(default="", max_length=20000)
+    q: str = Field(default="", max_length=80)
+    group: str = Field(default="", max_length=200)
+    label: str = Field(default="", max_length=200)
+
+
+class CelcatLoginIn(BaseModel):
+    base: str = Field(min_length=10, max_length=200)
+    username: str = Field(min_length=1, max_length=120)
+    password: SecretStr = Field(min_length=1, max_length=200)
+
+
+def _celcat_client(user: User, body: CelcatIn):
+    base = _public_https(body.base)
+    if body.session:
+        state = unseal(user.sub, body.session)
+        if state.get("kind") != "celcat-session" or state.get("base") != base:
+            raise HTTPException(422, detail={"code": "bad_token", "message": "Session Celcat invalide : reconnecte-toi."})
+        return base, ade.resume(state)
+    return base, httpx.Client(timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA})
+
+
+@router.post("/celcat/login")
+def celcat_login(body: CelcatLoginIn, user: CurrentUser):
+    """Celcat protégé : connexion par la page de l'université (seule étape qui utilise le mot de passe)."""
+    rate_limit(f"ade:{user.sub}", limit=8, window_seconds=600)
+    base = _public_https(body.base)
+    with _ade_guard("connexion Celcat"):
+        client, _res = ade.sso_login(f"{base}/", body.username, body.password.get_secret_value(),
+                                     back=lambda r: "/calendar" in r.url.path.lower() and "password" not in r.text.lower()[:20000])
+        try:
+            state = {"kind": "celcat-session", **ade.dump(client, base, {})}
+        finally:
+            client.close()
+    return {"session": seal(user.sub, state)}
+
+
+@router.post("/celcat/groups")
+def celcat_groups(body: CelcatIn, user: CurrentUser):
+    rate_limit(f"ade-tree:{user.sub}", limit=120, window_seconds=600)
+    base, client = _celcat_client(user, body)
+    try:
+        with _ade_guard("groupes Celcat"):
+            return {"groups": higher.celcat_groups(client, base, body.q.strip())}
+    finally:
+        client.close()
+
+
+@router.post("/celcat/choose")
+def celcat_choose(body: CelcatIn, user: CurrentUser):
+    """Groupe choisi. Celcat public : on garde (chiffré) l'adresse + le groupe, relus à chaque visite, sans
+    identifiant. Celcat protégé : copie des cours + rappel de reconnexion (la session ne dure pas)."""
+    rate_limit(f"ics:{user.sub}", limit=30, window_seconds=600)
+    if not body.group:
+        raise HTTPException(422, detail={"code": "invalid", "message": "Choisis ton groupe."})
+    base, client = _celcat_client(user, body)
+    try:
+        with _ade_guard("cours Celcat"):
+            events = higher.celcat_events(client, base, body.group)
+    finally:
+        client.close()
+    keep = None if body.session else {"kind": "celcat", "base": base, "fid": body.group}
+    out = _result({"events": events, "subjects": pronote.subjects(events)}, user.sub, keep)
+    out["method"] = "celcat" if keep else "snapshot"
+    out["label"] = body.label or body.group
     return out
 
 

@@ -48,10 +48,30 @@ export async function robotConnect(body, school) {
 // ---------- Robot ADE (universités) ----------
 // La session ADE (chiffrée par le serveur) ne vit que dans la mémoire de la page, le temps de choisir sa classe.
 export const adeLogin = (body) => api("/api/timetable/ade/login", { method: "POST", json: body });
+export const higherSearch = (q) => api(`/api/timetable/higher?q=${encodeURIComponent(q)}`).then((r) => r.schools);
+export const higherDetect = (domain) => api("/api/timetable/higher/detect", { method: "POST", json: { domain } }).then((r) => r.systems);
+export const celcatLogin = (body) => api("/api/timetable/celcat/login", { method: "POST", json: body }).then((r) => r.session);
+export const celcatGroups = (base, q, session = "") => api("/api/timetable/celcat/groups", { method: "POST", json: { base, q, session } }).then((r) => r.groups);
+
+/** Groupe Celcat choisi : lien relu sans identifiant (Celcat public) ou copie + rappel (Celcat protégé). */
+export async function celcatChoose(base, group, session, school) {
+  const res = await api("/api/timetable/celcat/choose", { method: "POST", json: { base, group: group.id, session, label: group.name } });
+  if (res.sealed) {
+    await addSource({ type: "sealed", sealed: res.sealed, label: `Celcat · ${group.name}`, establishment: school.name });
+  } else {
+    const root = await drive.init();
+    const saved = await drive.save({ parentId: root, name: `Emploi du temps — ${group.name}.json`, mimeType: "application/json",
+      kind: "timetable", blob: new Blob([JSON.stringify({ events: res.events })], { type: "application/json" }) });
+    await addSource({ type: "snapshot", fileId: saved.id, label: `Celcat · ${group.name}`, syncedAt: new Date().toISOString(),
+      establishment: school.name, higher: { domain: school.domain, name: school.name, city: school.city || "" } });
+  }
+  return res;
+}
 export const adeTree = (session, project, node = null) => api("/api/timetable/ade/tree", { method: "POST", json: { session, project, node } });
 
 export async function adeChoose(session, project, node, university) {
   const res = await api("/api/timetable/ade/choose", { method: "POST", json: { session, project, resource: node.id, label: node.path || node.name } });
+  // (le lien d'export ADE se lit sans identifiant : mise à jour automatique, aucun rappel nécessaire)
   await addSource({ type: "sealed", sealed: res.sealed, label: `ADE · ${node.name}`, establishment: university });
   return res;
 }

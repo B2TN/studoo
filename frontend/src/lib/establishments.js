@@ -67,3 +67,25 @@ export const ICAL_STEPS_PRONOTE = [
   "Choisis « Exporter au format iCal » et copie le lien affiché.",
   "Colle-le ci-dessous : ton emploi du temps se mettra à jour tout seul.",
 ];
+
+
+/** Dernier recours : où trouver le lien d'export selon le logiciel reconnu. */
+export const LAST_RESORT_STEPS = {
+  hyperplanning: [
+    "Ouvre HyperPlanning depuis l'ENT de ton établissement et connecte-toi (espace Étudiant).",
+    "Va dans « Emploi du temps », puis clique sur l'icône « Exporter » (calendrier avec une flèche) en haut à droite.",
+    "Choisis « Exporter au format iCal » / « Synchroniser avec mon agenda » et copie le lien affiché.",
+    "Colle-le ci-dessous : ton emploi du temps se mettra à jour tout seul.",
+  ],
+  aurion: [
+    "Ouvre Aurion (« Mon planning ») depuis l'ENT de ton école.",
+    "Cherche « Exporter », « iCal » ou « Synchroniser » dans le planning ; sinon, demande à la scolarité un lien iCal de ton groupe.",
+    "Copie le lien (il finit souvent par .ics) et colle-le ci-dessous, ou importe le fichier .ics plus bas.",
+  ],
+  ade: [
+    "Ouvre l'emploi du temps ADE de ton établissement et connecte-toi.",
+    "Choisis ton année puis descends jusqu'à ta classe (établissement → filière → groupe).",
+    "Clique sur « Export Agenda » (icône calendrier), puis « Générer URL », et copie le lien (il contient « anonymous_cal »).",
+    "Colle-le ci-dessous.",
+  ],
+};

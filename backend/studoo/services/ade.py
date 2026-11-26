@@ -13,6 +13,7 @@ Testé le 26/11/2026 sur l'ADE de l'Université Paris Cité (IUT Paris – Rives
 Les identifiants techniques (noms forts GWT, numéros de méthode, signatures de types) sont relus dans le code
 d'ADE à chaque connexion : une mise à jour d'ADE ne casse pas le robot tant que les méthodes existent.
 """
+import html
 import json
 import re
 import time
@@ -122,15 +123,30 @@ MFA_WORDS = ("otp", "double authentification", "authentification forte", "multi-
 BAD_WORDS = ("incorrect", "invalide", "invalid", "erron", "échec", "echec", "failed", "mauvais", "unknown", "inconnu")
 
 
-def login(base: str, username: str, password: str) -> httpx.Client:
-    """Ouvre une session ADE avec les identifiants de l'université. Renvoie le client (cookies de session)."""
+def sso_login(start_url: str, username: str, password: str, *, back=None) -> tuple[httpx.Client, httpx.Response]:
+    """Connexion par la page de l'université (CAS Apereo, Shibboleth CAS ou SAML) en partant de `start_url`.
+
+    Renvoie (client avec les cookies de session, dernière réponse du service). `back(res)` dit si l'on est revenu
+    sur le service ; par défaut : on n'est plus sur une page de connexion (hôte différent de l'IdP).
+    """
     client = httpx.Client(follow_redirects=True, timeout=TIMEOUT, headers={"User-Agent": UA})
-    ade_host = urlparse(base).hostname
+    service_host = urlparse(start_url).hostname
     try:
-        res = client.get(f"{base}/direct/")
-        for _ in range(5):
-            if urlparse(str(res.url)).hostname == ade_host:
-                return client  # de retour sur ADE : connecté
+        res = client.get(start_url)
+        idp_host = None
+        for _ in range(7):
+            host = urlparse(str(res.url)).hostname
+            page = _parse(res.text)
+            has_pwd = any(i["type"] == "password" for f in page.forms for i in f["inputs"])
+            saml = next((f for f in page.forms if any(i["name"] == "SAMLResponse" for i in f["inputs"])), None)
+            if saml:  # retour SAML (Shibboleth) : formulaire envoyé automatiquement par le navigateur
+                data = {i["name"]: i["value"] for i in saml["inputs"] if i["name"]}
+                res = client.post(urljoin(str(res.url), html.unescape(saml["action"])), data=data)
+                continue
+            if back(res) if back else (host == service_host or (idp_host and host != idp_host and not has_pwd)):
+                return client, res  # de retour sur le service : connecté
+            if has_pwd and idp_host is None:
+                idp_host = host
             page = _parse(res.text)
             low = " ".join(page.text).lower()
             for f in page.forms:
@@ -165,6 +181,18 @@ def login(base: str, username: str, password: str) -> httpx.Client:
     except httpx.HTTPError:
         client.close()
         raise _unavailable() from None
+
+
+def login(base: str, username: str, password: str) -> tuple[httpx.Client, str]:
+    """Ouvre une session ADE ; renvoie (client, adresse d'ADE après connexion — elle peut changer, ex. Aix-Marseille)."""
+    client, res = sso_login(f"{base}/direct/", username, password,
+                            back=lambda r: "/direct" in r.url.path and "password" not in r.text.lower()[:20000])
+    final = f"{res.url.scheme}://{res.url.host}"
+    if "ade web direct planning" in res.text.lower() and not getattr(client, "_studoo_sent", False):
+        client.close()  # ADE a son propre formulaire (pas la page de l'université) : pas encore pris en charge
+        raise _error(422, "ade_native", "Cet ADE utilise ses propres identifiants (pas ceux de l'université) : le robot ne "
+                                        "sait pas encore s'y connecter. Utilise le dernier recours (.ics).")
+    return client, final
 
 
 # ---------- GWT-RPC ----------
