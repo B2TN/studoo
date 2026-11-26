@@ -20,7 +20,7 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 
 | Outil | Comment |
 |---|---|
-| 🎙️ **Enregistrer un cours** | Le micro de l'appareil enregistre par tranches de 5 min. Chaque tranche est transcrite par Gemini avec le **rôle de chaque personne** (« Professeur : », « Élève : »), puis **l'audio est effacé**. |
+| 🎙️ **Enregistrer un cours** | Le micro de l'appareil enregistre par tranches de 5 min. Chaque tranche est transcrite par **Azure AI Speech** avec le **rôle de chaque personne** (« Professeur : », « Élève : »), puis **l'audio est effacé**. |
 | 📷 **Numériser une feuille** | Photo → détection de la feuille → redressement → suppression des ombres → **PDF propre**. Traitement d'image écrit à la main en JavaScript, dans le navigateur. |
 | 🗂️ **Ranger automatiquement** | Après chaque enregistrement/numérisation, Studoo **devine le cours** (emploi du temps + IA), le chapitre et **génère le titre**. |
 | 📝 **Fiches de révision** | Fiches dessinées à la main (définitions surlignées, formules encadrées, pièges, mini-quiz), exportables en PDF. |
@@ -48,9 +48,9 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 |---|---|---|
 | Site | **HTML, CSS, JavaScript** sans framework, assemblés par **Vite** | Comprendre chaque ligne ; site léger (Lighthouse **100/100** partout). |
 | API | **Python 3 + FastAPI** | Lisible, rapide, validation automatique des données (Pydantic). |
-| Connexion | **Google uniquement** (OAuth 2.0, flux « code ») | Un seul compte : Google fournit l'IA *et* le stockage. |
+| Connexion | **Google uniquement** (OAuth 2.0, flux « code ») | Un seul compte, qui donne aussi accès au stockage (Drive). |
 | Stockage | **Google Drive** de l'utilisateur, autorisation `drive.file` | Aucun cours sur nos serveurs ; Studoo ne voit que ses propres fichiers. |
-| IA | **Gemini** (Flash-Lite, Flash, TTS) via le SDK `google-genai` | Transcription audio avec rôles, OCR, fiches, scripts, voix. |
+| IA | **Microsoft Azure** : AI Speech (transcription avec rôles, voix Vivienne/Henri), Azure OpenAI GPT-4.1 mini (rangement, fiches, scripts, exercices, corrections), Qwen3-VL open source sur notre serveur (lecture des photos) | Crédit Azure for Students, données en Europe (Italy North). **Aucun envoi à Google par défaut** ; chaque élève peut, s'il le veut, utiliser **sa propre clé Gemini** pour les fonctionnalités qu'il coche. |
 | Base de données | **Postgres (Neon)**, SQLite en local, SQLAlchemy Core | Seulement comptes, compteurs et messages. |
 | Pronote / ENT | **pronotepy** (Python, non officielle, MIT) | Robot : lycée trouvé dans l'annuaire officiel, ENT reconnu tout seul, récupération du lien iCal officiel. |
 | Hébergement | **Vercel** (site statique + fonction Python) | Gratuit, déploiement automatique depuis GitHub, HTTPS. |
@@ -58,7 +58,7 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 ```
 Navigateur ──► Google Drive (direct, jeton de l'utilisateur)
     │
-    └──► /api (FastAPI) ──► Gemini   (clé cachée côté serveur)
+    └──► /api (FastAPI) ──► Azure    (AI Speech, OpenAI ; clés cachées côté serveur)
     │                  └──► Neon     (comptes, compteurs)
                        └──► Pronote / ENT / ADE (emploi du temps)
 ```
@@ -67,7 +67,7 @@ Détails, limites et quotas : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Sécurité et vie privée
 
-- **Aucune clé dans le navigateur** : la clé Gemini et le secret OAuth restent dans l'API.
+- **Aucune clé dans le navigateur** : clés Azure et secret OAuth restent dans l'API ; la clé Gemini *facultative* d'un élève est chiffrée sur le serveur et ne lui est jamais renvoyée.
 - **Session chiffrée** (Fernet/AES) dans un cookie `httpOnly`, `Secure`, `SameSite=Lax` ; protection **CSRF** par en-tête dédié.
 - **HTTPS forcé** + HSTS, **Content-Security-Policy** stricte, `X-Frame-Options`, `Permissions-Policy`.
 - **Validation côté serveur** de toutes les entrées (tailles, formats), **limitation de débit**, formulaire de contact **anti-spam** (pot de miel + piège temporel).
@@ -107,7 +107,7 @@ npm run dev --prefix frontend                                     # site → htt
 ## Tests
 
 ```bash
-cd backend && python -m pytest -q     # 48 tests : sessions, CSRF, quotas, IA, .ics, anti-SSRF, jetons chiffrés, admin…
+cd backend && python -m pytest -q     # sessions, CSRF, quotas, IA (Azure par défaut, Gemini seulement si choisi), .ics, robots, anti-SSRF, admin…
 npm test --prefix frontend             # scanner, homographie, routeur, fiches, emploi du temps…
 ```
 
@@ -120,9 +120,9 @@ voir le guide pas à pas [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
 
 ## Limites connues (offre gratuite)
 
-- Quotas Gemini gratuits **partagés entre tous les utilisateurs** (≈ 20 cours de 2 h transcrits par jour pour tout le site).
-- Voix Gemini limitée à quelques minutes par jour : au-delà, les podcasts sont lus par la voix du navigateur et les vidéos sont sous-titrées sans voix.
-- En offre gratuite, Google peut réutiliser les contenus envoyés à Gemini (indiqué dans la page RGPD).
+- Azure AI Speech en offre gratuite (F0) : 5 h de transcription et 500 000 caractères de voix par mois pour tout le site.
+- Azure OpenAI payé par le crédit Azure for Students : quotas quotidiens partagés (`QUOTA_*`) pour ne pas l'épuiser.
+- Gemini n'est utilisé qu'avec la clé personnelle d'un élève qui l'a choisi ; en offre gratuite, Google peut alors réutiliser les contenus envoyés (indiqué dans les réglages et la page RGPD).
 - Pronote et les ENT n'ont pas d'API officielle : les connecteurs peuvent cesser de fonctionner ; le lien iCal reste toujours possible.
 
 ## Licence et crédits

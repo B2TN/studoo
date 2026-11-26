@@ -1,20 +1,22 @@
-"""Routes IA : transcription, estimation du cours, fiches, podcasts, vidéos, OCR.
+"""Routes IA « en direct » : transcription, estimation du cours, fiches, lecture des PDF scannés.
 
-Le contenu des cours ne fait que *transiter* ici : il est envoyé à Gemini
-puis oublié. Rien n'est écrit sur disque ni en base.
+Par défaut, tout passe par les outils de Studoo sur Azure (Azure AI Speech pour la transcription,
+Azure OpenAI pour le reste). Gemini n'est utilisé qu'avec la clé PERSONNELLE d'un élève qui l'a choisi
+pour cette fonctionnalité (Réglages). Le contenu des cours ne fait que *transiter* ici : rien n'est
+écrit sur disque ni en base. Podcasts, vidéos et exercices passent par le serveur de tâches (routes/jobs.py).
 """
 import base64
 import binascii
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field, field_validator, model_validator
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field, model_validator
 
 from ..deps import User, current_user
 from ..config import get_settings
 from ..limits import consume, count_generation, quota_status, rate_limit
-from ..services import gemini, speech
-from ..services.schemas import Classification, Fiche, OcrResult, PodcastScript, Transcript, VideoScript
+from ..services import ai, fake, gemini, speech, user_keys
+from ..services.schemas import Classification, Fiche, OcrResult, Transcript
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 CurrentUser = Annotated[User, Depends(current_user)]
@@ -59,9 +61,8 @@ async def transcribe(
 ):
     """Transcrit une tranche d'audio (≈5 min) avec les rôles des intervenants.
 
-    L'audio est lu en mémoire (jamais écrit sur disque), envoyé à Azure AI Speech
-    (ou Gemini en secours),
-    puis supprimé dès la réponse reçue.
+    L'audio est lu en mémoire (jamais écrit sur disque), envoyé à Azure AI Speech (ou à Gemini avec la
+    clé de l'élève, s'il l'a choisi), puis supprimé dès la réponse reçue, même en cas d'échec.
     """
     rate_limit(f"transcribe:{user.sub}", limit=30, window_seconds=600)
     mime = (request.headers.get("content-type") or "").split(";")[0].strip()
@@ -76,19 +77,27 @@ async def transcribe(
     if len(audio) > MAX_AUDIO_BYTES:
         raise HTTPException(413, detail={"code": "too_big", "message": "Morceau audio trop gros."})
     s = get_settings()
-    if s.speech_key:  # Azure AI Speech (voir services/speech.py)
-        consume("lite", user.sub)  # même compteur d'usage que les autres IA
-        try:
+    gemini_key = user_keys.key_for(user.sub, "transcription")
+    try:
+        if gemini_key:  # choix de l'élève : Gemini avec SA clé
+            result = await gemini.generate_json(key=gemini_key, schema=Transcript, prompt=_gemini_prompt(prev),
+                                                media=[(audio, mime)], temperature=0.1)
+        elif s.speech_key:  # par défaut : Azure AI Speech (voir services/speech.py)
+            consume("lite", user.sub)  # même compteur d'usage que les autres IA du site
             result = await speech.transcribe(audio, mime, key=s.speech_key, region=s.speech_region)
-        finally:
-            del audio  # on oublie l'audio immédiatement, même en cas d'échec
-        if index == 0:
-            count_generation("transcription")
-        return result
-    if not s.ai_fake_enabled and not s.gemini_api_key:
-        del audio
-        raise HTTPException(503, detail={"code": "stt_unconfigured",
-                                         "message": "La transcription n'est pas encore configurée sur ce site (service de transcription absent)."})
+        elif s.ai_fake_enabled:
+            result = Transcript.model_validate(fake.answer("Transcript", ""))
+        else:
+            raise HTTPException(503, detail={"code": "stt_unconfigured", "message":
+                                "La transcription n'est pas encore configurée sur ce site (service de transcription absent)."})
+    finally:
+        del audio  # on oublie l'audio immédiatement, même en cas d'échec
+    if index == 0:
+        count_generation("transcription")
+    return result
+
+
+def _gemini_prompt(prev: str) -> str:
     prompt = (
         "Transcris fidèlement cet extrait de cours enregistré en classe.\n"
         "- Détecte qui parle et indique son RÔLE (pas son nom) : « Professeur », « Élève », "
@@ -100,16 +109,7 @@ async def transcribe(
     )
     if prev:
         prompt += f"\nFin de l'extrait précédent, pour garder la cohérence des rôles :\n{prev}\n"
-    try:
-        result = await gemini.generate_json(
-            tier="lite", sub=user.sub, schema=Transcript, prompt=prompt,
-            media=[(audio, mime)], temperature=0.1,
-        )
-    finally:
-        del audio  # on oublie l'audio immédiatement
-    if index == 0:
-        count_generation("transcription")
-    return result
+    return prompt
 
 
 class TreeCourse(BaseModel):
@@ -138,7 +138,8 @@ async def classify(body: ClassifyIn, user: CurrentUser):
         "Utilise exactement l'orthographe des noms existants quand tu les choisis.\n\n"
         f"EXTRAIT :\n{body.excerpt}"
     )
-    return await gemini.generate_json(tier="lite", sub=user.sub, schema=Classification, prompt=prompt, temperature=0.2)
+    return await ai.generate_json(feature="classement", tier="lite", sub=user.sub, schema=Classification, prompt=prompt,
+                                  temperature=0.2)
 
 
 @router.post("/fiche", response_model=Fiche)
@@ -153,92 +154,10 @@ async def fiche(body: SourcesIn, user: CurrentUser):
         "- Quiz : questions dont la réponse est dans les documents.\n\n"
         + body.as_prompt()
     )
-    tier = gemini.pick_text_tier("flash")
-    result = await gemini.generate_json(tier=tier, sub=user.sub, schema=Fiche, prompt=prompt, system=gemini.GROUNDING_RULE)
+    result = await ai.generate_json(feature="fiche", tier="flash", sub=user.sub, schema=Fiche, prompt=prompt,
+                                    system=ai.GROUNDING_RULE)
     count_generation("fiche")
     return result
-
-
-class PodcastIn(SourcesIn):
-    minutes: Literal[10, 20, 30] = 10
-
-
-@router.post("/podcast", response_model=PodcastScript)
-async def podcast(body: PodcastIn, user: CurrentUser):
-    rate_limit(f"gen:{user.sub}", limit=10, window_seconds=600)
-    words = body.minutes * 150
-    prompt = (
-        "Écris le script d'un podcast éducatif à deux voix (A et B) qui explique ces cours.\n"
-        f"DURÉE CIBLE : {body.minutes} minutes, soit environ {words} mots au total.\n"
-        "- A et B sont deux élèves passionnés qui se relancent et se posent des questions.\n"
-        "- Ton vivant et naturel, exemples tirés UNIQUEMENT des documents.\n"
-        "- Une introduction, les notions dans l'ordre logique, un récapitulatif final.\n"
-        "- Répliques de 1 à 4 phrases.\n\n"
-        + body.as_prompt()
-    )
-    tier = gemini.pick_text_tier("flash")
-    result = await gemini.generate_json(tier=tier, sub=user.sub, schema=PodcastScript, prompt=prompt,
-                                        system=gemini.GROUNDING_RULE, temperature=0.7)
-    count_generation("podcast")
-    return result
-
-
-class VideoIn(SourcesIn):
-    format: Literal["short", "medium", "long"] = "short"
-
-
-VIDEO_FORMATS = {"short": (2, 6), "medium": (10, 20), "long": (30, 48)}
-
-
-@router.post("/video", response_model=VideoScript)
-async def video(body: VideoIn, user: CurrentUser):
-    rate_limit(f"gen:{user.sub}", limit=10, window_seconds=600)
-    minutes, slides = VIDEO_FORMATS[body.format]
-    prompt = (
-        "Prépare une vidéo explicative sous forme de diaporama dessiné à la main.\n"
-        f"DURÉE CIBLE : {minutes} minutes. NOMBRE DE DIAPOS : {slides}.\n"
-        f"- Narration totale d'environ {minutes * 150} mots, répartie entre les diapos.\n"
-        "- Puces très courtes (5 mots max), un pictogramme (doodle) adapté par diapo.\n"
-        + ("- Format vertical type TikTok : accroche dès la première diapo, rythme rapide.\n" if body.format == "short" else "")
-        + "- Contenu UNIQUEMENT issu des documents.\n\n"
-        + body.as_prompt()
-    )
-    tier = gemini.pick_text_tier("flash")
-    result = await gemini.generate_json(tier=tier, sub=user.sub, schema=VideoScript, prompt=prompt,
-                                        system=gemini.GROUNDING_RULE, temperature=0.6)
-    count_generation("video")
-    return result
-
-
-class TtsLine(BaseModel):
-    speaker: Literal["A", "B", "N"]
-    text: str = Field(min_length=1, max_length=1200)
-
-
-class TtsIn(BaseModel):
-    lines: list[TtsLine] = Field(min_length=1, max_length=20)
-    voices: dict[str, str] = {}
-
-    @model_validator(mode="after")
-    def total(self):
-        if sum(len(line.text) for line in self.lines) > 1400:
-            raise ValueError("Segment trop long pour la synthèse vocale.")
-        return self
-
-    @field_validator("voices")
-    @classmethod
-    def clean_voices(cls, v: dict[str, str]) -> dict[str, str]:
-        allowed = {"Kore", "Puck", "Charon", "Aoede", "Fenrir", "Leda", "Orus", "Zephyr"}
-        return {k: val for k, val in v.items() if k in {"A", "B", "N"} and val in allowed}
-
-
-@router.post("/tts")
-async def tts(body: TtsIn, user: CurrentUser):
-    """Renvoie l'audio brut (PCM 16 bits mono) d'un segment d'environ une minute."""
-    rate_limit(f"tts:{user.sub}", limit=40, window_seconds=600)
-    voices = {"A": "Kore", "B": "Puck", "N": "Kore", **body.voices}
-    pcm, rate = await gemini.synthesize(sub=user.sub, lines=[(l.speaker, l.text) for l in body.lines], voices=voices)
-    return Response(content=pcm, media_type="application/octet-stream", headers={"X-Sample-Rate": str(rate)})
 
 
 class OcrImage(BaseModel):
@@ -265,6 +184,7 @@ async def ocr(body: OcrIn, user: CurrentUser):
         "en Markdown : titres, listes, formules (en texte simple). Décris brièvement les schémas entre crochets. "
         "N'ajoute rien qui n'est pas écrit."
     )
-    result = await gemini.generate_json(tier="lite", sub=user.sub, schema=OcrResult, prompt=prompt, media=media, temperature=0.1)
+    result = await ai.generate_json(feature="photos", tier="lite", sub=user.sub, schema=OcrResult, prompt=prompt,
+                                    media=media, temperature=0.1)
     count_generation("scan")
     return result

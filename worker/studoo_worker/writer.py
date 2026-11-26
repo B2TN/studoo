@@ -1,9 +1,10 @@
 """Écriture des scripts (podcasts, vidéos, fiches) par une IA, au format JSON demandé.
 
 Ordre d'essai :
+0. SEULEMENT si l'élève a choisi Gemini pour ce type de génération (Réglages) : Gemini avec SA clé ;
 1. Azure OpenAI (GPT-4.1 mini, crédit Azure for Students) et/ou Groq, selon les clés présentes → quelques secondes ;
-2. Gemini avec la clé PERSONNELLE de l'élève, seulement s'il en a enregistré une (secours) ;
-3. le modèle open source local du serveur (Qwen3-4B) : marche toujours, mais ≈ 1 h pour 10 min de podcast.
+2. le modèle open source local du serveur (Qwen3-4B) : marche toujours, mais ≈ 1 h pour 10 min de podcast.
+Sans ce choix explicite, aucune donnée ne part chez Google.
 Les journaux ne contiennent jamais le texte des cours ni les clés.
 """
 import json
@@ -114,16 +115,16 @@ def write(prompt: str, schema: dict, *, gemini_key: str = "", max_tokens: int = 
 
     `images` (photos JPEG en base64) : seulement les IA qui lisent les images ; sinon WriterError (pas de modèle local).
     """
+    if gemini_key:  # choix explicite de l'élève
+        try:
+            return _gemini(gemini_key, prompt, schema, max_tokens, temperature, images)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Gemini (clé de l'élève) indisponible (%s) : outils de Studoo", _why(exc))
     for provider in _providers(images=bool(images)):
         try:
             return _chat(provider, prompt, schema, max_tokens, temperature, images)
         except Exception as exc:  # noqa: BLE001 - on passe au suivant
             log.warning("%s indisponible (%s) : secours", provider["name"], _why(exc))
-    if gemini_key:
-        try:
-            return _gemini(gemini_key, prompt, schema, max_tokens, temperature, images)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("Gemini (clé de l'élève) indisponible (%s) : modèle local", _why(exc))
     if images:
         raise WriterError("Aucune IA capable de lire les photos n'est disponible.")
     log.warning("Écriture par le modèle local du serveur (lent)")

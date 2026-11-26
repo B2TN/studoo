@@ -14,7 +14,7 @@
    ▼
  API FastAPI (Python, fonctions Vercel)          API Node (fonction Vercel)
    ├── /api/auth/*   échange du code OAuth          └── /api/pronote/*  (Pawnote)
-   ├── /api/ai/*     appels Gemini (clé cachée)
+   ├── /api/ai/*     IA : Azure AI Speech / Azure OpenAI (clés cachées)
    ├── /api/ent/*    ENT étudiants (CAS → ADE…)
    ├── /api/events   analytics maison (sans cookie)
    └── /api/admin/*  réservé à ADMIN_EMAILS
@@ -24,7 +24,7 @@
 
 **Pourquoi ce découpage ?** Le navigateur parle directement à Google Drive avec le jeton
 de l'utilisateur : nos serveurs ne stockent aucun cours. Le serveur ne sert qu'à cacher
-la clé Gemini, valider les données et compter les visites.
+les clés d'IA, valider les données et compter les visites.
 
 ## 2. Connexion Google (seul moyen de connexion)
 
@@ -40,29 +40,37 @@ la clé Gemini, valider les données et compter les visites.
 - Passage en public : vérification de marque Google (gratuite, quelques jours) — il faut une page d'accueil, RGPD et CGU en ligne (prévues).
 - `drive.file` ne permet pas de parcourir les fichiers déjà présents dans le Drive : on importe depuis l'appareil (le fichier devient alors « créé par l'appli »).
 
-## 3. IA : Gemini (clé du propriétaire du site, côté serveur)
+## 3. IA : les outils de Studoo sur Microsoft Azure (itération 6)
 
-L'utilisateur n'a aucune clé à fournir : c'est **ta** clé Gemini, cachée dans l'API, qui paie.
-Budget choisi : **0 €** → niveau gratuit.
+**Par défaut, aucune donnée ne part chez Google.** Tout passe par les services Azure de Studoo
+(crédit Azure for Students, région Italy North), ou par des modèles open source sur notre serveur de tâches.
 
-| Usage | Modèle (configurable par variable d'env.) | Remarque |
+| Usage | Où ça tourne | Remarque |
 |---|---|---|
-| Transcription + diarisation (tranches de 5 min) | Gemini *Flash-Lite* | Gemini comprend l'audio et sait étiqueter « Professeur / Élève ». |
-| Estimation du cours, titre automatique | Flash-Lite | Petite requête texte. |
-| Fiches, scripts de podcast et de vidéo | Gemini *Flash* (repli Flash-Lite) | Qualité supérieure, quota plus faible. |
-| Voix (podcast, vidéo) | Gemini *TTS* multi-voix | Repli : voix de synthèse du navigateur. |
+| Transcription + rôles (tranches de 5 min) | **Azure AI Speech** « fast transcription » (`studoo-voix`, F0) | Diarisation : la voix qui parle le plus = « Professeur ». Audio effacé même en cas d'échec. |
+| Estimation du cours, titre automatique | **Azure OpenAI** GPT-4.1 mini, depuis l'API Vercel | Petite requête texte (`services/ai.py`). |
+| Fiches | Azure OpenAI GPT-4.1 mini, depuis l'API Vercel | JSON structuré, rendu dans le style cahier. |
+| Lecture des PDF scannés importés | Azure OpenAI GPT-4.1 mini (vision) | Pages réduites dans le navigateur. |
+| Lecture des photos de cours numérisées | **Qwen3-VL** (open source) sur le serveur de tâches | Rien ne sort de notre serveur. |
+| Scripts de podcast / vidéo, feuilles d'exercices, corrections de copies | Serveur de tâches → Azure OpenAI (repli : Qwen3-4B local) | Voir [AZURE.md](AZURE.md). |
+| Voix | Azure AI Speech (Vivienne + Henri ; Denise en secours ; voix locales sinon) | Signalé à l'élève si une voix de secours a servi. |
 
-**Limites honnêtes (à vérifier dans AI Studio, elles changent souvent) :**
-- En octobre 2026, le gratuit est rapporté à environ **20 requêtes/jour** pour Flash et **~500/jour** pour Flash-Lite, **par projet** (donc partagées entre tous les utilisateurs), remise à zéro à minuit heure du Pacifique. Un cours de 2 h = 24 tranches ≈ 24 requêtes Flash-Lite → environ **20 cours de 2 h par jour pour tout le site**.
-- TTS gratuit : quelques minutes d'audio par jour. Un podcast de 30 min ne tiendra pas en une journée → bascule automatique sur la voix du navigateur.
-- **RGPD** : au niveau gratuit, Google peut utiliser les contenus envoyés pour améliorer ses produits. C'est écrit en clair dans la page RGPD et rappelé avant le premier enregistrement. Passer au niveau payant (quelques €/mois) supprime ce point.
-- L'API gère les erreurs de quota proprement : message clair « quota du jour atteint, réessaie demain » et file d'attente côté client.
+**Gemini, en option personnelle.** Il n'y a plus de clé Gemini du site. Un élève peut enregistrer
+**sa** clé dans les réglages (vérifiée auprès de Google, chiffrée par Fernet avec une clé dérivée de
+`SESSION_SECRET` et liée à son compte, jamais renvoyée au navigateur ni écrite dans un journal). Des cases
+apparaissent alors, **toutes décochées** : transcription, rangement, fiches, exercices/corrections,
+lecture des photos, podcasts, vidéos. Pour une case cochée, l'API (ou le serveur de tâches, via la tâche
+chiffrée) appelle Gemini avec sa clé en premier, puis repasse sur Azure si Gemini échoue. Avant la saisie,
+la page explique ce qui part chez Google pour chaque fonctionnalité.
+
+**Quotas.** `QUOTA_LITE_PER_DAY` / `QUOTA_FLASH_PER_DAY` (partagés) et `QUOTA_USER_PER_DAY` (par élève)
+protègent le crédit Azure. Les demandes faites avec la clé Gemini d'un élève ne consomment pas ces quotas.
 
 ## 4. Fonctionnalités : comment, et ce qui est réaliste
 
 ### 4.1 Transcription
 Micro → `MediaRecorder` (Opus, ~1 Mo / 5 min) → tranche envoyée à `/api/ai/transcribe` →
-Gemini → texte renvoyé → **l'audio est effacé de la mémoire** (jamais écrit sur disque, ni Drive,
+Azure AI Speech → texte renvoyé → **l'audio est effacé de la mémoire** (jamais écrit sur disque, ni Drive,
 ni serveur). Texte affiché au fil du cours (~1 min de décalage). Durée max : 2 h.
 Consentement : engagement accepté une fois, puis rappel discret.
 Ensuite : page de confirmation (cours/chapitre estimés, titre auto).
@@ -72,25 +80,23 @@ Traitement d'image **écrit à la main en JavaScript** (`frontend/src/lib/scan-c
 au lieu d'OpenCV.js qui pèse ~10 Mo) : détection de la feuille (seuil d'Otsu + plus grande zone claire),
 coins ajustables à la main, redressement par homographie, suppression des ombres (normalisation de
 l'éclairage) et contraste. PDF assemblé avec **pdf-lib**. La photo ne quitte jamais l'appareil
-(seule une copie réduite part vers Gemini pour lire le texte et estimer le cours).
+(seule une copie réduite part vers le serveur de tâches de Studoo, où Qwen3-VL lit le texte).
 
 ### 4.3 Fiches
-Gemini produit un JSON structuré (titres, définitions, encadrés, schémas simples), rendu par le
+Azure OpenAI (GPT-4.1 mini) produit un JSON structuré (titres, définitions, encadrés, schémas simples), rendu par le
 site dans le style cahier. Fichier `.fiche.json` sur Drive + bouton « Exporter en PDF »
 (impression navigateur avec feuille de style dédiée).
 
 ### 4.4 Podcasts (10 / 20 / 30 min)
-Gemini écrit un dialogue à deux voix **uniquement à partir des cours sélectionnés**. Voix Gemini
-TTS par segments d'~1 min, assemblés et encodés en audio compressé dans le navigateur, puis
-envoyés sur Drive. Si le quota TTS est épuisé : le script est enregistré et lu par la voix du
-navigateur dans le lecteur du site (pas de fichier audio dans ce cas — les navigateurs ne
-permettent pas d'enregistrer leur propre voix de synthèse).
+Le serveur de tâches fait écrire un dialogue à deux voix par Azure OpenAI, **uniquement à partir des
+cours sélectionnés**, puis le fait lire par Azure AI Speech (Vivienne + Henri) et range le MP3 dans le Drive.
+Détails : [AZURE.md](AZURE.md).
 
 ### 4.5 Vidéos explicatives (≈2 / 10 / 30 min)
 Pas de vidéo IA « réelle » (Veo est payant). Alternative gratuite : **diaporama animé dessiné à
-la main + voix**. Gemini écrit le script et les diapos ; le navigateur dessine chaque diapo sur un
+la main + voix**. Azure OpenAI écrit le script et les diapos (serveur de tâches) ; le navigateur dessine chaque diapo sur un
 `<canvas>` et encode un **MP4** (WebCodecs + `mp4-muxer`), plus vite que le temps réel sur un
-ordinateur récent (plus lent sur téléphone). Sans voix Gemini disponible : MP4 sous-titré.
+ordinateur récent (plus lent sur téléphone). Voix : Azure AI Speech (Vivienne).
 
 ### 4.6 Emploi du temps
 | Méthode | Réalisme |
@@ -124,15 +130,13 @@ Adresse : `<nom>.vercel.app` (personnalisable gratuitement).
 - HTTPS forcé (Vercel + en-tête HSTS), en-têtes CSP, `X-Content-Type-Options`, etc.
 - Toutes les entrées validées côté serveur (Pydantic), tailles maximales imposées.
 - Anti-spam : limitation de débit par utilisateur/IP, champ « pot de miel » sur les formulaires.
-- Clés (Gemini, secret OAuth, clé de chiffrement) uniquement dans les variables d'environnement Vercel.
+- Clés (Azure, secret OAuth, clé de chiffrement) uniquement dans les variables d'environnement Vercel et du serveur de tâches ; aucune clé Gemini du site.
 
 ## 7. Ce que TU devras faire (je te guiderai pas à pas)
 1. Créer un projet Google Cloud, l'écran de consentement OAuth et un identifiant client Web.
-2. Créer une clé Gemini dans Google AI Studio.
+2. Créer les ressources Azure (AI Speech, Azure OpenAI) : voir [AZURE.md](AZURE.md).
 3. Créer un compte Vercel (connexion avec GitHub) et une base Neon.
 4. Ajouter les variables d'environnement.
 
-Sources consultées : [quotas Gemini (oct. 2026, non officiel)](https://imisofts.com/blog/gemini-api-free-tier-limits/),
-[aifreeapi](https://www.aifreeapi.com/en/posts/google-gemini-api-free-tier),
-[Pawnote](https://github.com/LiterateInk/Pawnote/blob/index/README.md),
+Sources consultées : [Pawnote](https://github.com/LiterateInk/Pawnote/blob/index/README.md),
 [limites Vercel](https://vercel.com/docs/limits), [offre Hobby](https://vercel.com/docs/accounts/plans/hobby-plan).

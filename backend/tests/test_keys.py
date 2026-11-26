@@ -1,4 +1,4 @@
-"""Clé Gemini personnelle de l'élève : vérifiée par Google, chiffrée, jamais renvoyée, transmise aux tâches."""
+"""Clé Gemini personnelle de l'élève : vérifiée par Google, chiffrée, jamais renvoyée, utilisée seulement là où il l'a choisi."""
 import httpx
 from sqlalchemy import select
 
@@ -40,9 +40,10 @@ def test_key_refused_by_google_or_malformed(logged, monkeypatch):
     assert logged.get("/api/me/gemini-key").json()["set"] is False
 
 
-def test_key_goes_into_the_sealed_job_payload(logged, monkeypatch):
+def test_key_goes_into_the_sealed_job_payload_only_when_chosen(logged, monkeypatch):
     _google(monkeypatch)
     logged.put("/api/me/gemini-key", json={"key": KEY})
+    assert logged.put("/api/me/gemini-key/prefs", json={"prefs": {"podcast": True}}).json()["prefs"]["podcast"] is True
     res = logged.post("/api/jobs", json={"kind": "podcast", "sources": [{"title": "C", "text": "Cours"}],
                                          "options": {"minutes": 10, "voice": "vivienne-remy"}, "folder_id": "dossier1"})
     assert res.status_code == 201, res.text

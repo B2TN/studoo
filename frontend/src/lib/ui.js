@@ -113,7 +113,7 @@ export function cookieBanner() {
   const choose = (value) => { store.set(CONSENT_KEY, { stats: value, date: new Date().toISOString() }); banner.remove(); if (value) trackPage(); };
   const banner = h("section", { class: "consent card sketch", role: "region", "aria-label": "Cookies et statistiques" },
     h("p", {}, h("strong", {}, "Ta vie privée d'abord. "),
-      "Studoo n'utilise qu'un cookie indispensable (ta connexion). On aimerait aussi compter les visites de façon anonyme (sans cookie, sans pub). ",
+      "Studoo n'utilise que des cookies indispensables (ta connexion). On aimerait aussi compter les visites de façon anonyme (sans cookie, sans pub). ",
       h("a", { href: "/rgpd" }, "En savoir plus")),
     h("div", { class: "row" },
       h("button", { class: "btn", type: "button", onclick: () => choose(false) }, "Refuser"),

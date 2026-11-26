@@ -120,7 +120,7 @@ function scriptPlayer(script) {
   });
   stopBtn.addEventListener("click", () => { ctrl?.stop(); ctrl = null; highlight(-1); playBtn.dataset.state = ""; playBtn.replaceChildren(icon("player-play"), "Écouter"); });
   box.addEventListener("click", (e) => { const p = e.target.closest("p[data-i]"); if (p) { ctrl ||= speakLines(lines, { onLine: highlight }); ctrl.seek(Number(p.dataset.i)); playBtn.dataset.state = "playing"; playBtn.replaceChildren(icon("player-pause"), "Pause"); } });
-  return { el: h("div", { class: "stack" }, h("p", { class: "small muted" }, "Lu par la voix de ton appareil (quota de voix Gemini épuisé ce jour-là). Clique sur une réplique pour y aller."),
+  return { el: h("div", { class: "stack" }, h("p", { class: "small muted" }, "Lu par la voix de ton appareil (voix de synthèse indisponibles ce jour-là). Clique sur une réplique pour y aller."),
     h("div", { class: "row" }, playBtn, stopBtn), box), stop: () => ctrl?.stop() };
 }
 

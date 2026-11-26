@@ -33,7 +33,7 @@ export function canvasToBase64(canvas, quality = 0.75) {
   return canvas.toDataURL("image/jpeg", quality).split(",")[1];
 }
 
-/** OCR par Gemini : renvoie le texte Markdown des pages. */
+/** Lecture des pages scannées (Azure OpenAI par défaut, Gemini seulement si l'élève l'a choisi) : texte Markdown. */
 export async function ocrImages(base64List) {
   const res = await api("/api/ai/ocr", { method: "POST", json: { images: base64List.slice(0, 8).map((data) => ({ data, mime: "image/jpeg" })) } });
   return res.text;

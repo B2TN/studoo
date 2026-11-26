@@ -20,11 +20,13 @@ Compte : environ 30 minutes. Tout est gratuit, aucune carte bancaire n'est deman
 > Pour ouvrir au public : **Audience → Publier l'application**. `drive.file` n'étant pas un scope sensible,
 > Google ne demande qu'une vérification de la marque (quelques jours, gratuite).
 
-## 2. Google AI Studio : clé Gemini
+## 2. Microsoft Azure : IA du site
 
-1. Va sur <https://aistudio.google.com/apikey> → **Create API key** (dans le projet Studoo).
-2. Dans **Rate limits**, vérifie les quotas gratuits du jour et les noms exacts des modèles,
-   puis ajuste `GEMINI_MODEL_*` et `QUOTA_*` si besoin.
+Le site n'utilise **aucune clé Gemini**. L'IA tourne sur Azure (voir [AZURE.md](AZURE.md)) :
+
+1. **Azure AI Speech** (`studoo-voix`) : copie la clé 1 et la région → `SPEECH_KEY`, `SPEECH_REGION`.
+2. **Azure OpenAI** (`studoo-ecriture-…`, déploiement `gpt-4.1-mini`) : copie la clé et l'adresse
+   `https://<ressource>.openai.azure.com/openai/v1/chat/completions` → `AZURE_OPENAI_KEY`, `AZURE_OPENAI_URL`.
 
 ## 3. Neon : base de données
 
@@ -35,7 +37,7 @@ Compte : environ 30 minutes. Tout est gratuit, aucune carte bancaire n'est deman
 
 > ✅ Déjà fait : le projet Vercel « studoo » est relié au dépôt GitHub, l'adresse est `studoo-app.vercel.app`,
 > et `APP_URL`, `SESSION_SECRET` et une base SQLite **provisoire** (`/tmp`, effacée régulièrement) sont configurés.
-> Il reste à ajouter les variables Google, Gemini, admin et Neon ci-dessous.
+> Il reste à ajouter les variables Google, Azure, admin et Neon ci-dessous.
 
 1. Sur <https://vercel.com>, ouvre le projet **studoo**.
 2. **Settings → Environment Variables** (Production) — ajoute ou remplace :
@@ -44,7 +46,8 @@ Compte : environ 30 minutes. Tout est gratuit, aucune carte bancaire n'est deman
 |---|---|
 | `APP_URL` | `https://studoo-app.vercel.app` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | étape 1 |
-| `GEMINI_API_KEY` | étape 2 |
+| `SPEECH_KEY` / `SPEECH_REGION` | étape 2 (transcription) |
+| `AZURE_OPENAI_KEY` / `AZURE_OPENAI_URL` | étape 2 (rangement automatique, fiches, lecture des PDF) |
 | `SESSION_SECRET` | 48 caractères aléatoires : `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `ADMIN_EMAILS` | ton adresse Gmail |
 | `DATABASE_URL` | étape 3 |

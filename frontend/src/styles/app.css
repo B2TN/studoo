@@ -200,3 +200,9 @@ table.data th, table.data td { border-bottom: 1.5px dashed var(--grid-strong); p
 .bar.level.hearing span { background: var(--fluo-green); }
 .level-hint { min-height: 1.4em; margin-top: 6px; }
 .rec-result h2 .icon { width: 1em; height: 1em; vertical-align: -0.15em; }
+
+/* Réglages : préférences Gemini (itération 6) */
+.gemini-prefs { border: 2px dashed var(--grid-strong); border-radius: 14px; padding: 12px 14px; margin: 0; }
+.gemini-prefs legend { padding: 0 6px; font-weight: 700; }
+.check-row { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.3; }
+.check-row input { margin-top: 4px; width: 18px; height: 18px; flex: none; accent-color: var(--ink-2); }

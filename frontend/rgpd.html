@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Données personnelles (RGPD) · Studoo</title>
-  <meta name="description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA (Microsoft Azure, Google Gemini), tes droits.">
+  <meta name="description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA sur Microsoft Azure (Gemini seulement avec ta propre clé), tes droits.">
   <link rel="canonical" href="https://studoo-app.vercel.app/rgpd">
   <meta name="theme-color" content="#FBF6E9">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:title" content="Données personnelles (RGPD) · Studoo">
-  <meta property="og:description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA (Microsoft Azure, Google Gemini), tes droits.">
+  <meta property="og:description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA sur Microsoft Azure (Gemini seulement avec ta propre clé), tes droits.">
   <meta property="og:image" content="https://studoo-app.vercel.app/og-image.png">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
@@ -30,7 +30,7 @@
   </header>
   <main id="contenu" class="page">
     <h1>Tes données <span class="hl">personnelles</span></h1>
-    <p class="muted">Dernière mise à jour : 26 novembre 2026 (transcription par Microsoft Azure AI Speech, robot d'emploi du temps, correction des copies, voix).</p>
+    <p class="muted">Dernière mise à jour : 27 novembre 2026 (plus aucun envoi à Google Gemini par défaut, option Gemini avec ta propre clé, nouveaux robots d'emploi du temps, signalement d'établissement).</p>
     <div class="card sketch">
       <p><strong>En bref :</strong> tes cours sont rangés dans <strong>ton</strong> Google Drive, pas chez nous. Studoo garde seulement le strict nécessaire pour te connecter et protéger le service (ton e-mail, ton nom, des compteurs). Pas de pub, pas de revente. Si tu as moins de 15 ans, lis cette page avec un parent.</p>
     </div>
@@ -45,7 +45,9 @@
       <tbody>
         <tr><td>Identifiant Google, e-mail, nom, photo de profil</td><td>Te connecter, afficher ton compte, réserver l'admin</td><td>Exécution du service (CGU)</td><td>Jusqu'à la suppression de ton compte</td></tr>
         <tr><td>Jeton d'accès Google (« refresh token »)</td><td>Accéder à <em>tes</em> fichiers Studoo dans ton Drive</td><td>Exécution du service</td><td>Stocké <strong>chiffré dans un cookie de ton navigateur</strong> (30 jours), jamais dans notre base</td></tr>
-        <tr><td>Compteurs d'utilisation de l'IA (par jour)</td><td>Respecter les quotas gratuits et éviter les abus</td><td>Intérêt légitime</td><td>Supprimés avec ton compte</td></tr>
+        <tr><td>Compteurs d'utilisation de l'IA (par jour)</td><td>Rester dans le budget de l'IA du site et éviter les abus</td><td>Intérêt légitime</td><td>Supprimés avec ton compte</td></tr>
+        <tr><td>Compteurs anti-abus (nombre de requêtes par minute ou par heure)</td><td>Bloquer les robots et le spam</td><td>Intérêt légitime</td><td>Seule une <strong>empreinte chiffrée</strong> est gardée (jamais ton adresse IP ni ton identifiant en clair), effacée après 2 jours au plus</td></tr>
+        <tr><td>Ta clé Gemini personnelle et tes choix d'usage (facultatif)</td><td>Utiliser Gemini à la place des outils de Studoo, seulement pour ce que tu as coché</td><td>Consentement (tu l'enregistres toi-même)</td><td><strong>Chiffrée</strong> sur le serveur, jamais renvoyée à ton navigateur ; supprimée dès que tu cliques sur « Supprimer ma clé », ou avec ton compte</td></tr>
         <tr><td>Identifiant et mot de passe de ton ENT ou de Pronote (robot d'emploi du temps)</td><td>Te connecter à ton emploi du temps à ta place, une seule fois</td><td>Exécution du service demandé</td><td><strong>Jamais enregistrés</strong> : gardés uniquement dans la mémoire du serveur de Studoo pendant la connexion (moins de 2 minutes), puis supprimés, que la connexion réussisse, échoue, dépasse le délai ou plante. Jamais écrits dans un journal ni un rapport d'erreur.</td></tr>
         <tr><td>Tâches de génération en cours (podcast, vidéo, feuille d'exercices, correction ou lecture de copie) : texte des cours choisis, photos réduites, jeton Google « hors ligne »</td><td>Fabriquer le résultat sur le serveur pendant que tu es absent, puis le ranger dans ton Drive</td><td>Exécution du service demandé</td><td><strong>Chiffrés</strong>, et <strong>effacés dès la fin de la tâche</strong> (24 h au plus en cas d'échec, pour pouvoir la relancer)</td></tr>
         <tr><td>Abonnement aux notifications (adresse technique de ton navigateur)</td><td>Te prévenir quand une génération est prête</td><td>Consentement (bouton « Activer les notifications »)</td><td>Jusqu'à la désactivation ou la suppression du compte</td></tr>
@@ -58,17 +60,18 @@
     <h2>Tes cours</h2>
     <ul>
       <li>Transcriptions, PDF, fiches, podcasts et vidéos sont enregistrés <strong>dans ton Google Drive</strong>, dans le dossier « Studoo ». Studoo utilise l'autorisation Google « drive.file » : il ne voit que les fichiers qu'il a créés, jamais le reste de ton Drive.</li>
-      <li><strong>Fabrication sur le serveur :</strong> les podcasts, vidéos et lectures de copies sont fabriqués par le serveur de tâches de Studoo. Pour les podcasts et vidéos, le texte des cours choisis est envoyé à <strong>Microsoft Azure OpenAI</strong> pour écrire le script, puis le script est lu par les voix de <strong>Microsoft Azure AI Speech</strong>. Selon les conditions de Microsoft, ces textes ne servent pas à entraîner ses modèles. Le serveur écrit ensuite le résultat dans ton Drive grâce à un jeton Google « hors ligne » chiffré, puis efface tout. Les vidéos sont animées directement dans ton navigateur.</li>
+      <li><strong>Fabrication sur le serveur :</strong> les podcasts, vidéos, feuilles d'exercices, corrections et lectures de photos sont fabriqués par le serveur de tâches de Studoo (Microsoft Azure, région Italy North). Pour les podcasts et vidéos, le texte des cours choisis est envoyé à <strong>Microsoft Azure OpenAI</strong> pour écrire le script, puis le script est lu par les voix de <strong>Microsoft Azure AI Speech</strong>. Selon les conditions de Microsoft, ces textes ne servent pas à entraîner ses modèles. Le serveur écrit ensuite le résultat dans ton Drive grâce à un jeton Google « hors ligne » chiffré, puis efface tout. Les vidéos sont animées directement dans ton navigateur.</li>
       <li><strong>Voix :</strong> les podcasts et vidéos sont lus par des voix de synthèse générées par une IA (Vivienne et Henri de Microsoft Azure ; Denise en secours, ou d'autres voix si Azure est indisponible, ce qui t'est alors signalé). Ce ne sont pas des voix humaines.</li>
       <li><strong>Feuilles d'exercices et correction :</strong> les exercices sont écrits à partir de tes cours. Quand tu fais corriger ta copie, ses photos (réduites dans ton navigateur) sont envoyées à <strong>Microsoft Azure OpenAI</strong> (modèle GPT-4.1 mini) pour être lues et corrigées, puis effacées du serveur ; seule la correction est rangée dans ton Drive. Évite d'écrire ton nom complet ou des informations personnelles sur la copie.</li>
-      <li><strong>Ta clé Gemini (facultative) :</strong> si tu enregistres ta propre clé Gemini dans les réglages, elle est gardée chiffrée et ne sert qu'en secours (quand les services d'Azure sont indisponibles ou épuisés). Les textes envoyés avec ta clé relèvent alors de ton propre compte Google et de ses conditions. Tu peux la supprimer à tout moment.</li>
-      <li><strong>Enregistrements audio :</strong> le son est découpé en tranches de 5 minutes, envoyé à l'IA pour être transcrit, puis effacé. Aucun fichier audio n'est conservé, ni chez nous ni dans ton Drive.</li>
-      <li><strong>Photos de cours :</strong> le redressement se fait dans ton navigateur ; une copie réduite est envoyée à l'IA pour lire le texte, puis oubliée.</li>
+      <li><strong>Gemini avec ta propre clé (facultatif) :</strong> par défaut, <strong>rien n'est envoyé à Google Gemini</strong>. Dans les réglages, tu peux enregistrer ta propre clé Gemini puis cocher les fonctionnalités où tu la préfères (transcription, rangement automatique, fiches, exercices et corrections, lecture des photos, podcasts, vidéos). Pour celles-là seulement, le contenu concerné (le son, le texte des cours ou les photos, selon le cas) part vers l'API Gemini de Google avec ta clé, et relève alors de ton compte Google et de ses conditions : avec l'offre gratuite, Google peut réutiliser ces contenus pour améliorer ses services et les faire relire par des personnes. Tout est décoché au départ ; tu peux tout décocher ou supprimer ta clé en un clic.</li>
+      <li><strong>Enregistrements audio :</strong> le son est découpé en tranches de 5 minutes, envoyé à Microsoft Azure AI Speech pour être transcrit, puis effacé. Aucun fichier audio n'est conservé, ni chez nous ni dans ton Drive.</li>
+      <li><strong>Photos de cours :</strong> le redressement se fait dans ton navigateur ; une copie réduite est envoyée au serveur de tâches de Studoo, où un modèle open source (Qwen3-VL) lit le texte <strong>sur notre propre serveur</strong> : elle ne part chez aucun autre service, puis elle est effacée. Les PDF scannés que tu importes sont lus par Microsoft Azure OpenAI.</li>
     </ul>
 
     <h2>Intelligence artificielle</h2>
     <p><strong>Transcription des cours enregistrés :</strong> le son est envoyé par tranches de 5 minutes à <strong>Microsoft Azure AI Speech</strong> (région Italy North, Union européenne), qui le transcrit en reconnaissant les différentes voix, puis il est effacé — aucun fichier audio n'est conservé, ni chez nous, ni chez Microsoft, même si la transcription échoue. Microsoft n'utilise pas ces données pour entraîner ses modèles.</p>
-    <p><strong>Autres usages (lecture de photos, fiches) :</strong> le contenu transite par notre serveur jusqu'à l'API Google Gemini, sans y être stocké. Studoo utilise actuellement <strong>l'offre gratuite</strong> de Gemini : selon les conditions de Google, les contenus envoyés peuvent alors être utilisés par Google pour améliorer ses produits et être examinés par des personnes. <strong>N'enregistre donc pas d'informations sensibles</strong> (santé, données d'autres élèves…). Si Studoo passe à l'offre payante, cette réutilisation cessera et cette page sera mise à jour.</p>
+    <p><strong>Autres usages :</strong> pour deviner le cours d'un document (un extrait du texte et les noms de tes cours et chapitres), écrire une fiche (le texte des cours choisis) ou lire un PDF scanné (les pages réduites), le contenu transite par notre serveur jusqu'à <strong>Microsoft Azure OpenAI</strong> (modèle GPT-4.1 mini, payé par le crédit Azure for Students de l'éditeur), sans être stocké par Studoo. Selon les conditions de Microsoft, ces contenus ne servent pas à entraîner ses modèles ; Microsoft peut les garder jusqu'à 30 jours pour détecter les abus. Le stockage de ce service est en Italy North ; le calcul peut avoir lieu dans un autre centre de Microsoft (offre « Global »).</p>
+    <p><strong>Google Gemini :</strong> jamais utilisé par défaut, et jamais avec une clé du site. Seulement si tu enregistres ta propre clé et coches une fonctionnalité dans les réglages (voir plus haut).</p>
 
     <h2>Emploi du temps</h2>
     <p><strong>Le robot (lycées) :</strong> tu choisis ton établissement dans l'annuaire public de l'Éducation nationale (data.education.gouv.fr : seul le nom tapé dans la recherche y est envoyé), puis tu tapes ton identifiant et ton mot de passe. Le serveur de Studoo (Vercel, région Paris) s'en sert <strong>une seule fois</strong> pour se connecter à Pronote ou à ton ENT, récupère ton emploi du temps, puis les <strong>supprime aussitôt</strong> : ils ne sont jamais écrits dans une base, un fichier, un journal ou un rapport d'erreur, et disparaissent dans tous les cas (réussite, erreur, délai dépassé, plantage).</p>
@@ -79,16 +82,16 @@
 
     <h2>Qui d'autre reçoit des données ? (sous-traitants)</h2>
     <ul>
-      <li><strong>Google</strong> (connexion, Drive, Gemini) — Irlande / États-Unis.</li>
-      <li><strong>Vercel</strong> (hébergement du site et de l'API) — États-Unis, encadré par le Data Privacy Framework UE–États-Unis.</li>
+      <li><strong>Google</strong> (connexion, Drive ; Gemini <em>uniquement</em> avec ta propre clé, si tu l'as choisi) — Irlande / États-Unis.</li>
+      <li><strong>Vercel</strong> (hébergement du site et de l'API ; l'API tourne dans la région Paris) — société américaine, encadrée par le Data Privacy Framework UE–États-Unis.</li>
       <li><strong>Neon</strong> (base de données des comptes, compteurs et tâches en cours) — région Union européenne.</li>
-      <li><strong>Microsoft Azure</strong> (transcription des cours enregistrés avec Azure AI Speech, serveur de tâches, écriture des scripts et des feuilles d'exercices, lecture et correction des copies avec Azure OpenAI, voix Azure AI Speech : fabrication des podcasts, vidéos, exercices et corrections) — stockage en région Italy North (Milan, Union européenne) ; l'écriture des scripts peut être calculée dans un autre centre de Microsoft, encadré par le Data Privacy Framework UE–États-Unis.</li>
+      <li><strong>Microsoft Azure</strong> (transcription des cours enregistrés avec Azure AI Speech ; rangement automatique, fiches, lecture des PDF scannés, scripts, feuilles d'exercices et corrections avec Azure OpenAI ; voix Azure AI Speech ; serveur de tâches qui fabrique podcasts, vidéos, exercices, corrections et lectures de photos) — stockage en région Italy North (Milan, Union européenne) ; l'écriture des scripts peut être calculée dans un autre centre de Microsoft, encadré par le Data Privacy Framework UE–États-Unis.</li>
       <li><strong>Index Éducation (Pronote) et ton ENT régional</strong> (le robot s'y connecte avec tes identifiants, à ta demande) — France.</li>
       <li><strong>Brevo</strong> (envoi de l'e-mail « c'est prêt » si les notifications ne sont pas activées) — Union européenne.</li>
     </ul>
 
     <h2>Cookies</h2>
-    <p>Studoo dépose un seul cookie indispensable : ta session de connexion (chiffrée, 30 jours), plus un petit indicateur « connecté » sans donnée personnelle. Aucun cookie publicitaire ni traceur tiers. La mesure d'audience maison n'utilise pas de cookie et n'est activée que si tu l'acceptes ; tu peux changer d'avis dans les réglages.</p>
+    <p>Studoo dépose seulement deux cookies indispensables : ta session de connexion (chiffrée, 30 jours) et un petit indicateur « connecté » sans donnée personnelle. Aucun cookie publicitaire ni traceur tiers. La mesure d'audience maison n'utilise pas de cookie (une empreinte anonyme qui change chaque jour, sans adresse IP enregistrée) et n'est activée que si tu l'acceptes ; tu peux changer d'avis dans les réglages. Ton navigateur garde aussi quelques préférences (thème, ton choix sur la bannière, dernière liste de générations affichée) dans son stockage local : elles ne nous sont pas envoyées.</p>
 
     <h2>Tes droits</h2>
     <p>Tu peux accéder à tes données, les rectifier, les effacer (bouton « Supprimer mon compte » dans les réglages), t'opposer à un traitement ou en demander la portabilité (tes fichiers sont déjà dans ton Drive). Écris-nous via la <a href="/contact">page contact</a>. Tu peux aussi saisir la <a href="https://www.cnil.fr/fr/plaintes" rel="noopener">CNIL</a>.</p>

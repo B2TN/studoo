@@ -67,7 +67,6 @@ def test_real_silence_and_service_errors_are_distinct(logged, monkeypatch):
 def test_no_transcription_service_is_said_clearly(logged, monkeypatch):
     s = get_settings()
     monkeypatch.setattr(s, "speech_key", "")
-    monkeypatch.setattr(s, "gemini_api_key", "")
     monkeypatch.setattr(type(s), "ai_fake_enabled", property(lambda self: False))  # comme en ligne (pas de mode démo)
     res = logged.post("/api/ai/transcribe", content=AUDIO, headers={"Content-Type": "audio/webm"})
     assert res.status_code == 503 and res.json()["detail"]["code"] == "stt_unconfigured"

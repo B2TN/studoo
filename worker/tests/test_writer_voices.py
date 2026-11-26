@@ -1,4 +1,4 @@
-"""Écriture (Azure OpenAI / Groq → Gemini de l'élève → modèle local) et voix (Azure → Gemini de l'élève → voix locales)."""
+"""Écriture (Gemini de l'élève s'il l'a choisi → Azure OpenAI / Groq → modèle local) et voix (Azure → Gemini de l'élève → voix locales)."""
 import base64
 import json
 
@@ -15,7 +15,7 @@ def mock_http(monkeypatch, handler):
     monkeypatch.setattr(httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
 
 
-def test_groq_writes_first(monkeypatch):
+def test_without_student_choice_nothing_goes_to_google(monkeypatch):
     monkeypatch.setattr(settings, "GROQ_API_KEY", "gk")
     seen = []
 
@@ -26,25 +26,25 @@ def test_groq_writes_first(monkeypatch):
         return httpx.Response(200, json={"choices": [{"message": {"content": '{"ok": true}'}}], "usage": {}})
 
     mock_http(monkeypatch, handler)
-    assert writer.write("cours", SCHEMA, gemini_key="cle-eleve") == {"ok": True}
-    assert seen == ["api.groq.com"]  # la clé de l'élève n'est pas utilisée quand Groq répond
+    assert writer.write("cours", SCHEMA) == {"ok": True}
+    assert seen == ["api.groq.com"]  # pas de clé de l'élève dans la tâche = rien chez Google
 
 
-def test_student_gemini_key_is_the_fallback(monkeypatch):
+def test_student_choice_of_gemini_goes_first_then_studoo(monkeypatch):
     monkeypatch.setattr(settings, "GROQ_API_KEY", "gk")
     monkeypatch.setattr(writer.time, "sleep", lambda s: None)
     seen = []
 
     def handler(req):
         seen.append(req.url.host)
-        if req.url.host == "api.groq.com":
-            return httpx.Response(503)
-        assert req.headers["x-goog-api-key"] == "cle-eleve"
-        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": '{"ok": false}'}]}}]})
+        if req.url.host == "generativelanguage.googleapis.com":
+            assert req.headers["x-goog-api-key"] == "cle-eleve" and "cle-eleve" not in str(req.url)
+            return httpx.Response(429)  # quota de l'élève épuisé : on repasse sur les outils de Studoo
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"ok": false}'}}]})
 
     mock_http(monkeypatch, handler)
     assert writer.write("cours", SCHEMA, gemini_key="cle-eleve") == {"ok": False}
-    assert seen == ["api.groq.com", "generativelanguage.googleapis.com"]
+    assert seen == ["generativelanguage.googleapis.com", "api.groq.com"]
 
 
 def test_azure_openai_first_then_groq(monkeypatch):

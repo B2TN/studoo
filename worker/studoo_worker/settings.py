@@ -19,7 +19,7 @@ MAIL_FROM = os.environ.get("MAIL_FROM", "")
 
 # Écriture des scripts : Azure OpenAI (GPT-4.1 mini, payé par le crédit Azure for Students, ≈ 1 centime par podcast ;
 # clé et adresse posées par worker/azure/deploy.ps1), ou Groq si une clé est fournie.
-# Secours : Gemini avec la clé personnelle de l'élève (s'il en a mis une), puis le modèle local (lent).
+# Gemini : uniquement avec la clé personnelle d'un élève qui l'a choisi pour ce type de génération ; secours : modèle local (lent).
 AZURE_OPENAI_KEY = os.environ.get("AZURE_OPENAI_KEY", "")
 AZURE_OPENAI_URL = os.environ.get("AZURE_OPENAI_URL", "")  # https://<ressource>.openai.azure.com/openai/v1/chat/completions
 AZURE_OPENAI_MODEL = os.environ.get("AZURE_OPENAI_MODEL", "gpt-4.1-mini")  # nom du déploiement

@@ -7,7 +7,7 @@ découpées, pauses aux virgules et entre les phrases, volume égalisé (−16 L
 Ordre d'essai :
 1. Azure AI Speech, Vivienne + Henri (offre gratuite F0 : 500 000 caractères par mois) ;
 2. Azure AI Speech, Denise + Henri (mêmes réglages) si Vivienne ne répond pas — signalé à l'élève ;
-3. Gemini TTS avec la clé PERSONNELLE de l'élève, s'il en a enregistré une — signalé ;
+3. Gemini TTS avec la clé PERSONNELLE de l'élève, seulement s'il a choisi Gemini pour les podcasts/vidéos — signalé ;
 4. les voix open source locales (Kokoro / Piper) — signalé.
 Tout sort en MP3 24 kHz mono 96 kbit/s (voir media.MP3_ARGS).
 """

@@ -214,14 +214,15 @@ def correct(payload: dict, report) -> tuple:
     read_by = "ia"
     try:
         result = writer.write(rules + "\n\nLa copie de l'élève est sur les photos jointes.", CORRECTION_SCHEMA,
-                              images=images, max_tokens=6000, temperature=0.2)
+                              images=images, max_tokens=6000, temperature=0.2, gemini_key=payload.get("gemini_key", ""))
     except Exception as exc:  # noqa: BLE001 - aucune IA ne lit les images : lecteur local puis correction du texte
         log.warning("Correction sur photo impossible (%s) : lecteur local", type(exc).__name__)
         text = _read_with_local_ocr(images, report)
         read_by = "lecteur local"
         report(70, "Correction de ta copie")
         result = writer.write(rules + "\n\nTexte lu sur la copie (lecture automatique, peut contenir des erreurs) :\n"
-                              + text, CORRECTION_SCHEMA, max_tokens=6000, temperature=0.2)
+                              + text, CORRECTION_SCHEMA, max_tokens=6000, temperature=0.2,
+                              gemini_key=payload.get("gemini_key", ""))
     report(90, "Calcul de la note")
     by_label = {q["label"]: q for ex in doc["exercises"] for q in ex["questions"]}
     by_key = {_key(label): label for label in by_label}

@@ -1,4 +1,4 @@
-"""Clé Gemini personnelle de l'élève : enregistrer (après vérification), voir si elle existe, supprimer."""
+"""Clé Gemini personnelle de l'élève : enregistrer (après vérification), voir, choisir ses usages, supprimer."""
 import re
 from typing import Annotated
 
@@ -17,6 +17,10 @@ KEY_RE = re.compile(r"^[A-Za-z0-9_\-]{30,60}$")
 
 class KeyIn(BaseModel):
     key: str = Field(min_length=30, max_length=60)
+
+
+class PrefsIn(BaseModel):
+    prefs: dict[str, bool] = Field(max_length=20)
 
 
 async def _check_with_google(key: str) -> None:
@@ -47,7 +51,15 @@ async def put_key(body: KeyIn, user: CurrentUser):
     return user_keys.status(user.sub)
 
 
+@router.put("/gemini-key/prefs")
+async def put_prefs(body: PrefsIn, user: CurrentUser):
+    """Fonctionnalités où l'élève veut Gemini (avec sa clé) au lieu des outils de Studoo."""
+    if not user_keys.status(user.sub)["set"]:
+        raise HTTPException(409, detail={"code": "no_key", "message": "Enregistre d'abord ta clé Gemini."})
+    return user_keys.set_prefs(user.sub, body.prefs)
+
+
 @router.delete("/gemini-key")
 async def delete_key(user: CurrentUser):
     user_keys.remove(user.sub)
-    return {"set": False, "hint": "", "updated_at": None}
+    return user_keys.status(user.sub)

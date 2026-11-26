@@ -20,20 +20,22 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
-    # IA Gemini (clé du propriétaire du site, jamais envoyée au navigateur)
-    gemini_api_key: str = ""
-    gemini_model_lite: str = "gemini-flash-lite-latest"
+    # IA de Studoo : Azure OpenAI (GPT-4.1 mini, ressource « studoo-ecriture », crédit Azure for Students).
+    # Adresse du type https://<ressource>.openai.azure.com/openai/v1/chat/completions
+    azure_openai_key: str = ""
+    azure_openai_url: str = ""
+    azure_openai_model: str = "gpt-4.1-mini"
+
+    # Gemini : UNIQUEMENT avec la clé personnelle d'un élève qui l'a choisi (aucune clé du site).
     gemini_model_flash: str = "gemini-flash-latest"
-    gemini_model_tts: str = "gemini-2.5-flash-preview-tts"
 
     # Transcription des cours : Azure AI Speech (service « studoo-voix », offre gratuite F0)
     speech_key: str = ""
     speech_region: str = "italynorth"
 
-    # Quotas quotidiens (niveau gratuit, partagés entre tous les utilisateurs)
-    quota_lite_per_day: int = 450
-    quota_flash_per_day: int = 18
-    quota_tts_per_day: int = 12
+    # Quotas quotidiens de l'IA du site (partagés entre tous les élèves, pour tenir dans le crédit Azure)
+    quota_lite_per_day: int = 2000
+    quota_flash_per_day: int = 300
     quota_user_per_day: int = 60
 
     # Sécurité
@@ -74,7 +76,7 @@ class Settings(BaseSettings):
     @property
     def ai_fake_enabled(self) -> bool:
         # Le mode « IA factice » sert aux tests et aux démos locales uniquement.
-        return self.is_local and (self.ai_fake or not self.gemini_api_key)
+        return self.is_local and (self.ai_fake or not self.azure_openai_key)
 
 
 DEFAULT_SECRET = "dev-secret-change-me-dev-secret-change-me"

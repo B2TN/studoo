@@ -106,13 +106,15 @@ jobs = Table(
     Column("size", Integer, nullable=False, default=0),             # minutes demandées / pages : pour l'estimation
 )
 
-# Clé Gemini PERSONNELLE de l'élève (facultative, secours des podcasts/vidéos), chiffrée : jamais renvoyée en clair.
+# Clé Gemini PERSONNELLE de l'élève (facultative, utilisée seulement pour les fonctionnalités qu'il a cochées),
+# chiffrée : jamais renvoyée en clair.
 user_keys = Table(
     "user_keys", metadata,
     Column("sub", String(64), primary_key=True),
     Column("gemini_key", Text, nullable=False),  # chiffrée (services/user_keys.py)
     Column("hint", String(8), nullable=False, default=""),  # 4 derniers caractères, pour la reconnaître
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("prefs", Text, nullable=False, default="{}"),  # fonctionnalités où l'élève a choisi Gemini (JSON)
 )
 
 # Abonnements aux notifications web (PWA). Aucune donnée personnelle hormis l'adresse technique du navigateur.
@@ -148,6 +150,7 @@ def get_engine() -> Engine:
 _LATE_COLUMNS = {
     "jobs": {"note": "VARCHAR(300) NOT NULL DEFAULT ''", "fingerprint": "VARCHAR(64) NOT NULL DEFAULT ''",
              "size": "INTEGER NOT NULL DEFAULT 0"},
+    "user_keys": {"prefs": "TEXT NOT NULL DEFAULT '{}'"},
 }
 
 

@@ -2,13 +2,15 @@
 
 Le serveur de tâches fabrique les podcasts, vidéos, feuilles d'exercices, corrections et lectures de copies :
 
+Gemini n'intervient **jamais par défaut** : seulement si l'élève a enregistré *sa* clé et coché ce type de génération dans ses réglages ; il passe alors en premier, et Azure sert de secours.
+
 | Étape | Service (gratuit) | Secours 1 | Secours 2 |
 |---|---|---|---|
-| Écrire le script | **Azure OpenAI** (GPT-4.1 mini, payé par le crédit étudiant : ≈ 1 centime par podcast ; ou Groq si une clé `GROQ_API_KEY` est fournie) | Gemini avec la clé **de l'élève** (s'il en a mis une dans ses réglages) | Qwen3-4B sur le serveur (≈ 1 h par podcast) |
-| Voix | **Azure AI Speech** : podcasts = Vivienne + Henri, vidéos = Vivienne, allure radio (−5 %, pauses, volume égalisé) ; offre F0 : 500 000 caractères/mois ≈ 55 podcasts de 10 min | Denise + Henri (Azure), signalé à l'élève | Gemini TTS (clé de l'élève) puis Kokoro/Piper, signalé |
+| Écrire le script | **Azure OpenAI** (GPT-4.1 mini, payé par le crédit étudiant : ≈ 1 centime par podcast ; ou Groq si une clé `GROQ_API_KEY` est fournie) | Qwen3-4B sur le serveur (≈ 1 h par podcast) | |
+| Voix | **Azure AI Speech** : podcasts = Vivienne + Henri, vidéos = Vivienne, allure radio (−5 %, pauses, volume égalisé) ; offre F0 : 500 000 caractères/mois ≈ 55 podcasts de 10 min | Denise + Henri (Azure), signalé à l'élève | Kokoro/Piper (Gemini TTS d'abord si l'élève l'a choisi), signalé |
 | Vidéo | animée **dans le navigateur** (rien à monter sur le serveur), export MP4 sur l'appareil | | |
-| Feuille d'exercices | Azure OpenAI (GPT-4.1 mini) | Gemini (clé de l'élève) | Qwen3-4B sur le serveur |
-| Corriger une copie (photo) | Azure OpenAI (GPT-4.1 mini, lit l'écriture manuscrite) ≈ 7 s | Gemini (clé de l'élève) | Qwen3-VL lit la copie puis l'IA corrige le texte |
+| Feuille d'exercices | Azure OpenAI (GPT-4.1 mini) | Qwen3-4B sur le serveur | |
+| Corriger une copie (photo) | Azure OpenAI (GPT-4.1 mini, lit l'écriture manuscrite) ≈ 7 s | Qwen3-VL lit la copie puis l'IA corrige le texte | |
 | Lire une copie (numérisation) | Qwen3-VL sur le serveur | | |
 
 ## Comment ça marche
@@ -107,7 +109,7 @@ Crédit (pages Azure du 24/11/2026) :
   soit ≈ **19 h de plus par mois** si le crédit est réparti sur l'année.
 - Une génération ne garde la machine que quelques minutes : le crédit de calcul n'est plus la limite.
   La limite devient la voix Azure gratuite : **500 000 caractères par mois ≈ 55 podcasts de 10 min**
-  (au-delà : Gemini avec la clé de l'élève, sinon les voix locales).
+  (au-delà : les voix locales, ou Gemini TTS pour un élève qui l'a choisi avec sa clé).
 - Écriture (Azure OpenAI, GPT-4.1 mini) : environ 0,40 $ par million de jetons lus et 1,60 $ par million écrits,
   soit ≈ 1 centime par podcast de 10 min, pris sur les 100 $ du crédit étudiant (quota : 100 000 jetons par minute).
   Mode « Global Standard » (le seul ouvert aux comptes étudiants) : les données restent stockées en Italie mais le calcul

@@ -184,8 +184,9 @@ async def create_job(body: JobIn, user: CurrentUser):
         "refresh_token": user.refresh_token, "email": user.email,
         "sources": [x.model_dump() for x in body.sources], "images": body.images,
         "options": body.options, "folder_id": body.folder_id, "course": body.course, "chapter": body.chapter,
-        # Clé Gemini personnelle (facultative) : secours si l'IA ou les voix du site sont indisponibles.
-        "gemini_key": user_keys.load(user.sub) if body.kind in {"podcast", "video", "fiche", "exercices"} else "",
+        # Clé Gemini personnelle : seulement si l'élève a choisi Gemini pour ce type de génération (Réglages).
+        # Sinon vide : tout reste sur les outils de Studoo (Azure), rien ne part chez Google.
+        "gemini_key": user_keys.key_for(user.sub, user_keys.JOB_FEATURE.get(body.kind, "")),
     })
     titles = {"podcast": "Podcast", "video": "Vidéo", "fiche": "Fiche", "ocr": "Lecture de copie",
               "exercices": "Feuille d'exercices", "correction": "Correction de copie"}

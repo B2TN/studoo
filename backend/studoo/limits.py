@@ -1,4 +1,6 @@
 """Anti-spam (limitation de débit) et quotas IA quotidiens."""
+import hashlib
+import hmac
 import time
 
 from fastapi import HTTPException, Request
@@ -6,7 +8,7 @@ from fastapi import HTTPException, Request
 from . import db
 from .config import get_settings
 
-TIERS = ("lite", "flash", "tts")
+TIERS = ("lite", "flash")
 
 
 def client_ip(request: Request) -> str:
@@ -17,10 +19,16 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "0.0.0.0"
 
 
+def _anon(key: str) -> str:
+    """Empreinte du compteur : la base ne contient jamais l'adresse IP ni l'identifiant en clair."""
+    secret = get_settings().session_secret.encode()
+    return hmac.new(secret, b"rate-limit|" + key.encode(), hashlib.sha256).hexdigest()[:48]
+
+
 def rate_limit(key: str, limit: int, window_seconds: int) -> None:
     """Refuse la requête si `key` a dépassé `limit` appels dans la fenêtre."""
     window = int(time.time() // window_seconds) * window_seconds  # début de la fenêtre (horodatage)
-    count = db.increment(db.rate_limits, {"key": key[:128], "window": window})
+    count = db.increment(db.rate_limits, {"key": _anon(key), "window": window})
     if count > limit:
         raise HTTPException(
             status_code=429,
@@ -30,7 +38,7 @@ def rate_limit(key: str, limit: int, window_seconds: int) -> None:
 
 def tier_limit(tier: str) -> int:
     s = get_settings()
-    return {"lite": s.quota_lite_per_day, "flash": s.quota_flash_per_day, "tts": s.quota_tts_per_day}[tier]
+    return {"lite": s.quota_lite_per_day, "flash": s.quota_flash_per_day}[tier]
 
 
 def quota_status(sub: str | None = None) -> dict:

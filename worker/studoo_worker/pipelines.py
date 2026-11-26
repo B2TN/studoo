@@ -147,9 +147,18 @@ def ocr(payload: dict, report) -> tuple[bytes, str, str, str, dict]:
     from . import ocr as ocr_engine
     pages = payload["images"]
     texts = []
+    key = payload.get("gemini_key", "")  # seulement si l'élève a choisi Gemini pour la lecture des photos
     for i, img in enumerate(pages):
         report(5 + 85 * i / len(pages), f"Lecture de la page {i + 1}/{len(pages)}")
-        texts.append(ocr_engine.read_page(img))
+        text = ""
+        if key:
+            try:
+                text = writer.write(ocr_engine.PROMPT, {"type": "object", "properties": {"text": {"type": "string"}},
+                                                        "required": ["text"]}, gemini_key=key, images=[img],
+                                    max_tokens=4000, temperature=0.1)["text"]
+            except Exception:  # noqa: BLE001 - Gemini indisponible : lecteur du serveur
+                text = ""
+        texts.append(text or ocr_engine.read_page(img))
     title = _safe(payload["options"].get("title") or "Texte lu", 70)
     body = f"# {title}\n\n" + "\n\n---\n\n".join(texts)
     return body.encode(), f"{title} (texte).md", "text/markdown", "scan-text", {}
