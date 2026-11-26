@@ -1,15 +1,18 @@
-"""Emploi du temps : liens iCal, fichiers .ics et connecteur Pronote.
+"""Emploi du temps : robot de connexion (lycées), liens iCal et fichiers .ics (dernier recours).
 
-Règle de sécurité : tout ce qui donne accès à l'emploi du temps (lien iCal
-privé, jeton Pronote) est renvoyé au navigateur sous forme SCELLÉE (chiffrée).
-Le navigateur le range dans le Drive de l'élève et le renvoie pour se
-synchroniser. Aucun mot de passe n'est conservé, ni écrit dans les journaux.
+Règles de sécurité :
+- le mot de passe tapé pour le robot ne vit que dans la mémoire de la requête (≤ 2 min, région Paris) :
+  jamais écrit en base, dans un fichier ou un journal ; il disparaît à la fin de la requête dans tous les cas
+  (réussite, erreur, délai dépassé, plantage) ;
+- tout ce qui donne accès à l'emploi du temps ensuite (lien iCal privé) est renvoyé au navigateur sous forme
+  SCELLÉE (chiffrée) ; le navigateur le range dans le Drive de l'élève et le renvoie pour se synchroniser.
 """
 from datetime import timedelta
 from typing import Annotated, Literal
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, SecretStr
 from starlette.concurrency import run_in_threadpool
 
@@ -82,6 +85,49 @@ async def sync(body: SyncIn, user: CurrentUser):
         # Pronote donne un nouveau jeton à chaque connexion : on renvoie le nouveau, scellé.
         return _result({"events": events, "subjects": pronote.subjects(events)}, user.sub, new_keep)
     raise HTTPException(422, detail={"code": "bad_token", "message": "Source inconnue."})
+
+
+ANNUAIRE = "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-annuaire-education/records"
+
+
+@router.get("/schools")
+async def schools(user: CurrentUser, q: str = Query(min_length=2, max_length=80)):
+    """Recherche d'un lycée ou collège dans l'annuaire officiel (données publiques de l'Éducation nationale)."""
+    rate_limit(f"schools:{user.sub}", limit=60, window_seconds=600)
+    words = [w for w in "".join(c if c.isalnum() or c in " -'" else " " for c in q).split() if len(w) > 1][:5]
+    if not words:
+        return {"schools": []}
+    where = " and ".join(f'(search(nom_etablissement, "{w}") or search(nom_commune, "{w}"))' for w in words)
+    params = {
+        "select": "identifiant_de_l_etablissement,nom_etablissement,nom_commune,type_etablissement",
+        "where": f'{where} and type_etablissement in ("Lycée", "Collège") and etat = "OUVERT"',
+        "limit": 12,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.get(ANNUAIRE, params=params)
+            res.raise_for_status()
+    except httpx.HTTPError:
+        raise HTTPException(503, detail={"code": "unavailable", "message": "L'annuaire des établissements ne répond pas : réessaie."}) from None
+    return {"schools": [{"uai": r["identifiant_de_l_etablissement"], "name": r["nom_etablissement"],
+                         "city": r["nom_commune"], "type": r["type_etablissement"]} for r in res.json().get("results", [])]}
+
+
+class ConnectIn(BaseModel):
+    uai: str = Field(min_length=8, max_length=8)
+    username: str = Field(min_length=1, max_length=120)
+    password: SecretStr = Field(min_length=1, max_length=200)  # SecretStr : jamais affiché ni journalisé
+
+
+@router.post("/connect")
+def robot_connect(body: ConnectIn, user: CurrentUser):
+    """Le robot : identifiant + mot de passe → emploi du temps (le mot de passe est oublié à la fin de la requête)."""
+    rate_limit(f"pronote:{user.sub}", limit=8, window_seconds=600)
+    events, keep = pronote.robot_login(body.uai, body.username, body.password.get_secret_value())
+    durable = keep if keep.get("kind") == "ical" else None
+    out = _result({"events": events, "subjects": pronote.subjects(events)}, user.sub, durable)
+    out["method"] = "ical" if durable else "snapshot"  # snapshot : reconnexion conseillée toutes les 2 semaines
+    return out
 
 
 @router.get("/ents")

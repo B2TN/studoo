@@ -1,13 +1,15 @@
 # Mettre en ligne le serveur de tâches (Azure for Students — gratuit, sans carte)
 
-Le serveur de tâches fabrique les podcasts, vidéos et lectures de copies :
+Le serveur de tâches fabrique les podcasts, vidéos, feuilles d'exercices, corrections et lectures de copies :
 
 | Étape | Service (gratuit) | Secours 1 | Secours 2 |
 |---|---|---|---|
 | Écrire le script | **Azure OpenAI** (GPT-4.1 mini, payé par le crédit étudiant : ≈ 1 centime par podcast ; ou Groq si une clé `GROQ_API_KEY` est fournie) | Gemini avec la clé **de l'élève** (s'il en a mis une dans ses réglages) | Qwen3-4B sur le serveur (≈ 1 h par podcast) |
-| Voix | **Azure AI Speech** (voix Vivienne/Rémy ou Denise/Henri, offre F0 : 500 000 caractères/mois ≈ 55 podcasts de 10 min) | Gemini TTS avec la clé de l'élève | Kokoro/Piper sur le serveur |
+| Voix | **Azure AI Speech** : podcasts = Vivienne + Henri, vidéos = Vivienne, allure radio (−5 %, pauses, volume égalisé) ; offre F0 : 500 000 caractères/mois ≈ 55 podcasts de 10 min | Denise + Henri (Azure), signalé à l'élève | Gemini TTS (clé de l'élève) puis Kokoro/Piper, signalé |
 | Vidéo | animée **dans le navigateur** (rien à monter sur le serveur), export MP4 sur l'appareil | | |
-| Lire une copie | Qwen3-VL sur le serveur | | |
+| Feuille d'exercices | Azure OpenAI (GPT-4.1 mini) | Gemini (clé de l'élève) | Qwen3-4B sur le serveur |
+| Corriger une copie (photo) | Azure OpenAI (GPT-4.1 mini, lit l'écriture manuscrite) ≈ 7 s | Gemini (clé de l'élève) | Qwen3-VL lit la copie puis l'IA corrige le texte |
+| Lire une copie (numérisation) | Qwen3-VL sur le serveur | | |
 
 ## Comment ça marche
 ```

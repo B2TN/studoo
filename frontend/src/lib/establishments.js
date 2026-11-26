@@ -1,23 +1,10 @@
-// Services d'emploi du temps pris en charge.
+// Établissements et aides pour l'emploi du temps.
 //
-// Honnêteté : aucun de ces services n'a d'API publique officielle.
-// - Pronote et 26 ENT régionaux : connecteur non officiel (pronotepy, côté serveur), QR code ou identifiants.
-// - Universités : l'emploi du temps (ADE, Celcat, HyperPlanning…) propose presque
-//   un lien iCal personnel ; connexion automatique prévue sur le serveur de tâches, puis
-//   le synchronise en continu (les dates des liens ADE sont mises à jour automatiquement).
-
-export const HIGH_SCHOOL_SERVICES = [
-  { id: "pronote", name: "Pronote", connector: "pronote", note: "Compte Pronote direct (sans ENT) : QR code ou identifiants Pronote." },
-  { id: "monlycee", name: "Monlycée.net (Île-de-France)", short: "Monlycée.net", ent: "ile_de_france", connector: "pronote", note: "Connexion avec tes identifiants Monlycée.net, ou par QR code Pronote." },
-  { id: "mbn", name: "Mon Bureau Numérique (Grand Est)", short: "Mon Bureau Numérique", ent: "monbureaunumerique", connector: "pronote", note: "Connexion avec tes identifiants Mon Bureau Numérique, ou par QR code Pronote." },
-  { id: "hdf", name: "ENT Hauts-de-France", short: "ENT HDF", ent: "ent_hdf", connector: "pronote", note: "Connexion avec tes identifiants ENT HDF, ou par QR code Pronote." },
-  { id: "toutatice", name: "Toutatice (Bretagne)", short: "Toutatice", ent: "ac_rennes", connector: "pronote", note: "Connexion avec tes identifiants Toutatice, ou par QR code Pronote." },
-  { id: "eclat", name: "Éclat-BFC (Bourgogne-Franche-Comté)", short: "Éclat-BFC", ent: "eclat_bfc", connector: "pronote", note: "Connexion avec tes identifiants Éclat-BFC, ou par QR code Pronote." },
-  { id: "atrium", name: "Atrium (Provence-Alpes-Côte d'Azur)", short: "Atrium", ent: "atrium_sud", connector: "pronote", note: "Connexion avec tes identifiants Atrium, ou par QR code Pronote." },
-  { id: "autre-ent", name: "Autre ENT régional", short: "ENT", ent: "*", connector: "pronote", note: "Choisis ton ENT dans la liste (26 ENT pris en charge), ou utilise le QR code Pronote." },
-  { id: "skolengo", name: "Skolengo", connector: "pronote", note: "Skolengo n'est pas pris en charge par le connecteur : si ton lycée utilise Pronote, prends le QR code Pronote." },
-  { id: "ecoledirecte", name: "ÉcoleDirecte", connector: "ics", note: "ÉcoleDirecte ne propose pas d'export iCal : importe un fichier .ics si ton établissement en fournit un." },
-];
+// Itération 4 :
+// - lycées : le robot de Studoo se connecte à Pronote (avec ou sans ENT régional) à partir du code officiel
+//   du lycée (UAI) et des identifiants de l'élève : plus aucun lien ni QR code ;
+// - universités : pas encore de robot (chaque université a sa propre page de connexion devant ADE, Celcat,
+//   HyperPlanning…) ; les étapes ci-dessous guident le « dernier recours » (lien iCal à coller).
 
 // Les 20 plus grands établissements d'enseignement supérieur (par nombre d'étudiants).
 const STEPS_PARIS_CITE = [
@@ -75,11 +62,4 @@ export const ICAL_STEPS_PRONOTE = [
   "Va dans « Emploi du temps », puis clique sur l'icône « Exporter » (calendrier avec une flèche).",
   "Choisis « Exporter au format iCal » et copie le lien affiché.",
   "Colle-le ci-dessous : ton emploi du temps se mettra à jour tout seul.",
-];
-
-export const QR_STEPS_PRONOTE = [
-  "Ouvre Pronote sur un ordinateur (directement ou depuis ton ENT).",
-  "Clique sur l'icône QR code en haut de la page (« Accès mobile »).",
-  "Choisis un code à 4 chiffres de ton choix : un QR code s'affiche (valable 10 minutes).",
-  "Scanne ce QR code avec la caméra ci-dessous (ou importe une capture d'écran), puis tape ton code à 4 chiffres.",
 ];

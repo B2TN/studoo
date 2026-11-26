@@ -57,3 +57,15 @@ describe("C5 : formules lisibles", () => {
     expect(html(math("<b>x</b>_1"))).toBe("<b>x</b><sub>1</sub>"); // texte brut : les balises restent du texte
   });
 });
+
+describe("C2 : rappel de reconnexion", () => {
+  it("rappelle de se reconnecter au bout de 14 jours, seulement pour les copies sans lien durable", async () => {
+    const { staleSources, RECONNECT_DAYS } = await import("../src/lib/timetable-data.js");
+    const now = Date.parse("2026-12-20T10:00:00Z");
+    const old = { type: "snapshot", syncedAt: "2026-12-01T10:00:00Z" };
+    const fresh = { type: "snapshot", syncedAt: "2026-12-15T10:00:00Z" };
+    const durable = { type: "sealed", addedAt: "2026-01-01T10:00:00Z" };
+    expect(RECONNECT_DAYS).toBe(14);
+    expect(staleSources([old, fresh, durable], now)).toEqual([old]);
+  });
+});

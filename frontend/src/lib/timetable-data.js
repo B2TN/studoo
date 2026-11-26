@@ -19,9 +19,35 @@ export function clearTimetableCache() {
   try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignoré */ }
 }
 
-/** Connexion Pronote (QR code, identifiants Pronote ou ENT). Renvoie la source scellée. */
-export function pronoteLogin(body) {
-  return api("/api/timetable/pronote", { method: "POST", json: body });
+/** Jours au bout desquels on rappelle de se reconnecter (établissements sans lien iCal durable). */
+export const RECONNECT_DAYS = 14;
+
+/**
+ * Le robot : identifiant + mot de passe → emploi du temps. Le mot de passe n'est envoyé qu'une fois et
+ * n'est gardé nulle part. On range ensuite :
+ * - un lien iCal durable, chiffré (mise à jour automatique pour toujours) ;
+ * - sinon une copie des cours dans le Drive + un rappel de reconnexion toutes les 2 semaines.
+ */
+export async function robotConnect(body, school) {
+  const res = await api("/api/timetable/connect", { method: "POST", json: body });
+  const settings = await getSettings();
+  const others = (settings.timetable?.sources || []).filter((src) => src.uai !== school.uai); // une seule source par lycée
+  await saveSettings({ timetable: { ...settings.timetable, sources: others } });
+  const where = { uai: school.uai, school: school.name, city: school.city || "" };
+  if (res.sealed) {
+    await addSource({ type: "sealed", sealed: res.sealed, label: `Pronote · ${school.name}`, ...where });
+  } else {
+    const root = await drive.init();
+    const saved = await drive.save({ parentId: root, name: `Emploi du temps — ${school.name}.json`, mimeType: "application/json",
+      kind: "timetable", blob: new Blob([JSON.stringify({ events: res.events })], { type: "application/json" }) });
+    await addSource({ type: "snapshot", fileId: saved.id, label: `Pronote · ${school.name}`, syncedAt: new Date().toISOString(), ...where });
+  }
+  return res;
+}
+
+/** Sources « copie » à rafraîchir (plus de RECONNECT_DAYS jours). */
+export function staleSources(sources, now = Date.now()) {
+  return sources.filter((src) => src.type === "snapshot" && now - new Date(src.syncedAt).getTime() > RECONNECT_DAYS * 86400e3);
 }
 
 /** Emploi du temps fictif (mode démo local uniquement). */
@@ -66,6 +92,9 @@ async function fromSource(src) {
   }
   if (src.type === "pronote" && src.blob) {
     throw new Error("Ta connexion Pronote doit être refaite (nouvelle méthode plus sûre). Va dans « Emploi du temps ».");
+  }
+  if (src.type === "snapshot" && src.fileId) {
+    return (await drive.readJson(src.fileId)).events || [];
   }
   if (src.type === "ics-file" && src.fileId) {
     const content = await drive.readText(src.fileId);

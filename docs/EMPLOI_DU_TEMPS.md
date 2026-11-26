@@ -1,9 +1,46 @@
-# Emploi du temps : récupération automatique (mis à jour le 24/11/2026)
+# Emploi du temps : le robot de connexion (mis à jour le 26/11/2026, itération 4)
 
-Objectif : l'élève **se connecte à son service**, Studoo **va chercher lui-même** l'emploi du temps et le
-garde à jour. Aucun lien à coller, aucun identifiant ni mot de passe stocké : seulement un **jeton chiffré**
-(lié au compte Studoo), supprimé par « Déconnecter ».
+Règle : **seule l'option « Dernier recours : .ics » demande un lien ou un fichier**. Pour les autres, l'élève
+tape son identifiant et son mot de passe, et le **robot** de Studoo (côté serveur) va chercher l'emploi du temps.
 
+## Comment marche le robot (lycées)
+1. L'élève cherche son lycée dans l'**annuaire officiel** de l'Éducation nationale (`data.education.gouv.fr`,
+   données publiques) → Studoo obtient son code **UAI**.
+2. Adresse Pronote déduite du code : `https://<uai>.index-education.net/pronote/eleve.html` (aucun lien à coller).
+3. **ENT reconnu tout seul** : la page élève redirige vers la page de connexion de l'ENT régional
+   (ex. `mon.lyceeconnecte.fr`, `ent.l-educdenormandie.fr`) ; Studoo associe cette adresse au bon connecteur
+   de `pronotepy` (42 connecteurs lus dans la bibliothèque). Au plus 2 essais (variante élève / EduConnect).
+4. Connexion, récupération des cours, puis :
+   - **lien iCal officiel** du compte gardé chiffré dans le Drive → à jour pour toujours, sans mot de passe ;
+   - sinon **copie des cours** dans le Drive + **rappel de reconnexion toutes les 2 semaines** (choix du 26/11).
+
+**Mot de passe :** il n'existe que dans la mémoire de la requête (fonction Vercel, région Paris, 2 min au plus) :
+jamais écrit en base, dans un fichier, un journal ou un rapport d'erreur (type `SecretStr`, erreurs de saisie
+renvoyées sans les valeurs, journaux de `pronotepy` coupés). Il disparaît à la fin de la requête dans **tous**
+les cas : réussite, échec, délai dépassé, plantage. C'est plus strict que « stocké chiffré puis supprimé » :
+il n'y a rien à supprimer.
+
+**Erreurs expliquées à l'élève :** mot de passe incorrect · double authentification (le robot ne peut pas la
+passer → dernier recours) · ENT non reconnu (ex. EduConnect seul) · service en maintenance / qui ne répond pas ·
+lycée sans Pronote hébergé chez Index Éducation.
+
+Vérifié le 26/11/2026 : annuaire (Lycée Lavoisier Paris → 0750656F) ; redirections réelles de 3 lycées
+(Paris : Pronote direct ; Brive : Lycée connecté ; Le Havre : L'Educ de Normandie) ; vraie connexion au Pronote
+de démonstration d'Index Éducation (0,7 s, lien iCal obtenu).
+
+## Ce qui peut casser
+- `pronotepy` est **non officiel** : une mise à jour de Pronote ou d'un ENT peut le casser du jour au lendemain.
+- Certains ENT bloquent les adresses de serveurs étrangers : les fonctions du site tournent à **Paris** (Vercel `cdg1`).
+- Les comptes avec **double authentification obligatoire** ne passent pas.
+
+## Universités : pas encore de robot
+Chaque université place son emploi du temps (ADE, Celcat, HyperPlanning) derrière sa propre page de connexion
+(CAS, parfois avec double authentification). La piste la plus générique — connexion CAS puis page personnelle
+ADE « MyPlanning » pilotée par un navigateur invisible (Playwright) sur le serveur de tâches — doit être testée
+**université par université avec un vrai compte**. En attendant, le parcours étudiant guide vers le dernier
+recours (étapes propres à chaque université, bouton vers l'ADE officiel).
+
+## Historique (itérations 2 et 3)
 ## Service par service
 
 | Service | Comment Studoo récupère l'emploi du temps | Testé depuis le serveur | Fiabilité | État |

@@ -24,9 +24,10 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 | 📷 **Numériser une feuille** | Photo → détection de la feuille → redressement → suppression des ombres → **PDF propre**. Traitement d'image écrit à la main en JavaScript, dans le navigateur. |
 | 🗂️ **Ranger automatiquement** | Après chaque enregistrement/numérisation, Studoo **devine le cours** (emploi du temps + IA), le chapitre et **génère le titre**. |
 | 📝 **Fiches de révision** | Fiches dessinées à la main (définitions surlignées, formules encadrées, pièges, mini-quiz), exportables en PDF. |
-| 🎧 **Podcasts** | 10, 20 ou 30 min à deux voix (Gemini TTS), encodés en MP3 dans le navigateur. |
-| 🎬 **Vidéos explicatives** | Diaporama animé dessiné + voix + sous-titres, encodé en **MP4** dans le navigateur (WebCodecs) : format TikTok, YouTube ou long. |
-| 📅 **Emploi du temps** | Pronote par QR code ou identifiants, 26 ENT régionaux (Monlycée.net, Mon Bureau Numérique, ENT HDF…), ADE de l'IUT Paris Rives de Seine et 20 universités, ou lien/fichier `.ics`. Seul un **jeton chiffré** est gardé ([détails](docs/EMPLOI_DU_TEMPS.md)). |
+| 🎧 **Podcasts** | 10, 20 ou 30 min, dialogue Vivienne + Henri (voix Azure, allure radio), script écrit par GPT-4.1 mini sur le serveur de tâches. |
+| 🎬 **Vidéos explicatives** | Diaporama animé dessiné + voix (Vivienne) + sous-titres, animé dans le navigateur et exportable en **MP4** (WebCodecs) : format TikTok, YouTube ou long. |
+| ✏️ **Feuilles d'exercices** | Entraînement (TD), mise en pratique (TP), contrôle blanc (DST) ou questions flash (QCM), tirés des cours ; corrigé masqué ; **correction de la copie en photo** (note /20, erreurs, notions à revoir). |
+| 📅 **Emploi du temps** | **Robot** : l'élève choisit son lycée et se connecte ; Studoo trouve Pronote et l'ENT régional tout seul, récupère l'emploi du temps et oublie le mot de passe. Universités et autres services : dernier recours `.ics` ([détails](docs/EMPLOI_DU_TEMPS.md)). |
 
 <table>
   <tr>
@@ -51,7 +52,7 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 | Stockage | **Google Drive** de l'utilisateur, autorisation `drive.file` | Aucun cours sur nos serveurs ; Studoo ne voit que ses propres fichiers. |
 | IA | **Gemini** (Flash-Lite, Flash, TTS) via le SDK `google-genai` | Transcription audio avec rôles, OCR, fiches, scripts, voix. |
 | Base de données | **Postgres (Neon)**, SQLite en local, SQLAlchemy Core | Seulement comptes, compteurs et messages. |
-| Pronote / ENT | **pronotepy** (Python, non officielle, MIT) | QR code, identifiants Pronote ou ENT régional, récupération du lien iCal officiel. |
+| Pronote / ENT | **pronotepy** (Python, non officielle, MIT) | Robot : lycée trouvé dans l'annuaire officiel, ENT reconnu tout seul, récupération du lien iCal officiel. |
 | Hébergement | **Vercel** (site statique + fonction Python) | Gratuit, déploiement automatique depuis GitHub, HTTPS. |
 
 ```
