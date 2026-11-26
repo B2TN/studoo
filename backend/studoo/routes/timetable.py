@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from .. import db
 from ..deps import User, current_user
 from ..limits import rate_limit
-from ..services import pronote
+from ..services import ade, pronote
 from ..services.ics import _check_host, fetch_working, parse_ics
 from ..services.sealed import seal, unseal
 
@@ -127,6 +127,87 @@ def robot_connect(body: ConnectIn, user: CurrentUser):
     durable = keep if keep.get("kind") == "ical" else None
     out = _result({"events": events, "subjects": pronote.subjects(events)}, user.sub, durable)
     out["method"] = "ical" if durable else "snapshot"  # snapshot : reconnexion conseillée toutes les 2 semaines
+    return out
+
+
+# ---------- Robot des universités (ADE) ----------
+class AdeLoginIn(BaseModel):
+    university: str = Field(min_length=2, max_length=40)
+    username: str = Field(min_length=1, max_length=120)
+    password: SecretStr = Field(min_length=1, max_length=200)
+
+
+class AdeStepIn(BaseModel):
+    session: str = Field(min_length=20, max_length=20000)
+    project: int = Field(ge=0, le=100000)
+    node: dict | None = None  # {"id", "name", "level"} ; absent = racine de l'arborescence
+
+
+class AdeChooseIn(BaseModel):
+    session: str = Field(min_length=20, max_length=20000)
+    project: int = Field(ge=0, le=100000)
+    resource: int = Field(ge=0, le=100_000_000)
+    label: str = Field(default="", max_length=300)
+
+
+def _ade_state(sub: str, sealed: str) -> dict:
+    state = unseal(sub, sealed)
+    if state.get("kind") != "ade-session":
+        raise HTTPException(422, detail={"code": "bad_token", "message": "Session ADE invalide : reconnecte-toi."})
+    return state
+
+
+@router.get("/universities")
+async def universities():
+    return {"universities": [{"id": k, "name": v["name"], "tested": v["tested"]} for k, v in ade.UNIVERSITIES.items()]}
+
+
+@router.post("/ade/login")
+def ade_login(body: AdeLoginIn, user: CurrentUser):
+    """Étape 1 : connexion à l'université (le SEUL moment où le mot de passe sert), puis liste des années ADE."""
+    rate_limit(f"ade:{user.sub}", limit=8, window_seconds=600)
+    uni = ade.UNIVERSITIES.get(body.university)
+    if not uni:
+        raise HTTPException(422, detail={"code": "invalid", "message": "Université non prise en charge par le robot."})
+    client = ade.login(uni["base"], body.username, body.password.get_secret_value())
+    try:
+        gwt = ade.discover(client, uni["base"])
+        ade.register(client, gwt)
+        projects = ade.projects(client, gwt)
+        state = {"kind": "ade-session", **ade.dump(client, uni["base"], gwt)}
+    finally:
+        client.close()
+    return {"session": seal(user.sub, state), "projects": projects}
+
+
+@router.post("/ade/tree")
+def ade_tree(body: AdeStepIn, user: CurrentUser):
+    """Étapes suivantes : contenu d'un dossier (établissement → filière → classe). Aucun mot de passe ici."""
+    rate_limit(f"ade-tree:{user.sub}", limit=120, window_seconds=600)
+    state = _ade_state(user.sub, body.session)
+    client = ade.resume(state)
+    try:
+        node = body.node or {}
+        if not node:
+            ade.load_project(client, state["gwt"], body.project)
+        nodes = ade.children(client, state["gwt"], int(node.get("id", -1)), str(node.get("name", "Formations"))[:200],
+                             int(node.get("level", 0)))
+    except httpx.HTTPError:
+        raise HTTPException(503, detail={"code": "unavailable", "message": "ADE ne répond pas : réessaie."}) from None
+    finally:
+        client.close()
+    return {"nodes": nodes}
+
+
+@router.post("/ade/choose")
+async def ade_choose(body: AdeChooseIn, user: CurrentUser):
+    """Dernière étape : la classe choisie → lien d'export iCal officiel (lisible sans identifiant), gardé chiffré."""
+    rate_limit(f"ics:{user.sub}", limit=30, window_seconds=600)
+    state = _ade_state(user.sub, body.session)
+    start, end = _window()
+    working_url, data = await fetch_working(ade.export_url(state["base"], body.project, body.resource), start, end)
+    out = _result(data, user.sub, {"kind": "ical", "url": working_url})
+    out["label"] = body.label
     return out
 
 

@@ -8,8 +8,11 @@ import { h, mount } from "../lib/dom.js";
 import { time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
 import { drive, getSettings } from "../lib/storage.js";
-import { addSource, clearTimetableCache, loadEvents, removeSource, RECONNECT_DAYS, robotConnect, staleSources } from "../lib/timetable-data.js";
-import { detectSoftware, ICAL_STEPS_PRONOTE, ICAL_STEPS_UNIVERSITY, UNIVERSITIES } from "../lib/establishments.js";
+import {
+  adeChoose, adeLogin, adeTree, addSource, clearTimetableCache, guessProject, loadEvents, removeSource, RECONNECT_DAYS,
+  robotConnect, staleSources,
+} from "../lib/timetable-data.js";
+import { detectSoftware, ICAL_STEPS_PRONOTE, ICAL_STEPS_UNIVERSITY, ROBOT_TESTED, UNIVERSITIES } from "../lib/establishments.js";
 import { openDialog, toast } from "../lib/ui.js";
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
@@ -174,15 +177,129 @@ function highSchoolTab(done, preset) {
     h("p", { class: "small muted" }, "ÉcoleDirecte, Skolengo sans Pronote, double authentification obligatoire ? Le robot ne peut pas s'y connecter : utilise le dernier recours."));
 }
 
-function universityTab(useLastResort) {
-  return h("div", { class: "stack" },
-    h("p", { class: "card sketch small" }, icon("bulb"), " ",
-      h("strong", {}, "La connexion automatique des universités n'est pas encore prête. "),
-      "Chaque université cache son emploi du temps (ADE, Celcat, HyperPlanning…) derrière sa propre page de connexion : "
-      + "le robot doit être construit et testé université par université. En attendant, choisis la tienne : Studoo te guide pour le dernier recours."),
+// ---------- Robot : universités (ADE) ----------
+// 1. identifiant + mot de passe de l'université (seule étape qui les utilise) ; 2. l'année ; 3. établissement →
+// filière → classe dans l'arborescence d'ADE ; 4. Studoo garde le lien d'export (lisible sans mot de passe).
+function adeRobot(u, done, useLastResort) {
+  const slot = h("div", { class: "stack" });
+  let session = null;
+  let project = null;
+
+  const loginForm = () => {
+    const user = h("input", { class: "input", id: "ade-user", autocomplete: "username", autocapitalize: "none", spellcheck: false });
+    const pass = h("input", { class: "input", id: "ade-pass", type: "password", autocomplete: "current-password" });
+    const err = h("p", { class: "error", role: "alert" });
+    const submit = h("button", { class: "btn primary", type: "submit" }, icon("check"), "Me connecter");
+    setTimeout(() => user.focus(), 0);
+    return h("form", { class: "stack", novalidate: true, onsubmit: async (e) => {
+      e.preventDefault();
+      err.textContent = "";
+      if (!user.value.trim() || !pass.value) { err.textContent = "Identifiant et mot de passe requis."; return; }
+      submit.disabled = true;
+      submit.replaceChildren(h("span", { class: "spinner", style: { width: "22px", height: "22px" } }), "Connexion à ton université… (10 à 20 s)");
+      try {
+        const res = await adeLogin({ university: u.robot, username: user.value.trim(), password: pass.value });
+        session = res.session;
+        mount(slot, projectStep(res.projects));
+      } catch (e2) {
+        err.textContent = e2.message;
+      } finally {
+        pass.value = ""; // le mot de passe est effacé du formulaire dans tous les cas
+        submit.disabled = false;
+        submit.replaceChildren(icon("check"), "Me connecter");
+      }
+    } },
+      h("p", { class: "notice", role: "note" }, icon("shield-lock"), " ", PRIVACY_NOTE),
+      ROBOT_TESTED.has(u.robot) ? null : h("p", { class: "small muted" }, icon("info"),
+        " Robot en test pour cette université : s'il n'y arrive pas, utilise le dernier recours."),
+      h("div", { class: "field" }, h("label", { for: "ade-user" }, "Identifiant de ton université (ENT)"), user),
+      h("div", { class: "field" }, h("label", { for: "ade-pass" }, "Mot de passe"), pass),
+      err, h("div", {}, submit),
+      h("p", { class: "small muted" }, "Le robot se connecte par la page officielle de ton université, ouvre ADE, puis te laisse choisir ta classe. "
+        + "Ton mot de passe ne sert qu'à cette connexion : il n'est jamais enregistré. Studoo garde ensuite seulement le lien d'export de ta classe, qui se lit sans mot de passe."));
+  };
+
+  const projectStep = (projects) => {
+    const best = guessProject(projects);
+    const choices = h("div", { class: "choices", role: "radiogroup" }, projects.map((p) => {
+      const id = `ade-p-${p.id}`;
+      return h("div", { class: "choice" },
+        h("input", { type: "radio", name: "ade-project", id, value: String(p.id), checked: p.id === best?.id }),
+        h("label", { for: id }, h("strong", {}, p.name)));
+    }));
+    return h("div", { class: "stack" },
+      h("p", {}, icon("check"), " Connecté ! ", h("strong", {}, "1. Choisis l'année"), " (ADE range les emplois du temps par année ; la plus probable est cochée)."),
+      choices,
+      h("div", {}, h("button", { class: "btn primary", type: "button", onclick: async (e) => {
+        project = Number(slot.querySelector("input[name=ade-project]:checked")?.value);
+        e.currentTarget.disabled = true;
+        await openLevel([]);
+      } }, icon("arrow-right"), "Continuer")));
+  };
+
+  // path : dossiers ouverts depuis la racine [{id, name, level}]
+  async function openLevel(path) {
+    const parent = path[path.length - 1] || null;
+    mount(slot, h("div", { class: "loading" }, h("div", { class: "spinner" }), "Lecture d'ADE…"));
+    let nodes;
+    try {
+      nodes = await adeTree(session, project, parent ? { id: parent.id, name: parent.name, level: parent.level } : null).then((r) => r.nodes);
+    } catch (e) {
+      mount(slot, h("p", { class: "error", role: "alert" }, e.message), h("div", { class: "row" },
+        h("button", { class: "btn", type: "button", onclick: () => mount(slot, loginForm()) }, icon("refresh"), "Recommencer"),
+        h("button", { class: "btn", type: "button", onclick: () => useLastResort(u) }, "Dernier recours (.ics)")));
+      return;
+    }
+    const filter = h("input", { class: "input", type: "search", placeholder: "Filtrer la liste…", "aria-label": "Filtrer la liste" });
+    const list = h("div", { class: "establishments" });
+    const choose = async (node, btn) => {
+      btn.disabled = true;
+      try {
+        const res = await adeChoose(session, project, node, u.name);
+        session = null; // la session ADE n'est plus utile : oubliée
+        toast(`${res.events.length} cours trouvés : ton emploi du temps se mettra à jour tout seul.`, "success", 8000);
+        done(res.subjects);
+      } catch (e) { btn.disabled = false; toast(e.message, "error", 8000); }
+    };
+    const paint = () => {
+      const q = filter.value.trim().toLowerCase();
+      const shown = nodes.filter((n) => !q || n.name.toLowerCase().includes(q));
+      mount(list, shown.length ? shown.map((n) => n.folder
+        ? h("button", { class: "btn", type: "button", onclick: () => openLevel([...path, n]) }, icon("folder"), h("span", {}, h("strong", {}, n.name)))
+        : h("button", { class: "btn c-green", type: "button", style: { color: "var(--on-fluo)" }, onclick: (e) => choose(n, e.currentTarget) },
+          icon("check"), h("span", {}, h("strong", {}, n.name), h("span", { class: "small" }, " · c'est ma classe"))))
+        : h("p", { class: "small muted" }, "Rien ne correspond."));
+    };
+    filter.addEventListener("input", paint);
+    paint();
+    const step = path.length === 0 ? "2. Choisis ton établissement (ou ta composante)" : nodes.some((n) => !n.folder) ? "Dernière étape : choisis ta classe" : "Continue : ta filière, ton année…";
+    mount(slot,
+      h("nav", { class: "crumbs", "aria-label": "Position dans ADE" },
+        h("button", { class: "btn small ghost", type: "button", onclick: () => openLevel([]) }, "ADE"),
+        path.map((p, i) => [icon("chevron-right"), h("button", { class: "btn small ghost", type: "button", onclick: () => openLevel(path.slice(0, i + 1)) }, p.name)])),
+      h("p", {}, h("strong", {}, step)),
+      nodes.length > 10 ? filter : null,
+      list,
+      parent ? h("p", { class: "small muted" }, "Ta classe n'est pas dans la liste ? ",
+        h("button", { class: "btn small", type: "button", onclick: (e) => choose({ ...parent, path: parent.name }, e.currentTarget) }, "Prendre tout « ", parent.name, " »")) : null);
+  }
+
+  mount(slot, loginForm());
+  return slot;
+}
+
+function universityTab(useLastResort, done) {
+  const slot = h("div", { class: "stack" });
+  const list = () => h("div", { class: "stack" },
+    h("p", {}, "Choisis ton université :"),
     h("div", { class: "establishments" }, [...UNIVERSITIES, { name: "Autre établissement", city: "", url: "" }].map((u) =>
-      h("button", { class: "btn", type: "button", onclick: () => useLastResort(u) },
-        icon("school"), h("span", {}, h("strong", {}, u.name), u.city ? h("span", { class: "small muted" }, ` · ${u.city}`) : null)))));
+      h("button", { class: "btn", type: "button", onclick: () => (u.robot ? mount(slot, h("p", {}, icon("school"), " ", h("strong", {}, u.name), " ",
+        h("button", { class: "btn small ghost", type: "button", onclick: () => mount(slot, list()) }, "Changer")), adeRobot(u, done, useLastResort)) : useLastResort(u)) },
+        icon("school"), h("span", {}, h("strong", {}, u.name), u.city ? h("span", { class: "small muted" }, ` · ${u.city}`) : null,
+          u.robot ? h("span", { class: "small" }, ROBOT_TESTED.has(u.robot) ? " · connexion automatique" : " · connexion automatique (en test)") : null)))),
+    h("p", { class: "small muted" }, "Les autres universités n'ont pas encore de robot : Studoo te guide pour le dernier recours (lien d'export à copier une fois)."));
+  mount(slot, list());
+  return slot;
 }
 
 function lastResortTab(done, establishment) {
@@ -213,7 +330,7 @@ function addPanel(go, { reconnect = null } = {}) {
   let establishment = null;
   const tabs = [
     ["Je suis au lycée", () => highSchoolTab(done, reconnect)],
-    ["Je suis étudiant·e", () => universityTab((u) => { establishment = u; select(2); })],
+    ["Je suis étudiant·e", () => universityTab((u) => { establishment = u; select(2); }, done)],
     ["Dernier recours : .ics", () => lastResortTab(done, establishment)],
   ];
   const panel = h("div", { style: { marginTop: "14px" } });

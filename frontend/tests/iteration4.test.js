@@ -69,3 +69,16 @@ describe("C2 : rappel de reconnexion", () => {
     expect(staleSources([old, fresh, durable], now)).toEqual([old]);
   });
 });
+
+describe("C2 : robot ADE des universités", () => {
+  it("coche l'année scolaire en cours, pas les copies de travail", async () => {
+    const { guessProject } = await import("../src/lib/timetable-data.js");
+    const projects = [
+      { id: 5, name: "1737557597291_1_HS_Suppression_impossible" }, { id: 4, name: "UPCité 2026-2027 restauré" },
+      { id: 3, name: "UPCité avec salles pour futur" }, { id: 2, name: "UPCité 2027-2028" },
+      { id: 1, name: "UPCité 2026-2027 planté" }, { id: 0, name: "UPCité 2025-2026" },
+    ]; // vraie liste de l'ADE de Paris Cité (26/11/2026)
+    expect(guessProject(projects, new Date("2026-11-26")).id).toBe(4);
+    expect(guessProject(projects, new Date("2027-09-15")).id).toBe(2);
+  });
+});

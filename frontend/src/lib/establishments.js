@@ -3,8 +3,9 @@
 // Itération 4 :
 // - lycées : le robot de Studoo se connecte à Pronote (avec ou sans ENT régional) à partir du code officiel
 //   du lycée (UAI) et des identifiants de l'élève : plus aucun lien ni QR code ;
-// - universités : pas encore de robot (chaque université a sa propre page de connexion devant ADE, Celcat,
-//   HyperPlanning…) ; les étapes ci-dessous guident le « dernier recours » (lien iCal à coller).
+// - universités sous ADE (champ `robot`) : le robot se connecte par la page de l'université, puis l'étudiant
+//   choisit son année, sa filière et sa classe dans l'arborescence d'ADE ; testé sur Paris Cité (IUT) ;
+// - autres : les étapes ci-dessous guident le « dernier recours » (lien iCal à coller).
 
 // Les 20 plus grands établissements d'enseignement supérieur (par nombre d'étudiants).
 const STEPS_PARIS_CITE = [
@@ -14,12 +15,15 @@ const STEPS_PARIS_CITE = [
   "Copie le lien généré (il contient « anonymous_cal.jsp ») et colle-le ci-dessous.",
 ];
 
+/** Universités dont le robot a été testé avec un vrai compte (les autres sont « en test »). */
+export const ROBOT_TESTED = new Set(["paris-cite"]);
+
 export const UNIVERSITIES = [
-  { name: "IUT de Paris – Rives de Seine", city: "Université Paris Cité", url: "https://iutparis-seine.u-paris.fr", ade: "https://adeconsult.app.u-pariscite.fr/direct/", steps: STEPS_PARIS_CITE },
-  { name: "Aix-Marseille Université", city: "Marseille", url: "https://www.univ-amu.fr" },
+  { name: "IUT de Paris – Rives de Seine", city: "Université Paris Cité", url: "https://iutparis-seine.u-paris.fr", ade: "https://adeconsult.app.u-pariscite.fr/direct/", steps: STEPS_PARIS_CITE, robot: "paris-cite" },
+  { name: "Aix-Marseille Université", city: "Marseille", url: "https://www.univ-amu.fr", robot: "amu" },
   { name: "Université de Lorraine", city: "Nancy / Metz", url: "https://www.univ-lorraine.fr" },
   { name: "Université de Lille", city: "Lille", url: "https://www.univ-lille.fr" },
-  { name: "Université Paris Cité", city: "Paris", url: "https://u-paris.fr", ade: "https://adeconsult.app.u-pariscite.fr/direct/", steps: STEPS_PARIS_CITE },
+  { name: "Université Paris Cité", city: "Paris", url: "https://u-paris.fr", ade: "https://adeconsult.app.u-pariscite.fr/direct/", steps: STEPS_PARIS_CITE, robot: "paris-cite" },
   { name: "Sorbonne Université", city: "Paris", url: "https://www.sorbonne-universite.fr" },
   { name: "Université Paris 1 Panthéon-Sorbonne", city: "Paris", url: "https://www.pantheonsorbonne.fr" },
   { name: "Université de Bordeaux", city: "Bordeaux", url: "https://www.u-bordeaux.fr" },
@@ -28,12 +32,12 @@ export const UNIVERSITIES = [
   { name: "Université de Strasbourg", city: "Strasbourg", url: "https://www.unistra.fr" },
   { name: "Université de Montpellier", city: "Montpellier", url: "https://www.umontpellier.fr" },
   { name: "Nantes Université", city: "Nantes", url: "https://www.univ-nantes.fr" },
-  { name: "Université Claude Bernard Lyon 1", city: "Lyon", url: "https://www.univ-lyon1.fr" },
+  { name: "Université Claude Bernard Lyon 1", city: "Lyon", url: "https://www.univ-lyon1.fr", robot: "lyon1" },
   { name: "Université Paris-Saclay", city: "Saclay", url: "https://www.universite-paris-saclay.fr" },
   { name: "Université Toulouse III – Paul Sabatier", city: "Toulouse", url: "https://www.univ-tlse3.fr" },
   { name: "Université Paris Nanterre", city: "Nanterre", url: "https://www.parisnanterre.fr" },
   { name: "Université Paris-Est Créteil", city: "Créteil", url: "https://www.u-pec.fr" },
-  { name: "Université de Rennes", city: "Rennes", url: "https://www.univ-rennes.fr" },
+  { name: "Université de Rennes", city: "Rennes", url: "https://www.univ-rennes.fr", robot: "rennes" },
   { name: "Université Lumière Lyon 2", city: "Lyon", url: "https://www.univ-lyon2.fr" },
   { name: "Université Clermont Auvergne", city: "Clermont-Ferrand", url: "https://www.uca.fr" },
 ];

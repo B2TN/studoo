@@ -45,6 +45,26 @@ export async function robotConnect(body, school) {
   return res;
 }
 
+// ---------- Robot ADE (universités) ----------
+// La session ADE (chiffrée par le serveur) ne vit que dans la mémoire de la page, le temps de choisir sa classe.
+export const adeLogin = (body) => api("/api/timetable/ade/login", { method: "POST", json: body });
+export const adeTree = (session, project, node = null) => api("/api/timetable/ade/tree", { method: "POST", json: { session, project, node } });
+
+export async function adeChoose(session, project, node, university) {
+  const res = await api("/api/timetable/ade/choose", { method: "POST", json: { session, project, resource: node.id, label: node.path || node.name } });
+  await addSource({ type: "sealed", sealed: res.sealed, label: `ADE · ${node.name}`, establishment: university });
+  return res;
+}
+
+/** L'année ADE la plus probable : celle de l'année scolaire en cours, sans les copies de travail (« HS », « planté »…). */
+export function guessProject(projects, now = new Date()) {
+  const y = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  const years = [`${y}-${y + 1}`, `${y}/${y + 1}`, `${y}-${String(y + 1).slice(2)}`];
+  const score = (p) => (years.some((t) => p.name.includes(t)) ? 10 : 0)
+    - (/plant|hs_|suppression|test|futur|archive|copie|old/i.test(p.name) ? 5 : 0) + (/restaur/i.test(p.name) ? 0 : 1);
+  return [...projects].sort((a, b) => score(b) - score(a))[0] || null;
+}
+
 /** Sources « copie » à rafraîchir (plus de RECONNECT_DAYS jours). */
 export function staleSources(sources, now = Date.now()) {
   return sources.filter((src) => src.type === "snapshot" && now - new Date(src.syncedAt).getTime() > RECONNECT_DAYS * 86400e3);

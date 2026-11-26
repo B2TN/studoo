@@ -33,12 +33,25 @@ de démonstration d'Index Éducation (0,7 s, lien iCal obtenu).
 - Certains ENT bloquent les adresses de serveurs étrangers : les fonctions du site tournent à **Paris** (Vercel `cdg1`).
 - Les comptes avec **double authentification obligatoire** ne passent pas.
 
-## Universités : pas encore de robot
-Chaque université place son emploi du temps (ADE, Celcat, HyperPlanning) derrière sa propre page de connexion
-(CAS, parfois avec double authentification). La piste la plus générique — connexion CAS puis page personnelle
-ADE « MyPlanning » pilotée par un navigateur invisible (Playwright) sur le serveur de tâches — doit être testée
-**université par université avec un vrai compte**. En attendant, le parcours étudiant guide vers le dernier
-recours (étapes propres à chaque université, bouton vers l'ADE officiel).
+## Universités : robot ADE (26/11/2026)
+ADE ne donne pas l'emploi du temps de l'étudiant : il faut choisir l'**année** (« projet »), puis descendre
+**établissement → filière → classe**. Le robot reproduit ce parcours avec l'étudiant :
+1. **Connexion** par la page officielle de l'université (CAS Apereo ou Shibboleth : page « Loading Session »,
+   champs `j_username`/`j_password`, `_eventId_proceed`). Seule étape qui utilise le mot de passe.
+   Erreurs reconnues : mot de passe refusé, double authentification, page inconnue.
+2. **ADE parlé comme son interface** (GWT-RPC) : `getInitialConfiguration` + `login` (enregistre l'identifiant de
+   client, sans quoi ADE répond « identifiant invalide »), `getProjectList`, `loadProject`, `getChildren`.
+   Les noms forts, numéros de méthode et signatures de types sont **relus dans le code d'ADE** à chaque connexion.
+3. Entre deux étapes, seule la **session ADE** (cookie, 25 min max) circule, chiffrée, liée au compte Studoo ;
+   elle n'est enregistrée nulle part.
+4. Classe choisie → lien d'export officiel `…/jsp/custom/modules/plannings/anonymous_cal.jsp?resources=<id>&projectId=<n>&calType=ical&nbWeeks=20`,
+   **lisible sans identifiant** et glissant (vérifié : 57 cours sur 4 semaines pour la classe 101 du département
+   INFO de l'IUT, sans session). C'est lui seul qui est gardé (chiffré, dans le Drive).
+
+Testé le 26/11/2026 sur l'ADE de l'Université Paris Cité (ADE 2025.1), session ouverte par l'utilisateur dans
+le navigateur : chaque appel construit par le robot a été accepté par ADE (12 classes de « INFO 1ère année »).
+Universités préconfigurées « en test » (même ADE derrière un CAS, non essayées avec un vrai compte) :
+Aix-Marseille, Lyon 1, Rennes, Tours, Artois. Les autres : dernier recours guidé.
 
 ## Historique (itérations 2 et 3)
 ## Service par service
