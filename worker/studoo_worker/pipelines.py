@@ -4,7 +4,7 @@ import re
 
 from studoo.services.schemas import Fiche, PodcastScript, VideoScript
 
-from . import drive, media, voices, writer
+from . import drive, exercises, media, voices, writer
 from .llm import sources_prompt
 
 
@@ -155,7 +155,8 @@ def ocr(payload: dict, report) -> tuple[bytes, str, str, str, dict]:
     return body.encode(), f"{title} (texte).md", "text/markdown", "scan-text", {}
 
 
-PIPELINES = {"podcast": podcast, "video": video, "fiche": fiche, "ocr": ocr}
+PIPELINES = {"podcast": podcast, "video": video, "fiche": fiche, "ocr": ocr,
+             "exercices": exercises.sheet, "correction": exercises.correct}
 
 
 def run(job: dict, payload: dict, report) -> tuple[str, str, str]:

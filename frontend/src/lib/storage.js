@@ -61,6 +61,8 @@ export const KINDS = {
   "podcast-script": { label: "Podcast (voix du navigateur)", icon: "headphones", color: "blue" },
   video: { label: "Vidéo", icon: "movie", color: "orange" },
   "video-anim": { label: "Vidéo", icon: "movie", color: "orange" },
+  exercices: { label: "Exercices", icon: "pencil", color: "pink" },
+  correction: { label: "Correction", icon: "list-check", color: "green" },
   settings: { label: "Réglages", icon: "settings", color: "yellow" },
   timetable: { label: "Emploi du temps", icon: "calendar-week", color: "lilac" },
 };
@@ -135,10 +137,11 @@ export async function pdfText(blob) {
   return pages.join("\n\n").trim();
 }
 
-/** Renvoie { title, text } pour chaque fichier sélectionné utilisable comme source. */
+/** Renvoie { title, text, id, chapter_id } pour chaque fichier sélectionné utilisable comme source. */
 export async function gatherSources(files) {
   const out = [];
   for (const f of files) {
+    const before = out.length;
     const kind = kindOf(f);
     const title = f.name.replace(/\.(md|pdf|json)$/i, "");
     if (kind === "transcript" || kind === "scan-text") {
@@ -152,6 +155,7 @@ export async function gatherSources(files) {
       if (text.length > 40) out.push({ title, text });
       else throw new Error(`« ${title} » ne contient pas de texte lisible. Numérise-le avec l'outil « Numériser » pour que l'IA le lise.`);
     }
+    if (out.length > before) Object.assign(out[out.length - 1], { id: f.id, chapter_id: f.parents?.[0] || "" });
   }
   return out;
 }

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../src/lib/api.js", () => ({ api: vi.fn(), getConfig: vi.fn() }));
 const { etaText } = await import("../src/lib/jobs.js");
 const { dedupe } = await import("../src/lib/storage.js");
+const { math } = await import("../src/lib/exercise-render.js");
 
 const file = (id, kind, name, extra = {}) => ({
   id, name, mimeType: "audio/mpeg", parents: ["chap"], size: "1000", modifiedTime: `2026-11-2${id.length}T10:00:00Z`,
@@ -46,5 +47,13 @@ describe("C4 : temps d'attente estimé", () => {
   it("indique la file d'attente et le retard", () => {
     expect(etaText({ low: 120, high: 300, ahead: 2, late: false })).toBe("Encore environ 2 à 5 min (2 générations avant la tienne)");
     expect(etaText({ low: 60, high: 180, ahead: 0, late: true })).toMatch(/^Un peu plus long que prévu : encore environ 1 à 3 min/);
+  });
+});
+
+describe("C5 : formules lisibles", () => {
+  it("met les indices et exposants en forme sans HTML injecté", () => {
+    const html = (parts) => parts.map((p) => (typeof p === "string" ? p : p.outerHTML)).join("");
+    expect(html(math("u_{n+1} = q × u_n et 2^n, q^(n+1)"))).toBe("u<sub>n+1</sub> = q × u<sub>n</sub> et 2<sup>n</sup>, q<sup>n+1</sup>");
+    expect(html(math("<b>x</b>_1"))).toBe("<b>x</b><sub>1</sub>"); // texte brut : les balises restent du texte
   });
 });

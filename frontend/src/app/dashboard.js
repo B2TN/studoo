@@ -13,6 +13,7 @@ const TOOLS = [
   ["/creer/fiche", "green", "notes", "Créer une fiche", "L'essentiel, rien que tes cours"],
   ["/creer/podcast", "blue", "headphones", "Faire un podcast", "10, 20 ou 30 min à écouter"],
   ["/creer/video", "orange", "movie", "Faire une vidéo", "Format TikTok, YouTube ou long"],
+  ["/creer/exercices", "pink", "pencil", "Feuille d'exercices", "Entraîne-toi, puis fais-toi corriger"],
   ["/importer", "lilac", "file-upload", "Importer un PDF", "Range-le dans un chapitre"],
 ];
 

@@ -37,6 +37,8 @@ DIFFICULTIES = {"facile", "moyen", "difficile", "progressif"}
 class Source(BaseModel):
     title: str = Field(max_length=200)
     text: str = Field(min_length=1, max_length=200_000)
+    id: str = Field(default="", max_length=128)          # fichier Drive du cours (liens « notions à revoir »)
+    chapter_id: str = Field(default="", max_length=128)
 
 
 class JobIn(BaseModel):

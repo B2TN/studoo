@@ -3,6 +3,9 @@ import { speakLines } from "../lib/audio.js";
 import { h, mount } from "../lib/dom.js";
 import { bytes, relativeDate, renderMarkdown } from "../lib/format.js";
 import { renderFiche } from "../lib/fiche-render.js";
+import { renderCorrection, renderSheet } from "../lib/exercise-render.js";
+import { createJob, etaText } from "../lib/jobs.js";
+import { canvasToBase64 } from "../lib/pdf-tools.js";
 import { icon } from "../lib/icons.js";
 import { drive, KINDS, kindOf, SOURCE_KINDS } from "../lib/storage.js";
 import { confirmDialog, errorToast, toast } from "../lib/ui.js";
@@ -17,6 +20,68 @@ function download(blob, name) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/** « Voir tout le corrigé » / « Cacher le corrigé » (masqué par défaut). */
+function revealButton(revealAll) {
+  let shown = false;
+  const btn = h("button", { class: "btn small", type: "button", "aria-pressed": "false", onclick: () => {
+    shown = !shown;
+    revealAll?.(shown);
+    btn.setAttribute("aria-pressed", String(shown));
+    btn.lastChild.textContent = shown ? "Cacher tout le corrigé" : "Voir tout le corrigé";
+  } }, icon("eye"), "Voir tout le corrigé");
+  return btn;
+}
+
+/** Photos de la copie → réduites dans le navigateur → correction sur le serveur (GPT-4.1 mini). */
+function correctPanel(file, sheetDoc) {
+  const photos = [];
+  const thumbs = h("div", { class: "thumbs" });
+  const err = h("p", { class: "error", role: "alert" });
+  const send = h("button", { class: "btn primary", type: "button", disabled: true }, icon("sparkles"), "Envoyer pour correction");
+  const input = h("input", { type: "file", accept: "image/*", multiple: true, hidden: true, "aria-label": "Photos de ta copie" });
+  const camera = h("input", { type: "file", accept: "image/*", capture: "environment", hidden: true, "aria-label": "Prendre ta copie en photo" });
+  const add = async (list) => {
+    for (const f of [...list].slice(0, 8 - photos.length)) {
+      const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
+      const scale = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+      const canvas = h("canvas", { width: Math.round(bmp.width * scale), height: Math.round(bmp.height * scale) });
+      canvas.getContext("2d").drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      photos.push(canvasToBase64(canvas, 0.72));
+      thumbs.append(h("img", { src: canvas.toDataURL("image/jpeg", 0.5), alt: `Page ${photos.length} de ta copie` }));
+    }
+    send.disabled = photos.length === 0;
+  };
+  input.addEventListener("change", () => add(input.files).catch(errorToast));
+  camera.addEventListener("change", () => add(camera.files).catch(errorToast));
+  const card = h("section", { class: "card sketch stack correct-panel" },
+    h("h2", {}, "Faire corriger ma copie"),
+    h("p", {}, "Prends en photo chaque page de ta copie, bien à plat et éclairée (8 pages au plus). ",
+      h("span", { class: "small muted" }, "Les photos sont lues par l'IA de Microsoft (GPT-4.1 mini) pour la correction, puis effacées.")),
+    h("div", { class: "row" },
+      h("button", { class: "btn", type: "button", onclick: () => camera.click() }, icon("camera"), "Prendre une photo"),
+      h("button", { class: "btn", type: "button", onclick: () => input.click() }, icon("photo"), "Choisir des images")),
+    input, camera, thumbs, err, h("div", {}, send));
+  send.addEventListener("click", async () => {
+    send.disabled = true;
+    err.textContent = "";
+    try {
+      const job = await createJob({
+        kind: "correction", title: `Correction — ${sheetDoc.title}`.slice(0, 160), images: photos,
+        sources: [{ title: "Feuille d'exercices", text: JSON.stringify(sheetDoc) }],
+        options: { sheet_id: file.id }, folder_id: file.parents?.[0] || "",
+      });
+      mount(card, h("h2", {}, "Copie envoyée !"),
+        h("p", {}, "La correction arrive dans le même dossier que la feuille. Tu peux fermer la page : tu seras prévenu."),
+        job.eta ? h("p", { class: "small muted" }, etaText(job.eta).replace(/^Encore /, "Temps estimé : ")) : null,
+        h("a", { class: "btn", href: "/", "data-link": "1" }, "Suivre sur le tableau de bord"));
+    } catch (e) {
+      err.textContent = e.message;
+      send.disabled = false;
+    }
+  });
+  return card;
 }
 
 /** « Télécharger en MP4 » : la vidéo est fabriquée sur l'appareil (sinon : la voix seule en MP3). */
@@ -72,6 +137,9 @@ export async function render({ view, params, go }) {
   let editBtn = null;
   let animDoc = null;
   let animAudio = null;
+  let sheetDoc = null;
+  let revealAll = null;
+  const panel = h("div");
   if (kind === "transcript" || kind === "scan-text") {
     let text = await drive.readText(file.id);
     const shownText = () => h("div", { class: "transcript-body" }, renderMarkdown(text.replace(/^# .*\n/, ""), h));
@@ -96,6 +164,13 @@ export async function render({ view, params, go }) {
     } }, icon("edit"), "Corriger le texte");
   } else if (kind === "fiche") {
     body = renderFiche(await drive.readJson(file.id));
+  } else if (kind === "exercices") {
+    sheetDoc = await drive.readJson(file.id);
+    const sheet = renderSheet(sheetDoc);
+    revealAll = sheet.revealAll;
+    body = sheet.el;
+  } else if (kind === "correction") {
+    body = renderCorrection(await drive.readJson(file.id), { tree: await drive.tree() });
   } else if (kind === "podcast") {
     body = h("audio", { controls: true, src: objectUrl(await drive.readBlob(file.id)), preload: "metadata" });
   } else if (kind === "podcast-script") {
@@ -124,7 +199,12 @@ export async function render({ view, params, go }) {
   const backHref = course ? (chapter ? `/cours/${course.id}/${chapter.id}` : `/cours/${course.id}`) : "/cours";
 
   const actions = [
-    kind === "fiche" ? h("button", { class: "btn primary", onclick: () => window.print() }, icon("printer"), "Exporter en PDF") : null,
+    kind === "fiche" || kind === "correction" ? h("button", { class: "btn primary", onclick: () => window.print() }, icon("printer"), "Exporter en PDF") : null,
+    kind === "exercices" ? [
+      h("button", { class: "btn primary c-pink", onclick: () => mount(panel, correctPanel(file, sheetDoc)) }, icon("camera"), "Corriger ma copie"),
+      revealButton(revealAll),
+      h("button", { class: "btn small", onclick: () => window.print() }, icon("printer"), "Imprimer la feuille"),
+    ] : null,
     editBtn,
     kind === "scan" && file.appProperties?.textId
       ? h("a", { class: "btn small primary", href: `/fichier/${file.appProperties.textId}`, "data-link": "1" }, icon("file-text"), "Voir / corriger le texte lu")
@@ -133,6 +213,7 @@ export async function render({ view, params, go }) {
       h("button", { class: "btn small c-green", onclick: () => go("/creer/fiche", { data: { fileIds: [file.id] } }) }, icon("notes"), "Fiche"),
       h("button", { class: "btn small c-blue", onclick: () => go("/creer/podcast", { data: { fileIds: [file.id] } }) }, icon("headphones"), "Podcast"),
       h("button", { class: "btn small c-orange", onclick: () => go("/creer/video", { data: { fileIds: [file.id] } }) }, icon("movie"), "Vidéo"),
+      h("button", { class: "btn small c-pink", onclick: () => go("/creer/exercices", { data: { fileIds: [file.id] } }) }, icon("pencil"), "Exercices"),
     ] : null,
     kind === "video-anim" ? exportButton(animDoc, animAudio, title) : h("button", { class: "btn small", onclick: async () => {
       try { download(await drive.readBlob(file.id), file.name); } catch (e) { errorToast(e); }
@@ -166,7 +247,8 @@ export async function render({ view, params, go }) {
       " Voix de synthèse générée par une IA.") : null,
     file.appProperties?.voiceNote ? h("p", { class: "small notice", role: "note" }, icon("info"), " ", file.appProperties.voiceNote) : null,
     h("div", { class: "row", style: { margin: "10px 0 18px" } }, actions),
-    kind === "fiche" ? body : h("section", { class: "viewer card sketch" }, body));
+    panel,
+    ["fiche", "exercices", "correction"].includes(kind) ? body : h("section", { class: "viewer card sketch" }, body));
 
   return () => {
     stopAudio?.();

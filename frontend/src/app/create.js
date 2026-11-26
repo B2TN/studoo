@@ -5,12 +5,15 @@ import { h, mount } from "../lib/dom.js";
 import { icon } from "../lib/icons.js";
 import { drive, gatherSources, KINDS, kindOf, safeName, SOURCE_KINDS } from "../lib/storage.js";
 import { errorToast, toast } from "../lib/ui.js";
+import { DIFFICULTIES, SHEET_TYPES } from "../lib/exercise-render.js";
 
 const TYPES = {
   fiche: { title: "Créer une fiche", noun: "fiche", color: "green", icon: "notes" },
   podcast: { title: "Faire un podcast", noun: "podcast", color: "blue", icon: "headphones" },
   video: { title: "Faire une vidéo", noun: "vidéo", color: "orange", icon: "movie" },
+  exercices: { title: "Feuille d'exercices", noun: "feuille", color: "pink", icon: "pencil" },
 };
+const JOB_TITLE = { podcast: "Podcast", video: "Vidéo", exercices: "Exercices" };
 const PODCAST = [[10, "Court", "10 minutes"], [20, "Moyen", "20 minutes"], [30, "Long", "30 minutes"]];
 const VIDEO = [["short", "Court", "≈ 2 min · format TikTok (vertical)"], ["medium", "Moyen", "≈ 10 min · format YouTube"], ["long", "Long", "≈ 30 min · révision complète"]];
 
@@ -116,8 +119,8 @@ async function launchServerJob(type, { sourcesFiles, dest, option, tree, out }) 
   if (!sources.length) throw new Error("Les fichiers choisis ne contiennent pas de texte utilisable.");
   const title = sourcesFiles.length === 1 ? sourcesFiles[0].name.replace(/\.(md|pdf|json)$/i, "") : `${course?.name || "Cours"} — ${chapter?.name || "révision"}`;
   const job = await createJob({
-    kind: type, title: `${type === "podcast" ? "Podcast" : "Vidéo"} — ${title}`.slice(0, 160),
-    sources, options: type === "podcast" ? { minutes: option } : { format: option },
+    kind: type, title: `${JOB_TITLE[type]} — ${title}`.slice(0, 160),
+    sources, options: type === "podcast" ? { minutes: option } : type === "exercices" ? option : { format: option },
     folder_id: dest.chapterId || dest.courseId, course: course?.name || "", chapter: chapter?.name || "",
   });
   return job;
@@ -153,9 +156,11 @@ export async function render({ view, params, data, go, refreshQuota }) {
   const [tree, files] = await Promise.all([drive.tree(), drive.allFiles()]);
   const picker = sourcePicker(tree, files, data?.fileIds || []);
 
-  const options = type === "podcast" ? choiceGroup("duree", PODCAST, 10) : type === "video" ? choiceGroup("format", VIDEO, "short") : null;
+  const options = type === "podcast" ? choiceGroup("duree", PODCAST, 10) : type === "video" ? choiceGroup("format", VIDEO, "short")
+    : type === "exercices" ? [choiceGroup("sorte", SHEET_TYPES, "entrainement"),
+      h("h3", { class: "section small-title" }, "Difficulté"), choiceGroup("niveau", DIFFICULTIES, "progressif")] : null;
   // Voix fixes (itération 4) : dialogue Vivienne + Henri pour les podcasts, Vivienne pour les vidéos.
-  const voices = type === "fiche" ? null : h("p", { class: "small muted voice-info" }, icon("headphones"),
+  const voices = type === "fiche" || type === "exercices" ? null : h("p", { class: "small muted voice-info" }, icon("headphones"),
     type === "podcast" ? " Lu par Vivienne et Henri, voix de synthèse (IA), au rythme d'une émission de radio."
       : " Commentée par Vivienne, voix de synthèse (IA), au rythme d'une émission de radio.");
   const destSel = h("select", { class: "input", id: "dest" }, tree.flatMap((c) => [
@@ -185,7 +190,9 @@ export async function render({ view, params, data, go, refreshQuota }) {
     if (!destSel.value) { err.textContent = "Choisis où ranger le résultat."; return; }
     const [courseId, chapterId] = destSel.value.split("|");
     const option = type === "podcast" ? Number(form.querySelector("input[name=duree]:checked").value)
-      : type === "video" ? form.querySelector("input[name=format]:checked").value : null;
+      : type === "video" ? form.querySelector("input[name=format]:checked").value
+        : type === "exercices" ? { type: form.querySelector("input[name=sorte]:checked").value,
+          difficulty: form.querySelector("input[name=niveau]:checked").value } : null;
     form.hidden = true;
     if (type !== "fiche") {
       try {
@@ -213,13 +220,14 @@ export async function render({ view, params, data, go, refreshQuota }) {
     h("h2", { class: "section" }, "1. Choisis tes cours"),
     h("p", { class: "small muted" }, "L'IA utilise uniquement le contenu de ces documents."),
     picker.el,
-    options ? [h("h2", { class: "section" }, type === "podcast" ? "2. Durée" : "2. Format"), options] : null,
+    options ? [h("h2", { class: "section" }, { podcast: "2. Durée", video: "2. Format", exercices: "2. Type de feuille" }[type]), options] : null,
     voices,
     h("h2", { class: "section" }, `${options ? 3 : 2}. Où le ranger ?`),
     h("div", { class: "field" }, h("label", { for: "dest" }, "Dossier (par défaut : le chapitre du dernier cours coché)"), destSel),
     err,
     h("div", {}, submit),
-    type !== "fiche" ? h("p", { class: "small muted" }, "Fabriqué sur le serveur de Studoo en quelques minutes : tu pourras fermer la page.") : null);
+    type !== "fiche" ? h("p", { class: "small muted" }, "Fabriqué sur le serveur de Studoo en quelques minutes : tu pourras fermer la page.") : null,
+    type === "exercices" ? h("p", { class: "small muted" }, "Les exercices viennent uniquement de tes cours. Le corrigé est caché : tu le révèles quand tu veux, et tu peux faire corriger ta copie en photo.") : null);
 
   mount(view,
     h("h1", { class: "view-title" }, h("span", { class: `hl ${meta.color}` }, meta.title)),

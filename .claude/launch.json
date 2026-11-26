@@ -19,6 +19,27 @@
       "port": 8000
     },
     {
+      "name": "api-demo",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "studoo.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8000"
+      ],
+      "env": {
+        "DEV_LOGIN": "1",
+        "AI_FAKE": "1",
+        "GOOGLE_CLIENT_ID": "",
+        "DATABASE_URL": "sqlite:///studoo-demo.db",
+        "WORKER_QUEUE_URL": ""
+      },
+      "port": 8000
+    },
+    {
       "name": "web",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

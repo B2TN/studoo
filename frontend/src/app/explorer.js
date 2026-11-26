@@ -104,6 +104,7 @@ function selectionBar(selected, files, { go, course, chapter }) {
         h("button", { class: "btn small c-green", onclick: () => toCreate("fiche") }, icon("notes"), "Fiche"),
         h("button", { class: "btn small c-blue", onclick: () => toCreate("podcast") }, icon("headphones"), "Podcast"),
         h("button", { class: "btn small c-orange", onclick: () => toCreate("video") }, icon("movie"), "Vidéo"),
+        h("button", { class: "btn small c-pink", onclick: () => toCreate("exercices") }, icon("pencil"), "Exercices"),
       ] : null,
       h("button", { class: "btn small danger", onclick: async () => {
         if (!(await confirmDialog("Mettre à la corbeille ?", `${plural(chosen.length, "fichier")} ira dans la corbeille de ton Google Drive (récupérable pendant 30 jours).`, { ok: "Mettre à la corbeille", danger: true }))) return;

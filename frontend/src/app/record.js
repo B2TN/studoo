@@ -9,7 +9,7 @@ import { duration, transcriptToMarkdown } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
 import { addPending } from "../lib/pending.js";
 import { drive, getSettings, saveSettings } from "../lib/storage.js";
-import { errorToast, toast } from "../lib/ui.js";
+import { errorToast, store, toast } from "../lib/ui.js";
 
 const CHUNK_MS = 5 * 60 * 1000;
 const MAX_MS = 2 * 60 * 60 * 1000;
@@ -81,9 +81,22 @@ export async function render({ view, go, refreshQuota }) {
     live.scrollTop = live.scrollHeight;
   }
 
+  // Temps réel de transcription d'une tranche, mesuré sur cet appareil (pour le temps d'attente estimé).
+  const timings = store.get("studoo-transcribe-secs", []);
+  function remainingText() {
+    const left = queue.length + (busy ? 1 : 0);
+    if (!left) return "";
+    const sorted = [...timings].sort((a, b) => a - b);
+    const lo = sorted.length >= 3 ? sorted[Math.floor(sorted.length * 0.2)] : 15;
+    const hi = sorted.length >= 3 ? sorted[Math.floor(sorted.length * 0.85)] * 1.3 : 60;
+    const [a, b] = [Math.round((left * lo) / 60), Math.max(1, Math.round((left * hi) / 60))];
+    return left * hi < 60 ? " Encore moins d'une minute." : ` Encore environ ${a < 1 ? "moins de " + b : a + " à " + Math.max(b, a + 1)} min.`;
+  }
+
   async function transcribeNext() {
     if (busy || !queue.length) return;
     busy = true;
+    const t0 = performance.now();
     const { blob, index } = queue.shift();
     const prev = segments.slice(-3).map((s) => `${s.speaker} : ${s.text}`).join("\n").slice(-580);
     let done = false;
@@ -108,6 +121,10 @@ export async function render({ view, go, refreshQuota }) {
       }
     }
     // L'audio de cette tranche n'est plus référencé nulle part : le navigateur l'efface.
+    if (done) {
+      timings.push(Math.round((performance.now() - t0) / 1000));
+      store.set("studoo-transcribe-secs", timings.slice(-20));
+    }
     busy = false;
     refreshQuota?.();
     updateStatus();
@@ -115,7 +132,7 @@ export async function render({ view, go, refreshQuota }) {
   }
 
   function updateStatus() {
-    if (stopping) status.textContent = queue.length || busy ? "Transcription des dernières minutes…" : "C'est prêt !";
+    if (stopping) status.textContent = queue.length || busy ? `Transcription des dernières minutes…${remainingText()}` : "C'est prêt !";
     else if (paused) status.textContent = "En pause.";
     else if (running) status.textContent = `Enregistrement en cours. ${busy ? "Transcription d'une tranche…" : "Le texte apparaît toutes les 5 minutes."}`;
   }
