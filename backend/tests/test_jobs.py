@@ -35,8 +35,27 @@ def test_job_validation(logged):
 
 
 def test_anti_spam_pending_limit(logged):
-    codes = [logged.post("/api/jobs", json=_job()).status_code for _ in range(7)]
+    codes = [logged.post("/api/jobs", json=_job(sources=[{"title": f"C{i}", "text": f"Cours {i}"}])).status_code
+             for i in range(7)]
     assert codes[:5] == [201] * 5 and codes[5] == 429
+
+
+def test_double_click_returns_the_same_job(logged):
+    first = logged.post("/api/jobs", json=_job()).json()
+    second = logged.post("/api/jobs", json=_job()).json()
+    assert second["existing"] is True and second["job"]["id"] == first["job"]["id"]
+    assert len(logged.get("/api/jobs").json()["jobs"]) == 1
+    logged.post(f"/api/jobs/{first['job']['id']}/cancel")  # une fois finie / annulée, on peut la refaire
+    assert logged.post("/api/jobs", json=_job()).json()["job"]["id"] != first["job"]["id"]
+
+
+def test_old_voice_option_is_ignored_and_eta_is_given(logged):
+    job = logged.post("/api/jobs", json=_job(options={"minutes": 20, "voice": "vivienne-remy"})).json()["job"]
+    eta = job["eta"]
+    assert 30 <= eta["low"] < eta["high"] <= 900 and eta["ahead"] == 0 and eta["late"] is False
+    with db.get_engine().connect() as conn:
+        row = conn.execute(db.jobs.select().where(db.jobs.c.id == job["id"])).mappings().one()
+    assert row["size"] == 20 and "voice" not in open_payload(get_settings().job_secret, row["payload"])["options"]
 
 
 def test_jobs_are_private(logged):

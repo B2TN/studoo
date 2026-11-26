@@ -4,7 +4,7 @@ import { longDate, plural, relativeDate, time } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
 import { swr } from "../lib/cache.js";
 import { jobsPanel } from "./jobs-panel.js";
-import { drive, HIDDEN_KINDS, KINDS, kindOf } from "../lib/storage.js";
+import { dedupe, drive, KINDS, kindOf } from "../lib/storage.js";
 import { eventsOfDay, lessonAt, loadEvents, nextLesson } from "../lib/timetable-data.js";
 
 const TOOLS = [
@@ -107,7 +107,7 @@ export async function render({ view, user }) {
   const sources = [
     swr("edt", () => loadEvents().catch(() => []), showEvents, { maxAgeMs: 86400e3 }),
     swr("tree", () => drive.tree(), showTree),
-    swr("recent", () => drive.recent(14).then((list) => list.filter((f) => !HIDDEN_KINDS.has(kindOf(f))).slice(0, 6)), showRecent),
+    swr("recent", () => drive.recent(14).then((list) => dedupe(list).slice(0, 6)), showRecent),
   ];
   const [edt, tree, recent] = sources;
   if (edt.cached) showEvents(edt.cached);

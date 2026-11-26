@@ -162,6 +162,9 @@ export async function render({ view, params, go }) {
     kind === "fiche" ? null : h("h1", { class: "view-title" }, title),
     h("p", { class: "small muted" }, h("span", { class: `badge c-${meta.color}`, style: { color: "var(--on-fluo)" } }, meta.label), " · modifié ", relativeDate(file.modifiedTime),
       file.size ? ` · ${bytes(file.size)}` : "", file.appProperties?.minutes ? ` · ${file.appProperties.minutes} min` : ""),
+    ["podcast", "video-anim"].includes(kind) ? h("p", { class: "small muted voice-info" }, icon("headphones"),
+      " Voix de synthèse générée par une IA.") : null,
+    file.appProperties?.voiceNote ? h("p", { class: "small notice", role: "note" }, icon("info"), " ", file.appProperties.voiceNote) : null,
     h("div", { class: "row", style: { margin: "10px 0 18px" } }, actions),
     kind === "fiche" ? body : h("section", { class: "viewer card sketch" }, body));
 

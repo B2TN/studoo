@@ -3,11 +3,12 @@
 import { h, mount } from "../lib/dom.js";
 import { relativeDate } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
-import { cancelJob, deleteJob, isActive, listJobs, retryJob } from "../lib/jobs.js";
+import { cancelJob, deleteJob, etaText, isActive, listJobs, retryJob } from "../lib/jobs.js";
 import { store, toast } from "../lib/ui.js";
 
-const KIND = { podcast: ["headphones", "blue"], video: ["movie", "orange"], fiche: ["notes", "green"], ocr: ["camera", "yellow"] };
-const STATUS = { queued: "En attente", running: "En cours", done: "Terminé", failed: "Échec", cancelled: "Annulé" };
+const KIND = { podcast: ["headphones", "blue"], video: ["movie", "orange"], fiche: ["notes", "green"], ocr: ["camera", "yellow"],
+  exercices: ["pencil", "pink"], correction: ["check", "green"] };
+const STATUS = { queued: "En file d'attente", running: "En cours", done: "Terminé", failed: "Échec", cancelled: "Annulé" };
 
 function row(job, refresh) {
   const [ic, color] = KIND[job.kind] || ["file", "yellow"];
@@ -24,7 +25,9 @@ function row(job, refresh) {
       h("br"),
       h("small", { class: job.status === "failed" ? "error" : "muted" },
         `${STATUS[job.status] || job.status} · ${job.status === "failed" ? job.error : job.step} · ${relativeDate(job.created_at)}`),
-      bar),
+      isActive(job) && job.eta ? h("small", { class: "eta", style: { display: "block" } }, icon("clock"), " ", etaText(job.eta)) : null,
+      bar,
+      job.status === "done" && job.note ? h("small", { class: "muted", style: { display: "block" } }, icon("info"), " ", job.note) : null),
     h("span", { class: "actions" },
       isActive(job) ? h("button", { class: "btn small", onclick: () => act(cancelJob, "Annulée") }, "Annuler") : null,
       job.status === "failed" ? h("button", { class: "btn small", onclick: () => act(retryJob, "Relancée") }, icon("refresh"), "Relancer") : null,

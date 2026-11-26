@@ -50,6 +50,7 @@ def test_process_one_end_to_end(monkeypatch):
     calls = {}
     monkeypatch.setattr(pipelines, "PIPELINES", {"podcast": lambda p, report: (report(50, "x"), (b"mp3", "Podcast — T.mp3", "audio/mpeg", "podcast", {}))[1]})
     monkeypatch.setattr(pipelines.drive, "access_token", lambda rt: "tok")
+    monkeypatch.setattr(pipelines.drive, "find_job_file", lambda token, job_id, kind: None)
     monkeypatch.setattr(pipelines.drive, "upload", lambda token, **kw: calls.setdefault("upload", {"id": "f1", "name": kw["name"]}))
     monkeypatch.setattr(notify, "_push", lambda *a: 1)
     assert main.process_one() is True
@@ -105,6 +106,7 @@ def test_lock_is_kept_alive_during_a_long_step(monkeypatch):
 
     monkeypatch.setattr(pipelines, "PIPELINES", {"podcast": slow})
     monkeypatch.setattr(pipelines.drive, "access_token", lambda rt: "tok")
+    monkeypatch.setattr(pipelines.drive, "find_job_file", lambda token, job_id, kind: None)
     monkeypatch.setattr(pipelines.drive, "upload", lambda token, **kw: {"id": "f1", "name": kw["name"]})
     monkeypatch.setattr(notify, "_push", lambda *a: 1)
     assert main.process_one() is True
@@ -113,3 +115,26 @@ def test_lock_is_kept_alive_during_a_long_step(monkeypatch):
     time.sleep(0.2)
     assert len(calls) == seen  # arrêté à la fin de la tâche
     assert get(jid)["status"] == "done"
+
+
+def test_retried_job_does_not_upload_twice(monkeypatch):
+    """Une tâche refaite après un envoi réussi reprend le fichier déjà rangé (pas de doublon dans « Mes cours »)."""
+    jid = add_job()
+    uploads, drive_files = [], {}
+    monkeypatch.setattr(pipelines, "PIPELINES", {"video": lambda p, report: (
+        b"{}", "Vidéo — T.json", "application/json", "video-anim", {}, b"mp3")})
+    monkeypatch.setattr(pipelines.drive, "access_token", lambda rt: "tok")
+    monkeypatch.setattr(pipelines.drive, "find_job_file", lambda token, job_id, kind: drive_files.get((job_id, kind)))
+
+    def upload(token, **kw):
+        uploads.append(kw["kind"])
+        assert kw["props"]["jobId"] == jid
+        drive_files[(jid, kw["kind"])] = {"id": f"f{len(uploads)}", "name": kw["name"]}
+        return drive_files[(jid, kw["kind"])]
+
+    monkeypatch.setattr(pipelines.drive, "upload", upload)
+    job = {"id": jid, "kind": "video"}
+    payload = {"refresh_token": "r", "folder_id": "d", "options": {}}
+    first = pipelines.run(job, payload, lambda p, s: None)
+    second = pipelines.run(job, payload, lambda p, s: None)  # comme une relance après coupure
+    assert uploads == ["video-audio", "video-anim"] and first[0] == second[0]

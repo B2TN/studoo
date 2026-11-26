@@ -33,7 +33,6 @@ def _video_schema(n: int, min_chars: int) -> dict:
 
 def podcast(payload: dict, report) -> tuple:
     minutes = int(payload["options"].get("minutes", 10))
-    voice = payload["options"].get("voice", voices.DEFAULT)
     key = payload.get("gemini_key", "")
     target = minutes * 60
     parts = max(1, minutes // 10)  # une partie de script par tranche de 10 min (≈ 1 500 mots)
@@ -61,7 +60,7 @@ def podcast(payload: dict, report) -> tuple:
         title = title or re.sub(r"\s*[–—:-]\s*(la )?(dernière|première) partie\s*$", "", script["title"], flags=re.I)
         lines += script["lines"]
     report(50, "Enregistrement des voix")
-    audio = voices.synthesize([(line["speaker"], line["text"]) for line in lines], option=voice, gemini_key=key)
+    audio, notice = voices.synthesize([(line["speaker"], line["text"]) for line in lines], gemini_key=key)
     missing = target - media.seconds(audio)
     if missing > 0.15 * target:  # trop court : un bonus d'exercices corrigés, une seule fois
         report(75, "Écriture d'un bonus d'exercices")
@@ -73,10 +72,13 @@ def podcast(payload: dict, report) -> tuple:
             "même ton naturel, puis une phrase de fin. Écris les nombres et formules comme on les prononce.",
             _podcast_schema(6), gemini_key=key, max_tokens=6000, temperature=0.7)
         report(85, "Enregistrement des voix du bonus")
-        extra = voices.synthesize([(x["speaker"], x["text"]) for x in bonus["lines"]], option=voice, gemini_key=key)
-        audio = media.join_mp3([audio, extra])
+        extra, extra_notice = voices.synthesize([(x["speaker"], x["text"]) for x in bonus["lines"]], gemini_key=key)
+        audio, notice = media.join_mp3([audio, extra]), notice or extra_notice
     report(95, "Finitions")
-    return audio, f"Podcast — {_safe(title)}.mp3", "audio/mpeg", "podcast", {"minutes": str(round(media.seconds(audio) / 60))}
+    props = {"minutes": str(round(media.seconds(audio) / 60))}
+    if notice:
+        props["voiceNote"] = notice
+    return audio, f"Podcast — {_safe(title)}.mp3", "audio/mpeg", "podcast", props
 
 
 def video(payload: dict, report) -> tuple:
@@ -86,7 +88,6 @@ def video(payload: dict, report) -> tuple:
     """
     fmt = payload["options"].get("format", "short")
     minutes, slides_n = {"short": (2, 6), "medium": (10, 20), "long": (30, 48)}[fmt]
-    voice = payload["options"].get("voice", voices.DEFAULT)
     key = payload.get("gemini_key", "")
     words_per_slide = minutes * 150 // slides_n
     batch = 12
@@ -111,7 +112,7 @@ def video(payload: dict, report) -> tuple:
             break
         slides += new
     report(50, "Enregistrement de la voix")
-    clips = voices.synthesize_groups([[("A", s["narration"])] for s in slides], option=voice, gemini_key=key)
+    clips = voices.synthesize_groups([[("A", s["narration"])] for s in slides], gemini_key=key)  # Vivienne seule
     report(85, "Calage des diapos sur la voix")
     gap = media.silence_mp3(0.7)
     chunks, t = [], 0.0
@@ -120,9 +121,13 @@ def video(payload: dict, report) -> tuple:
         chunks += [clip, gap]
         t = slide["end"] + media.seconds(gap)
     audio = media.join_mp3(chunks)
-    doc = {"version": 1, "title": title, "format": fmt, "voice": voice, "duration": round(t, 2), "slides": slides}
+    doc = {"version": 1, "title": title, "format": fmt, "voice": "vivienne", "duration": round(t, 2), "slides": slides}
+    if clips.notice:
+        doc["voiceNote"] = clips.notice
     data = json.dumps(doc, ensure_ascii=False).encode()
     props = {"format": fmt, "minutes": str(max(1, round(t / 60)))}
+    if clips.notice:
+        props["voiceNote"] = clips.notice
     return data, f"Vidéo — {_safe(title)}.json", "application/json", "video-anim", props, audio
 
 
@@ -153,17 +158,24 @@ def ocr(payload: dict, report) -> tuple[bytes, str, str, str, dict]:
 PIPELINES = {"podcast": podcast, "video": video, "fiche": fiche, "ocr": ocr}
 
 
-def run(job: dict, payload: dict, report) -> tuple[str, str]:
-    """Exécute la tâche puis range le résultat dans le Drive ; renvoie (id du fichier, nom)."""
+def run(job: dict, payload: dict, report) -> tuple[str, str, str]:
+    """Exécute la tâche puis range le résultat dans le Drive ; renvoie (id du fichier, nom, message pour l'élève)."""
     data, name, mime, kind, props, *extra = PIPELINES[job["kind"]](payload, report)
     report(97, "Rangement dans ton Google Drive")
     token = drive.access_token(payload["refresh_token"])
+    props = {**props, "jobId": job["id"]}  # chaque fichier porte l'identifiant de SA tâche : envoi idempotent
+
+    def upload_once(**kw) -> dict:
+        # Tâche relancée après un envoi réussi (coupure, verrou expiré…) : on reprend le fichier déjà rangé.
+        found = drive.find_job_file(token, job["id"], kw["kind"])
+        return found or drive.upload(token, folder_id=payload["folder_id"], **kw)
+
     if extra and extra[0]:  # vidéo : la voix est un fichier à part (caché), relié au script des diapos
-        audio = drive.upload(token, folder_id=payload["folder_id"], name=name.rsplit(".", 1)[0] + " (voix).mp3",
-                             mime="audio/mpeg", data=extra[0], kind="video-audio")
+        audio = upload_once(name=name.rsplit(".", 1)[0] + " (voix).mp3", mime="audio/mpeg", data=extra[0],
+                            kind="video-audio", props={"jobId": job["id"]})
         props = {**props, "audioId": audio["id"]}
-    saved = drive.upload(token, folder_id=payload["folder_id"], name=name, mime=mime, data=data, kind=kind, props=props)
+    saved = upload_once(name=name, mime=mime, data=data, kind=kind, props=props)
     pdf_id = payload["options"].get("pdf_id")
     if job["kind"] == "ocr" and pdf_id:
         drive.set_props(token, pdf_id, {"textId": saved["id"]})  # relie le texte lu au PDF numérisé
-    return saved["id"], saved.get("name", name)
+    return saved["id"], saved.get("name", name), props.get("voiceNote", "")

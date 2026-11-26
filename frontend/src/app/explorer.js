@@ -2,7 +2,7 @@
 import { h, mount } from "../lib/dom.js";
 import { plural } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
-import { COLORS, drive, isFolder, kindOf, safeName, SOURCE_KINDS } from "../lib/storage.js";
+import { COLORS, dedupe, drive, isFolder, kindOf, safeName, SOURCE_KINDS } from "../lib/storage.js";
 import { loadEvents, subjectsOf } from "../lib/timetable-data.js";
 import { confirmDialog, errorToast, openDialog, toast } from "../lib/ui.js";
 import { fileRow } from "./dashboard.js";
@@ -143,7 +143,7 @@ async function renderFolder(ctx) {
   const chapter = params.chapterId ? course.chapters.find((ch) => ch.id === params.chapterId) : null;
   if (params.chapterId && !chapter) throw new Error("Ce chapitre n'existe plus.");
   const folderId = chapter ? chapter.id : course.id;
-  const files = (await drive.listFiles(folderId)).filter((f) => !isFolder(f) && kindOf(f) !== "scan-text" && kindOf(f) !== "settings");
+  const files = dedupe((await drive.listFiles(folderId)).filter((f) => !isFolder(f)));
 
   const selected = new Set();
   const { bar, update } = selectionBar(selected, files, { go, course, chapter });

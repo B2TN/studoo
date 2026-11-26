@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Integer, MetaData, String, Table, Text,
-    create_engine, insert, select, update,
+    create_engine, insert, inspect, select, text, update,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
@@ -100,6 +100,10 @@ jobs = Table(
     Column("started_at", DateTime(timezone=True), nullable=True),
     Column("finished_at", DateTime(timezone=True), nullable=True),
     Column("locked_until", DateTime(timezone=True), nullable=True),
+    # Itération 4 :
+    Column("note", String(300), nullable=False, default=""),        # message pour l'élève (ex. voix de secours)
+    Column("fingerprint", String(64), nullable=False, default=""),  # empreinte de la demande : pas de double tâche
+    Column("size", Integer, nullable=False, default=0),             # minutes demandées / pages : pour l'estimation
 )
 
 # Clé Gemini PERSONNELLE de l'élève (facultative, secours des podcasts/vidéos), chiffrée : jamais renvoyée en clair.
@@ -136,7 +140,25 @@ def get_engine() -> Engine:
         kwargs = {"poolclass": NullPool} if url.startswith("postgresql") else {}
         _engine = create_engine(url, **kwargs)
         metadata.create_all(_engine)
+        _add_missing_columns(_engine)
     return _engine
+
+
+# Colonnes ajoutées après la création des tables (create_all ne modifie pas une table existante).
+_LATE_COLUMNS = {
+    "jobs": {"note": "VARCHAR(300) NOT NULL DEFAULT ''", "fingerprint": "VARCHAR(64) NOT NULL DEFAULT ''",
+             "size": "INTEGER NOT NULL DEFAULT 0"},
+}
+
+
+def _add_missing_columns(engine: Engine) -> None:
+    insp = inspect(engine)
+    for table, columns in _LATE_COLUMNS.items():
+        have = {c["name"] for c in insp.get_columns(table)}
+        for name, ddl in columns.items():
+            if name not in have:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
 
 
 def reset_engine() -> None:

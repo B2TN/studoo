@@ -68,6 +68,17 @@ def silence_mp3(seconds: float) -> bytes:
     return pcm_to_mp3(b"\0\0" * int(24000 * seconds))
 
 
+def normalize_mp3(mp3_bytes: bytes) -> bytes:
+    """Égalise le volume (−16 LUFS, comme la radio et les podcasts), même format en sortie.
+
+    Sur un silence pur, le calcul du volume échoue : on garde alors le son tel quel.
+    """
+    res = subprocess.run([ffmpeg(), "-loglevel", "error", "-f", "mp3", "-i", "pipe:0",
+                          "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", *MP3_ARGS, "-f", "mp3", "pipe:1"],
+                         input=mp3_bytes, capture_output=True)
+    return res.stdout if res.returncode == 0 and res.stdout else mp3_bytes
+
+
 def seconds(mp3_bytes: bytes) -> float:
     return len(mp3_bytes) / MP3_BYTES_PER_SECOND
 

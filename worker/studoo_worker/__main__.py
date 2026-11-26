@@ -43,7 +43,7 @@ def process_one() -> bool:
     stop = threading.Event()
     threading.Thread(target=_keep_alive, args=(job["id"], stop), daemon=True).start()
     try:
-        file_id, name = pipelines.run(job, payload, report)
+        file_id, name, note = pipelines.run(job, payload, report)
     except pipelines.Cancelled:
         log.info("Tâche %s annulée par l'élève", job["id"])
         return True
@@ -57,7 +57,7 @@ def process_one() -> bool:
         return True
     finally:
         stop.set()
-    queue.finish(job["id"], file_id, name)
+    queue.finish(job["id"], file_id, name, note)
     notify.job_finished(job, payload.get("email", ""), ok=True, file_id=file_id)
     log.info("Tâche %s terminée", job["id"])
     return True

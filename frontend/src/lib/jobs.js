@@ -11,6 +11,27 @@ export const deleteJob = (id) => api(`/api/jobs/${id}`, { method: "DELETE" });
 
 export const isActive = (job) => job.status === "queued" || job.status === "running";
 
+/** Arrondi lisible : « moins d'une minute », « 2 », « 15 »… (minutes). */
+function minutes(seconds) {
+  const m = seconds / 60;
+  return m < 1 ? 0 : m < 10 ? Math.round(m) : Math.round(m / 5) * 5;
+}
+
+/**
+ * Temps restant estimé, en fourchette honnête : « environ 2 à 4 min ».
+ * `eta` vient du serveur ({ low, high } en secondes, `ahead` tâches devant, `late` si plus long que prévu).
+ */
+export function etaText(eta) {
+  if (!eta) return "";
+  const lo = minutes(eta.low);
+  let hi = Math.max(minutes(eta.high), lo + 1);
+  if (hi === 0) hi = 1;
+  const range = eta.high < 60 ? "moins d'une minute" : lo === 0 ? `moins de ${hi} min` : `environ ${lo} à ${hi} min`;
+  const prefix = eta.late ? "Un peu plus long que prévu : encore " : "Encore ";
+  const queue = eta.ahead > 0 ? ` (${eta.ahead} génération${eta.ahead > 1 ? "s" : ""} avant la tienne)` : "";
+  return `${prefix}${range}${queue}`;
+}
+
 // ---------- Notifications web (PWA) ----------
 export function pushSupported() {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;

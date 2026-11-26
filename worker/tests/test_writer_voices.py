@@ -114,28 +114,36 @@ def test_groq_waits_when_rate_limited(monkeypatch):
     assert writer.write("cours", SCHEMA) == {"ok": True} and waits == [7.0]
 
 
-def test_azure_voices_then_student_gemini(monkeypatch):
+def test_vivienne_henri_then_denise_then_student_gemini_with_notice(monkeypatch):
     clip = media.silence_mp3(0.5)
     pcm = base64.b64encode(b"\0\0" * 12000).decode()  # 0,5 s de silence brut
     monkeypatch.setattr(settings, "SPEECH_KEY", "sk")
-    state = {"azure_ok": True, "ssml": []}
+    state = {"refuse": set(), "ssml": []}
 
     def handler(req):
         if req.url.host.endswith("tts.speech.microsoft.com"):
-            if not state["azure_ok"]:
-                return httpx.Response(403)  # quota gratuit du mois épuisé
-            state["ssml"].append(req.content.decode())
+            body = req.content.decode()
+            if any(v in body for v in state["refuse"]):
+                return httpx.Response(403)  # voix indisponible / quota gratuit du mois épuisé
+            state["ssml"].append(body)
             return httpx.Response(200, content=clip)
         assert req.headers["x-goog-api-key"] == "cle-eleve"
         return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"inlineData": {"data": pcm}}]}}]})
 
     mock_http(monkeypatch, handler)
-    lines = [("A", "Bonjour <tout> le monde"), ("B", "Salut & bienvenue")]
-    audio = voices.synthesize(lines, option="denise-henri", gemini_key="cle-eleve")
-    assert 0.4 < media.seconds(audio) < 0.7
-    assert "fr-FR-DeniseNeural" in state["ssml"][0] and "&lt;tout&gt;" in state["ssml"][0] and "&amp;" in state["ssml"][0]
-    state["azure_ok"] = False
-    assert 0.4 < media.seconds(voices.synthesize(lines, gemini_key="cle-eleve")) < 0.7
+    lines = [("A", "Bonjour <tout> le monde. Ça va, toi ?"), ("B", "Salut & bienvenue")]
+    audio, notice = voices.synthesize(lines, gemini_key="cle-eleve")
+    ssml = state["ssml"][0]
+    assert notice == "" and 0.4 < media.seconds(audio) < 0.7
+    assert "fr-FR-VivienneMultilingualNeural" in ssml and "fr-FR-HenriNeural" in ssml
+    assert "&lt;tout&gt;" in ssml and "&amp;" in ssml
+    assert "<prosody rate='-5%'>" in ssml and ssml.count("<s>") == 3 and "Comma-exact" in ssml  # allure radio
+    state["refuse"] = {"Vivienne"}
+    audio, notice = voices.synthesize(lines, gemini_key="cle-eleve")
+    assert "fr-FR-DeniseNeural" in state["ssml"][-1] and notice == voices.NOTICE_BACKUP
+    state["refuse"] = {"Vivienne", "Denise"}
+    audio, notice = voices.synthesize(lines, gemini_key="cle-eleve")
+    assert 0.4 < media.seconds(audio) < 0.7 and notice == voices.NOTICE_OTHER
 
 
 def test_azure_voice_request_that_hangs_is_sent_again(monkeypatch):
@@ -150,8 +158,8 @@ def test_azure_voice_request_that_hangs_is_sent_again(monkeypatch):
         return httpx.Response(200, content=clip)
 
     mock_http(monkeypatch, handler)
-    audio = voices.synthesize([("A", "Bonjour")])  # sans clé Gemini ni voix locales : Azure doit réussir
-    assert len(calls) == 2 and 0.4 < media.seconds(audio) < 0.7
+    audio, notice = voices.synthesize([("A", "Bonjour")])  # Azure doit réussir au 2e essai
+    assert len(calls) == 2 and notice == "" and 0.4 < media.seconds(audio) < 0.7
 
 
 def test_long_dialogue_is_split_in_order():
@@ -165,7 +173,7 @@ def test_video_slides_are_timed_on_the_voice(monkeypatch):
     slides = [{"title": f"D{i}", "bullets": ["a"], "doodle": "idea", "narration": f"Texte {i}"} for i in range(6)]
     monkeypatch.setattr(pipelines.writer, "write", lambda *a, **k: {"title": "Photosynthèse", "slides": slides})
     clips = [media.silence_mp3(1 + i) for i in range(6)]
-    monkeypatch.setattr(pipelines.voices, "synthesize_groups", lambda groups, **k: clips[:len(groups)])
+    monkeypatch.setattr(pipelines.voices, "synthesize_groups", lambda groups, **k: voices.Voiced(clips[:len(groups)]))
     data, name, mime, kind, props, audio = pipelines.video(
         {"sources": [{"title": "C", "text": "Cours"}], "options": {"format": "short"}}, lambda p, s: None)
     doc = json.loads(data)

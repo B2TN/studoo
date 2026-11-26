@@ -61,11 +61,11 @@ def is_cancelled(job_id: str) -> bool:
         return conn.execute(select(db.jobs.c.status).where(db.jobs.c.id == job_id)).scalar() == "cancelled"
 
 
-def finish(job_id: str, file_id: str, name: str) -> None:
+def finish(job_id: str, file_id: str, name: str, note: str = "") -> None:
     with db.get_engine().begin() as conn:
         conn.execute(update(db.jobs).where(db.jobs.c.id == job_id).values(
             status="done", progress=100, step="Terminé", payload=None,  # contenu et jeton effacés
-            result_file_id=file_id, result_name=name[:200], finished_at=db.now(), locked_until=None))
+            result_file_id=file_id, result_name=name[:200], note=note[:300], finished_at=db.now(), locked_until=None))
 
 
 def fail(job_id: str, error: str, *, final: bool = False, attempts: int = 0) -> None:

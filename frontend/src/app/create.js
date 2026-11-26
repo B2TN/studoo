@@ -1,6 +1,6 @@
 // Création d'une fiche, d'un podcast ou d'une vidéo à partir des cours choisis.
 import { api } from "../lib/api.js";
-import { createJob, enablePush, needsHomeScreen, pushStatus } from "../lib/jobs.js";
+import { createJob, enablePush, etaText, needsHomeScreen, pushStatus } from "../lib/jobs.js";
 import { h, mount } from "../lib/dom.js";
 import { icon } from "../lib/icons.js";
 import { drive, gatherSources, KINDS, kindOf, safeName, SOURCE_KINDS } from "../lib/storage.js";
@@ -108,7 +108,7 @@ async function runGeneration(type, { sourcesFiles, dest, option, tree, out, go }
  * On lit les cours ici (ils sont dans ton Drive), on les envoie chiffrés, et c'est tout :
  * tu peux fermer la page, tu seras prévenu à la fin.
  */
-async function launchServerJob(type, { sourcesFiles, dest, option, voice, tree, out }) {
+async function launchServerJob(type, { sourcesFiles, dest, option, tree, out }) {
   const course = tree.find((c) => c.id === dest.courseId);
   const chapter = course?.chapters.find((ch) => ch.id === dest.chapterId);
   mount(out, h("section", { class: "card sketch" }, h("div", { class: "loading" }, h("div", { class: "spinner" }), "Lecture de tes cours…")));
@@ -117,7 +117,7 @@ async function launchServerJob(type, { sourcesFiles, dest, option, voice, tree, 
   const title = sourcesFiles.length === 1 ? sourcesFiles[0].name.replace(/\.(md|pdf|json)$/i, "") : `${course?.name || "Cours"} — ${chapter?.name || "révision"}`;
   const job = await createJob({
     kind: type, title: `${type === "podcast" ? "Podcast" : "Vidéo"} — ${title}`.slice(0, 160),
-    sources, options: type === "podcast" ? { minutes: option, voice } : { format: option, voice },
+    sources, options: type === "podcast" ? { minutes: option } : { format: option },
     folder_id: dest.chapterId || dest.courseId, course: course?.name || "", chapter: chapter?.name || "",
   });
   return job;
@@ -141,7 +141,7 @@ function launchedCard(job, go) {
     h("h2", {}, "C'est lancé !"),
     h("p", {}, `« ${job.title} » est en préparation sur le serveur de Studoo. `,
       h("strong", {}, "Tu peux fermer la page ou éteindre ton téléphone"), " : le fichier arrivera dans ton Drive, dans le dossier choisi."),
-    h("p", { class: "small muted" }, "Compte en général 2 à 5 minutes (un peu plus pour 30 minutes de contenu)."),
+    job.eta ? h("p", { class: "small muted" }, `${etaText(job.eta).replace(/^Encore /, "Temps estimé : ")}. Tu peux suivre l'avancement sur le tableau de bord.`) : null,
     notifyArea,
     h("div", { class: "row" }, h("a", { class: "btn primary", href: "/", "data-link": "1" }, "Suivre sur le tableau de bord")));
 }
@@ -154,9 +154,10 @@ export async function render({ view, params, data, go, refreshQuota }) {
   const picker = sourcePicker(tree, files, data?.fileIds || []);
 
   const options = type === "podcast" ? choiceGroup("duree", PODCAST, 10) : type === "video" ? choiceGroup("format", VIDEO, "short") : null;
-  const voices = type === "fiche" ? null : choiceGroup("voix", type === "podcast"
-    ? [["vivienne-remy", "Vivienne et Rémy", "Voix vivantes et chaleureuses"], ["denise-henri", "Denise et Henri", "Voix plus posées"]]
-    : [["vivienne-remy", "Vivienne", "Voix vivante et chaleureuse"], ["denise-henri", "Denise", "Voix plus posée"]], "vivienne-remy");
+  // Voix fixes (itération 4) : dialogue Vivienne + Henri pour les podcasts, Vivienne pour les vidéos.
+  const voices = type === "fiche" ? null : h("p", { class: "small muted voice-info" }, icon("headphones"),
+    type === "podcast" ? " Lu par Vivienne et Henri, voix de synthèse (IA), au rythme d'une émission de radio."
+      : " Commentée par Vivienne, voix de synthèse (IA), au rythme d'une émission de radio.");
   const destSel = h("select", { class: "input", id: "dest" }, tree.flatMap((c) => [
     h("option", { value: `${c.id}|`, }, `${c.name} (racine)`),
     ...c.chapters.map((ch) => h("option", { value: `${c.id}|${ch.id}` }, `${c.name} › ${ch.name}`)),
@@ -188,8 +189,7 @@ export async function render({ view, params, data, go, refreshQuota }) {
     form.hidden = true;
     if (type !== "fiche") {
       try {
-        const voice = form.querySelector("input[name=voix]:checked").value;
-        const job = await launchServerJob(type, { sourcesFiles: chosen, dest: { courseId, chapterId }, option, voice, tree, out });
+        const job = await launchServerJob(type, { sourcesFiles: chosen, dest: { courseId, chapterId }, option, tree, out });
         mount(out, launchedCard(job, go));
       } catch (e2) {
         errorToast(e2);
@@ -214,8 +214,8 @@ export async function render({ view, params, data, go, refreshQuota }) {
     h("p", { class: "small muted" }, "L'IA utilise uniquement le contenu de ces documents."),
     picker.el,
     options ? [h("h2", { class: "section" }, type === "podcast" ? "2. Durée" : "2. Format"), options] : null,
-    voices ? [h("h2", { class: "section" }, "3. Voix"), voices] : null,
-    h("h2", { class: "section" }, `${options ? 4 : 2}. Où le ranger ?`),
+    voices,
+    h("h2", { class: "section" }, `${options ? 3 : 2}. Où le ranger ?`),
     h("div", { class: "field" }, h("label", { for: "dest" }, "Dossier (par défaut : le chapitre du dernier cours coché)"), destSel),
     err,
     h("div", {}, submit),

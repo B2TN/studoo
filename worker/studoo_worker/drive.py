@@ -44,6 +44,17 @@ def upload(token: str, *, folder_id: str, name: str, mime: str, data: bytes, kin
         return res.json()
 
 
+def find_job_file(token: str, job_id: str, kind: str) -> dict | None:
+    """Fichier déjà rangé par cette tâche (même identifiant de tâche) : une tâche relancée ne l'envoie pas deux fois."""
+    query = (f"appProperties has {{ key='jobId' and value='{job_id}' }} and "
+             f"appProperties has {{ key='kind' and value='{kind}' }} and trashed = false")
+    res = httpx.get(API, params={"q": query, "fields": "files(id,name,size)", "pageSize": 5},
+                    headers={"Authorization": f"Bearer {token}"}, timeout=20)
+    res.raise_for_status()
+    files = [f for f in res.json().get("files", []) if int(f.get("size") or 1) > 0]  # un envoi coupé = fichier vide
+    return files[0] if files else None
+
+
 def set_props(token: str, file_id: str, props: dict) -> None:
     httpx.patch(f"{API}/{file_id}", headers={"Authorization": f"Bearer {token}"},
                 json={"appProperties": props}, timeout=20).raise_for_status()

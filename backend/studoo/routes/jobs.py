@@ -3,6 +3,8 @@
 L'API ne fait que DÉPOSER la tâche dans la base ; le worker (serveur de tâches)
 la récupère, la traite, range le résultat dans le Drive et prévient l'élève.
 """
+import hashlib
+import json
 import logging
 import uuid
 from datetime import timedelta
@@ -19,14 +21,17 @@ from ..config import get_settings
 from ..deps import User, current_user
 from ..jobcrypto import seal_payload
 from ..limits import rate_limit
-from ..services import user_keys
+from ..services import estimate, user_keys
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 CurrentUser = Annotated[User, Depends(current_user)]
 
 PUBLIC_FIELDS = ("id", "kind", "title", "status", "progress", "step", "error", "result_file_id", "result_name",
-                 "created_at", "started_at", "finished_at", "attempts")
-KINDS = Literal["podcast", "video", "fiche", "ocr"]
+                 "created_at", "started_at", "finished_at", "attempts", "note")
+KINDS = Literal["podcast", "video", "fiche", "ocr", "exercices", "correction"]
+VIDEO_MINUTES = {"short": 2, "medium": 10, "long": 30}
+SHEET_TYPES = {"entrainement", "pratique", "controle", "flash"}
+DIFFICULTIES = {"facile", "moyen", "difficile", "progressif"}
 
 
 class Source(BaseModel):
@@ -46,7 +51,7 @@ class JobIn(BaseModel):
 
     @model_validator(mode="after")
     def check(self):
-        if self.kind == "ocr":
+        if self.kind in {"ocr", "correction"}:
             if not self.images:
                 raise ValueError("Ajoute au moins une photo.")
             if sum(len(i) for i in self.images) > 3_500_000:
@@ -55,10 +60,10 @@ class JobIn(BaseModel):
             raise ValueError("Choisis au moins un cours.")
         if sum(len(s.text) for s in self.sources) > 400_000:
             raise ValueError("Trop de texte : sélectionne moins de cours à la fois.")
-        allowed = {"minutes": {10, 20, 30}, "format": {"short", "medium", "long"},
-                   "voice": {"vivienne-remy", "denise-henri", "naturelle", "rapide"}}  # 2 dernières : anciennes pages
+        allowed = {"minutes": {10, 20, 30}, "format": set(VIDEO_MINUTES), "type": SHEET_TYPES, "difficulty": DIFFICULTIES}
+        self.options.pop("voice", None)  # anciennes pages : les voix sont fixes depuis l'itération 4
         for key, value in self.options.items():
-            if key in {"pdf_id", "title"}:  # OCR : fichier PDF à relier, titre
+            if key in {"pdf_id", "title", "sheet_id", "chapter_id"}:  # fichier à relier, titre
                 if not isinstance(value, str) or len(value) > 160:
                     raise ValueError(f"Option invalide : {key}")
             elif key not in allowed or value not in allowed[key]:
@@ -99,10 +104,52 @@ def _stuck(row, now) -> bool:
     return (row["status"] == "queued" and now - created > timedelta(minutes=3)) or            (row["status"] == "running" and locked is not None and locked < now)
 
 
-def _public(row) -> dict:
+def _public(row, eta: dict | None = None) -> dict:
     out = {k: row[k] for k in PUBLIC_FIELDS}
     for k in ("created_at", "started_at", "finished_at"):
         out[k] = out[k].isoformat() if out[k] else None
+    out["eta"] = eta
+    return out
+
+
+def _size(body: JobIn) -> int:
+    """Taille de la demande, pour l'estimation (aucun contenu) : minutes, pages ou milliers de caractères."""
+    if body.kind == "podcast":
+        return int(body.options.get("minutes", 10))
+    if body.kind == "video":
+        return VIDEO_MINUTES[body.options.get("format", "short")]
+    if body.kind in {"ocr", "correction"}:
+        return len(body.images)
+    return max(1, sum(len(x.text) for x in body.sources) // 1000)
+
+
+def _fingerprint(body: JobIn) -> str:
+    """Empreinte de la demande : un double clic ne crée pas deux tâches (ni deux fichiers)."""
+    data = json.dumps([body.kind, body.options, body.folder_id, [x.model_dump() for x in body.sources], body.images],
+                      sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(data.encode()).hexdigest()
+
+
+def _with_eta(conn, rows) -> list[dict]:
+    """Ajoute le temps restant estimé aux tâches en cours (modèle appris sur les dernières tâches terminées)."""
+    now = db.now()
+    active = [r for r in rows if r["status"] in {"queued", "running"}]
+    models = {}
+    for kind in {r["kind"] for r in active}:
+        history = conn.execute(select(db.jobs.c.created_at, db.jobs.c.started_at, db.jobs.c.finished_at, db.jobs.c.size)
+                               .where(db.jobs.c.kind == kind, db.jobs.c.status == "done")
+                               .order_by(desc(db.jobs.c.finished_at)).limit(30)).mappings().all()
+        models[kind] = estimate.model(kind, [dict(h) for h in history])
+    out = []
+    for r in rows:
+        eta = None
+        if r["status"] in {"queued", "running"}:
+            ahead = 0
+            if r["status"] == "queued":
+                ahead = conn.execute(select(func.count()).select_from(db.jobs).where(
+                    db.jobs.c.status.in_(["queued", "running"]), db.jobs.c.created_at < r["created_at"])).scalar_one()
+            eta = estimate.estimate(dict(r), models[r["kind"]], now, ahead=ahead)
+        out.append(_public(r, eta))
     return out
 
 
@@ -121,6 +168,13 @@ async def create_job(body: JobIn, user: CurrentUser):
     if pending >= s.max_pending_jobs:
         raise HTTPException(429, detail={"code": "too_many_jobs",
                                          "message": f"Tu as déjà {pending} générations en cours : attends qu'une se termine."})
+    fingerprint = _fingerprint(body)
+    with db.get_engine().connect() as conn:
+        same = conn.execute(select(db.jobs).where(
+            db.jobs.c.sub == user.sub, db.jobs.c.fingerprint == fingerprint,
+            db.jobs.c.status.in_(["queued", "running"]))).mappings().first()
+        if same:  # double clic / page renvoyée : on rend la tâche déjà en route
+            return {"job": _with_eta(conn, [same])[0], "existing": True}
     job_id = str(uuid.uuid4())
     payload = seal_payload(s.job_secret, {
         # Jeton Google « hors ligne » : permet au serveur d'écrire dans TON Drive pendant que tu es absent.
@@ -129,18 +183,20 @@ async def create_job(body: JobIn, user: CurrentUser):
         "sources": [x.model_dump() for x in body.sources], "images": body.images,
         "options": body.options, "folder_id": body.folder_id, "course": body.course, "chapter": body.chapter,
         # Clé Gemini personnelle (facultative) : secours si l'IA ou les voix du site sont indisponibles.
-        "gemini_key": user_keys.load(user.sub) if body.kind in {"podcast", "video", "fiche"} else "",
+        "gemini_key": user_keys.load(user.sub) if body.kind in {"podcast", "video", "fiche", "exercices"} else "",
     })
-    titles = {"podcast": "Podcast", "video": "Vidéo", "fiche": "Fiche", "ocr": "Lecture de copie"}
+    titles = {"podcast": "Podcast", "video": "Vidéo", "fiche": "Fiche", "ocr": "Lecture de copie",
+              "exercices": "Feuille d'exercices", "correction": "Correction de copie"}
     with db.get_engine().begin() as conn:
         conn.execute(insert(db.jobs).values(
             id=job_id, sub=user.sub, kind=body.kind, title=(body.title or titles[body.kind])[:160], status="queued",
             progress=0, step="En attente du serveur", attempts=0, payload=payload, error="", result_file_id="",
-            result_name="", notified=False, created_at=db.now(),
+            result_name="", notified=False, created_at=db.now(), note="", fingerprint=fingerprint, size=_size(body),
         ))
         row = conn.execute(select(db.jobs).where(db.jobs.c.id == job_id)).mappings().one()
+        job = _with_eta(conn, [row])[0]
     await wake_worker()
-    return {"job": _public(row)}
+    return {"job": job}
 
 
 @router.get("/jobs")
@@ -148,6 +204,7 @@ async def list_jobs(user: CurrentUser):
     with db.get_engine().connect() as conn:
         rows = conn.execute(select(db.jobs).where(db.jobs.c.sub == user.sub)
                             .order_by(desc(db.jobs.c.created_at)).limit(20)).mappings().all()
+        public = _with_eta(conn, rows)
     now = db.now()
     if any(_stuck(r, now) for r in rows):
         try:  # au plus un nouveau réveil toutes les 5 minutes par élève
@@ -155,7 +212,7 @@ async def list_jobs(user: CurrentUser):
             await wake_worker()
         except HTTPException:
             pass
-    return {"jobs": [_public(r) for r in rows]}
+    return {"jobs": public}
 
 
 def _own(conn, job_id: str, sub: str):

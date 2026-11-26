@@ -169,6 +169,32 @@ export function ficheToText(fiche) {
 export const HIDDEN_KINDS = new Set(["settings", "timetable", "scan-text", "video-audio"]); // voix d'une vidéo : ouverte via la vidéo
 export const SOURCE_KINDS = new Set(["transcript", "scan", "scan-text", "pdf", "fiche"]);
 
+/**
+ * Un seul fichier par contenu dans « Mes cours » (les doublons restent dans le Drive, simplement masqués).
+ * - fichiers techniques cachés (voix d'une vidéo, texte lu d'un scan, réglages) ;
+ * - même tâche de génération (appProperties.jobId) → un seul fichier ;
+ * - anciens fichiers sans jobId : même type + même nom + même dossier → un seul.
+ * On garde le plus récent COMPLET (taille non nulle), sinon le plus récent.
+ */
+export function dedupe(files) {
+  const groups = new Map();
+  const out = [];
+  for (const f of files) {
+    if (f.mimeType === "application/vnd.google-apps.folder") { out.push(f); continue; }
+    const kind = kindOf(f);
+    if (HIDDEN_KINDS.has(kind)) continue;
+    const key = f.appProperties?.jobId ? `job:${f.appProperties.jobId}`
+      : ["podcast", "video", "video-anim", "fiche"].includes(kind)
+        ? `name:${kind}|${(f.parents || [])[0] || ""}|${String(f.name).trim().toLowerCase()}` : `id:${f.id}`;
+    if (!groups.has(key)) { groups.set(key, f); out.push(f); continue; }
+    const kept = groups.get(key);
+    const complete = (x) => x.size === undefined || Number(x.size) > 0;
+    const better = (complete(f) && !complete(kept)) || (complete(f) === complete(kept) && String(f.modifiedTime) > String(kept.modifiedTime));
+    if (better) { out[out.indexOf(kept)] = f; groups.set(key, f); }
+  }
+  return out;
+}
+
 /** Nettoie un nom de fichier pour Drive. */
 export function safeName(name, max = 90) {
   return String(name).replace(/[\\/:*?"<>|\n\r]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max) || "Sans titre";

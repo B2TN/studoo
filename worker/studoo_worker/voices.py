@@ -1,14 +1,19 @@
 """Voix des podcasts et des vidéos.
 
+Voix choisies (itération 4) : podcasts = dialogue Vivienne (A) + Henri (B) ; vidéos = Vivienne seule.
+Allure « radio » : un peu plus lent (−5 %, réglé dans le moteur de voix : pas d'étirement du son), phrases
+découpées, pauses aux virgules et entre les phrases, volume égalisé (−16 LUFS).
+
 Ordre d'essai :
-1. Azure AI Speech : voix neuronales françaises très naturelles, quelques secondes pour 10 min de son
-   (offre gratuite F0 du site : 500 000 caractères par mois) ;
-2. Gemini TTS avec la clé PERSONNELLE de l'élève, seulement s'il en a enregistré une (secours) ;
-3. les voix open source locales (Kokoro / Piper) : toujours disponibles, moins naturelles.
+1. Azure AI Speech, Vivienne + Henri (offre gratuite F0 : 500 000 caractères par mois) ;
+2. Azure AI Speech, Denise + Henri (mêmes réglages) si Vivienne ne répond pas — signalé à l'élève ;
+3. Gemini TTS avec la clé PERSONNELLE de l'élève, s'il en a enregistré une — signalé ;
+4. les voix open source locales (Kokoro / Piper) — signalé.
 Tout sort en MP3 24 kHz mono 96 kbit/s (voir media.MP3_ARGS).
 """
 import base64
 import logging
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from xml.sax.saxutils import escape
@@ -19,18 +24,23 @@ from . import media, settings, tts
 
 log = logging.getLogger(__name__)
 
-# Paires de voix (animateur A, animateur B). La vidéo n'utilise que la voix A.
-PAIRS = {
-    "vivienne-remy": ("fr-FR-VivienneMultilingualNeural", "fr-FR-RemyMultilingualNeural"),
-    "denise-henri": ("fr-FR-DeniseNeural", "fr-FR-HenriNeural"),
-}
-DEFAULT = "vivienne-remy"
+# Voix (A, B). La vidéo n'utilise que la voix A.
+MAIN = ("fr-FR-VivienneMultilingualNeural", "fr-FR-HenriNeural")
+BACKUP = ("fr-FR-DeniseNeural", "fr-FR-HenriNeural")
 GEMINI_VOICES = {"A": "Kore", "B": "Puck"}
 CHUNK_CHARS = 2500  # par demande : bien sous la limite d'Azure (10 min de son)
+RATE = "-5%"         # un peu plus lent qu'une conversation : allure radio
+SENTENCE_PAUSE = "250ms"
+COMMA_PAUSE = "120ms"
+TURN_PAUSE = "300ms"  # entre deux répliques
+
+NOTICE_BACKUP = "La voix de Vivienne n'était pas disponible : ce fichier est lu par Denise et Henri."
+NOTICE_OTHER = "Les voix Vivienne et Henri n'étaient pas disponibles : ce fichier est lu par des voix de secours."
 
 
-def pair(option: str) -> tuple[str, str]:
-    return PAIRS.get(option, PAIRS[DEFAULT])  # anciennes valeurs (« naturelle », « rapide ») → paire par défaut
+class Voiced(list):
+    """Liste de MP3 (un par groupe), avec `notice` : message pour l'élève si des voix de secours ont servi."""
+    notice = ""
 
 
 def _chunks(lines: list[tuple[str, str]]) -> list[list[tuple[str, str]]]:
@@ -45,17 +55,31 @@ def _chunks(lines: list[tuple[str, str]]) -> list[list[tuple[str, str]]]:
 
 
 # ---------- 1. Azure AI Speech ----------
+def _sentences(text: str) -> list[str]:
+    return [s for s in re.split(r"(?<=[.!?…])\s+", text.strip()) if s]
+
+
+def ssml(lines: list[tuple[str, str]], voices: tuple[str, str]) -> str:
+    """SSML « radio » : une phrase par <s>, pauses réglées, vitesse réglée par le moteur (prosody)."""
+    parts = []
+    for who, text in lines:
+        body = f"<break time='{SENTENCE_PAUSE}'/>".join(f"<s>{escape(s)}</s>" for s in _sentences(text))
+        parts.append(f"<voice name='{voices[0] if who == 'A' else voices[1]}'>"
+                     f"<mstts:silence type='Comma-exact' value='{COMMA_PAUSE}'/>"
+                     f"<prosody rate='{RATE}'>{body}</prosody><break time='{TURN_PAUSE}'/></voice>")
+    return ("<speak version='1.0' xml:lang='fr-FR' xmlns:mstts='http://www.w3.org/2001/mstts'>"
+            + "".join(parts) + "</speak>")
+
+
 def _azure_one(lines: list[tuple[str, str]], voices: tuple[str, str], client: httpx.Client) -> bytes:
-    ssml = "<speak version='1.0' xml:lang='fr-FR'>" + "".join(
-        f"<voice name='{voices[0] if who == 'A' else voices[1]}'>{escape(text)}<break time='300ms'/></voice>"
-        for who, text in lines) + "</speak>"
+    body = ssml(lines, voices)
     url = f"https://{settings.SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
     headers = {"Ocp-Apim-Subscription-Key": settings.SPEECH_KEY, "Content-Type": "application/ssml+xml",
                "X-Microsoft-OutputFormat": "audio-24khz-96kbitrate-mono-mp3", "User-Agent": "studoo-worker"}
     hangs = 0
     for attempt in range(8):
         try:
-            res = client.post(url, content=ssml.encode(), headers=headers)
+            res = client.post(url, content=body.encode(), headers=headers)
         except httpx.TransportError:  # demande restée bloquée (vu le 26/11/2026) : on la renvoie
             hangs += 1
             if hangs > 3:
@@ -115,26 +139,41 @@ def _local(groups: list[list[tuple[str, str]]]) -> list[bytes]:
     return out
 
 
-def synthesize_groups(groups: list[list[tuple[str, str]]], *, option: str = DEFAULT, gemini_key: str = "") -> list[bytes]:
-    """Une liste de groupes de répliques (orateur « A »/« B », texte) → un MP3 par groupe, dans le même ordre."""
+def _try(label: str, fn) -> list[bytes] | None:
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 - quota épuisé, panne… : on passe au secours suivant
+        log.warning("%s indisponible (%s) : secours", label,
+                    getattr(getattr(exc, "response", None), "status_code", None) or type(exc).__name__)
+        return None
+
+
+def synthesize_groups(groups: list[list[tuple[str, str]]], *, gemini_key: str = "", **_old) -> Voiced:
+    """Une liste de groupes de répliques (orateur « A »/« B », texte) → un MP3 par groupe, dans le même ordre.
+
+    Chaque MP3 a son volume égalisé ; `.notice` dit à l'élève si des voix de secours ont servi.
+    """
+    chars = sum(len(t) for g in groups for _, t in g)
+    out, notice = None, ""
     if settings.SPEECH_KEY:
-        try:
-            out = _azure(groups, pair(option))
-            log.info("Voix Azure : %d morceaux, %d caractères", len(groups), sum(len(t) for g in groups for _, t in g))
-            return out
-        except Exception as exc:  # noqa: BLE001 - quota du mois épuisé, panne… : secours
-            log.warning("Azure Speech indisponible (%s) : secours", getattr(getattr(exc, "response", None), "status_code", type(exc).__name__))
-    if gemini_key:
-        try:
-            return _gemini(groups, gemini_key)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("Gemini TTS indisponible (%s) : voix locales", getattr(getattr(exc, "response", None), "status_code", type(exc).__name__))
-    return _local(groups)
+        out = _try("Voix Azure (Vivienne + Henri)", lambda: _azure(groups, MAIN))
+        if out is None:
+            out, notice = _try("Voix Azure (Denise + Henri)", lambda: _azure(groups, BACKUP)), NOTICE_BACKUP
+        if out is not None:
+            log.info("Voix Azure : %d morceaux, %d caractères", len(groups), chars)
+    if out is None and gemini_key:
+        out, notice = _try("Gemini TTS (clé de l'élève)", lambda: _gemini(groups, gemini_key)), NOTICE_OTHER
+    if out is None:
+        out, notice = _local(groups), NOTICE_OTHER
+    result = Voiced(media.normalize_mp3(clip) for clip in out)
+    result.notice = notice
+    return result
 
 
-def synthesize(lines: list[tuple[str, str]], *, option: str = DEFAULT, gemini_key: str = "") -> bytes:
-    """Un dialogue entier → un seul MP3."""
+def synthesize(lines: list[tuple[str, str]], *, gemini_key: str = "", **_old) -> tuple[bytes, str]:
+    """Un dialogue entier → (un seul MP3, message pour l'élève ou "")."""
     lines = [(who, " ".join(text.split())) for who, text in lines if text.strip()]
     if not lines:
-        return media.silence_mp3(1)
-    return media.join_mp3(synthesize_groups(_chunks(lines), option=option, gemini_key=gemini_key))
+        return media.silence_mp3(1), ""
+    clips = synthesize_groups(_chunks(lines), gemini_key=gemini_key)
+    return media.join_mp3(clips), clips.notice
