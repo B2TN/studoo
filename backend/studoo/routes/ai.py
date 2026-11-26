@@ -11,14 +11,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ..deps import User, current_user
-from ..limits import count_generation, quota_status, rate_limit
-from ..services import gemini
+from ..config import get_settings
+from ..limits import consume, count_generation, quota_status, rate_limit
+from ..services import gemini, speech
 from ..services.schemas import Classification, Fiche, OcrResult, PodcastScript, Transcript, VideoScript
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 CurrentUser = Annotated[User, Depends(current_user)]
 
 MAX_AUDIO_BYTES = 4 * 1024 * 1024
+MIN_AUDIO_BYTES = 800  # en dessous : enregistrement vide (en-tête seul)
 AUDIO_TYPES = {"audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav", "audio/aac"}
 MAX_SOURCES_CHARS = 400_000
 
@@ -68,8 +70,24 @@ async def transcribe(
     if length > MAX_AUDIO_BYTES:
         raise HTTPException(413, detail={"code": "too_big", "message": "Morceau audio trop gros."})
     audio = await request.body()
-    if not audio or len(audio) > MAX_AUDIO_BYTES:
-        raise HTTPException(413, detail={"code": "too_big", "message": "Morceau audio vide ou trop gros."})
+    if len(audio) < MIN_AUDIO_BYTES:
+        raise HTTPException(422, detail={"code": "empty_audio", "message": "L'enregistrement reçu est vide : le micro n'a rien envoyé."})
+    if len(audio) > MAX_AUDIO_BYTES:
+        raise HTTPException(413, detail={"code": "too_big", "message": "Morceau audio trop gros."})
+    s = get_settings()
+    if s.speech_key:  # Azure AI Speech (voir services/speech.py)
+        consume("lite", user.sub)  # même compteur d'usage que les autres IA
+        try:
+            result = await speech.transcribe(audio, mime, key=s.speech_key, region=s.speech_region)
+        finally:
+            del audio  # on oublie l'audio immédiatement, même en cas d'échec
+        if index == 0:
+            count_generation("transcription")
+        return result
+    if not s.ai_fake_enabled and not s.gemini_api_key:
+        del audio
+        raise HTTPException(503, detail={"code": "stt_unconfigured",
+                                         "message": "La transcription n'est pas encore configurée sur ce site (service de transcription absent)."})
     prompt = (
         "Transcris fidèlement cet extrait de cours enregistré en classe.\n"
         "- Détecte qui parle et indique son RÔLE (pas son nom) : « Professeur », « Élève », "

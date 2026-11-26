@@ -1,8 +1,14 @@
 // Enregistrement d'un cours au micro, transcrit au fil de l'eau.
 //
 // Fonctionnement : l'audio est découpé en tranches de 5 minutes. Chaque
-// tranche est envoyée à l'API, transcrite par Gemini avec les rôles
-// (« Professeur », « Élève »…), puis OUBLIÉE : aucun fichier audio n'est gardé.
+// tranche est envoyée à l'API, transcrite (Azure AI Speech) avec les rôles
+// (« Professeur », « Élève »…), puis OUBLIÉE : aucun fichier audio n'est gardé,
+// même en cas d'échec.
+//
+// Itération 5 : « Terminer » attend que le navigateur ait livré la dernière tranche
+// (avant, la page concluait trop tôt « Aucune parole détectée »), et chaque cas
+// d'erreur a son message : micro inaccessible, enregistrement vide, erreur du
+// service de transcription, ou vraiment aucune parole.
 import { api, ApiError } from "../lib/api.js";
 import { h, mount } from "../lib/dom.js";
 import { duration, transcriptToMarkdown } from "../lib/format.js";
@@ -13,6 +19,47 @@ import { errorToast, store, toast } from "../lib/ui.js";
 
 const CHUNK_MS = 5 * 60 * 1000;
 const MAX_MS = 2 * 60 * 60 * 1000;
+const MIN_BYTES = 800;          // en dessous : tranche vide (en-tête seul)
+const VOICE_LEVEL = 0.06;       // niveau (0 à 1) au-delà duquel on considère que le micro capte un son
+// Erreurs qu'un nouvel essai ne corrigera pas : on n'insiste pas.
+const FINAL_CODES = new Set(["empty_audio", "bad_audio", "bad_audio_type", "stt_unconfigured", "too_big", "site_quota", "user_quota"]);
+const debug = (...a) => { try { if (localStorage.getItem("studoo-debug")) console.info("[transcription]", ...a); } catch { /* ignoré */ } };
+
+/** Message clair selon la raison pour laquelle le micro n'est pas accessible. */
+export function micErrorMessage(err) {
+  switch (err?.name) {
+    case "NotAllowedError": case "SecurityError":
+      return "Accès au micro refusé. Autorise le micro (icône du cadenas à gauche de l'adresse du site), puis réessaie.";
+    case "NotFoundError": case "OverconstrainedError":
+      return "Aucun micro détecté. Branche un micro ou vérifie les réglages son de ton appareil.";
+    case "NotReadableError": case "AbortError":
+      return "Le micro est déjà utilisé par une autre application (visio, dictaphone…). Ferme-la puis réessaie.";
+    default:
+      return "Impossible d'ouvrir le micro. Vérifie qu'il est branché et autorisé, puis réessaie.";
+  }
+}
+
+/**
+ * Bilan d'un enregistrement terminé → message pour l'élève (null si tout va bien).
+ * stats : { chunks, empty, ok, errors: [messages], segments, maxLevel, seconds }
+ */
+export function outcomeMessage(stats) {
+  if (stats.segments > 0) return null;
+  if (stats.chunks === 0 || stats.empty === stats.chunks) {
+    return { kind: "empty", title: "L'enregistrement est vide",
+      text: "Ton navigateur n'a enregistré aucun son. Vérifie que le bon micro est choisi et autorisé, puis recommence." };
+  }
+  if (stats.errors.length) {
+    return { kind: "service", title: "La transcription n'a pas pu se faire",
+      text: `${stats.errors[stats.errors.length - 1]} Ton enregistrement n'a pas été gardé : recommence dans un moment.` };
+  }
+  if (stats.maxLevel < VOICE_LEVEL) {
+    return { kind: "silent-mic", title: "Le micro n'a capté aucun son",
+      text: "Le niveau sonore est resté à zéro pendant tout l'enregistrement : le micro est peut-être coupé ou ce n'est pas le bon. Vérifie-le, puis recommence." };
+  }
+  return { kind: "no-speech", title: "Aucune parole reconnue",
+    text: "Le son a bien été reçu et analysé, mais aucune phrase n'a été reconnue. Parle plus près du micro, sans bruit de fond fort, puis recommence." };
+}
 
 function pickMime() {
   const options = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
@@ -62,12 +109,17 @@ export async function render({ view, go, refreshQuota }) {
   const segments = [];
   const queue = [];
   let busy = false, chunkIndex = 0, failed = 0;
+  const pendingStops = new Set(); // tranches arrêtées dont le navigateur n'a pas encore livré le son
+  const stats = { chunks: 0, empty: 0, ok: 0, errors: [], segments: 0, maxLevel: 0, seconds: 0 };
+  let lastVoiceAt = 0;
   const mime = pickMime();
 
   // ----- Interface -----
   const timeEl = h("p", { class: "rec-time", "aria-live": "off" }, "0:00");
   const status = h("p", { class: "muted", role: "status" }, "Appuie sur le micro pour commencer.");
-  const level = h("div", { class: "bar level", "aria-hidden": "true" }, h("span"));
+  const level = h("div", { class: "bar level", role: "meter", "aria-label": "Niveau sonore du micro", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" }, h("span"));
+  const levelHint = h("p", { class: "small level-hint", "aria-live": "polite" }, "");
+  const result = h("div");
   const recBtn = h("button", { class: "rec-button", type: "button", "aria-label": "Démarrer l'enregistrement" }, icon("microphone"));
   const pauseBtn = h("button", { class: "btn", type: "button", hidden: true }, icon("player-pause"), "Pause");
   const stopBtn = h("button", { class: "btn pink", type: "button", hidden: true }, icon("player-stop"), "Terminer");
@@ -97,30 +149,41 @@ export async function render({ view, go, refreshQuota }) {
     if (busy || !queue.length) return;
     busy = true;
     const t0 = performance.now();
-    const { blob, index } = queue.shift();
+    const item = queue.shift();
+    const { index } = item;
+    let blob = item.blob;
+    item.blob = null;
     const prev = segments.slice(-3).map((s) => `${s.speaker} : ${s.text}`).join("\n").slice(-580);
     let done = false;
+    debug("tranche", index, blob.size, "octets", blob.type);
     for (let attempt = 0; attempt < 4 && !done; attempt++) {
       try {
         const res = await api(`/api/ai/transcribe?index=${index}&prev=${encodeURIComponent(prev)}`, {
           method: "POST", body: blob, headers: { "Content-Type": blob.type.split(";")[0] || "audio/webm" },
         });
+        debug("tranche", index, "→", res.segments.length, "segments, son reçu :", res.duration, "s");
         segments.push(...res.segments);
         showSegments(res.segments);
+        stats.ok++;
+        stats.segments += res.segments.length;
         done = true;
       } catch (err) {
-        const quota = err instanceof ApiError && ["site_quota", "user_quota"].includes(err.code);
-        if (quota || attempt === 3) {
+        debug("tranche", index, "erreur", err.status, err.code);
+        const final = err instanceof ApiError && (FINAL_CODES.has(err.code) || (err.status >= 400 && err.status < 500 && err.status !== 429));
+        if (final || attempt === 3) {
           failed++;
-          const marker = { speaker: "Studoo", text: `[passage de ${duration(CHUNK_MS / 1000)} non transcrit : ${err.message}]` };
+          if (err.code === "empty_audio") stats.empty++;
+          else stats.errors.push(err.message);
+          const marker = { speaker: "Studoo", text: `[passage non transcrit : ${err.message}]` };
           segments.push(marker);
           showSegments([marker]);
           break;
         }
-        await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
+        await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
       }
     }
-    // L'audio de cette tranche n'est plus référencé nulle part : le navigateur l'efface.
+    // L'audio de cette tranche n'est plus référencé nulle part (même en cas d'échec) : le navigateur l'efface.
+    blob = null;
     if (done) {
       timings.push(Math.round((performance.now() - t0) / 1000));
       store.set("studoo-transcribe-secs", timings.slice(-20));
@@ -138,16 +201,32 @@ export async function render({ view, go, refreshQuota }) {
   }
 
   function newRecorder() {
-    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined);
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined);
+    recorder = rec;
     const parts = [];
-    recorder.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
-    recorder.onstop = () => {
-      if (parts.length && !aborted) {
-        queue.push({ blob: new Blob(parts, { type: recorder.mimeType || mime || "audio/webm" }), index: chunkIndex++ });
-        transcribeNext();
-      }
-    };
-    recorder.start();
+    rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+    // La dernière tranche n'arrive qu'APRÈS rec.stop() (événements dataavailable puis stop) : on garde une promesse
+    // pour que « Terminer » l'attende au lieu de conclure sur une file vide.
+    const delivered = new Promise((resolve) => {
+      rec.onstop = () => {
+        if (!aborted) {
+          stats.chunks++;
+          const blob = new Blob(parts, { type: rec.mimeType || mime || "audio/webm" });
+          parts.length = 0;
+          if (blob.size < MIN_BYTES) {
+            stats.empty++;
+            debug("tranche vide ignorée", blob.size, "octets");
+          } else {
+            queue.push({ blob, index: chunkIndex++ });
+            transcribeNext();
+          }
+        }
+        resolve();
+      };
+    });
+    pendingStops.add(delivered);
+    delivered.then(() => pendingStops.delete(delivered));
+    rec.start();
   }
 
   function rotate() {
@@ -170,11 +249,22 @@ export async function render({ view, go, refreshQuota }) {
     analyser.fftSize = 512;
     audioCtx.createMediaStreamSource(stream).connect(analyser);
     const data = new Uint8Array(analyser.fftSize);
+    const startedLevel = Date.now();
     const loop = () => {
       analyser.getByteTimeDomainData(data);
       let peak = 0;
       for (const v of data) peak = Math.max(peak, Math.abs(v - 128));
-      level.firstChild.style.width = `${Math.min(100, (peak / 64) * 100)}%`;
+      const value = Math.min(1, peak / 64);
+      if (!paused) stats.maxLevel = Math.max(stats.maxLevel, value);
+      if (value >= VOICE_LEVEL) lastVoiceAt = Date.now();
+      level.firstChild.style.width = `${Math.round(value * 100)}%`;
+      level.setAttribute("aria-valuenow", String(Math.round(value * 100)));
+      level.classList.toggle("hearing", Date.now() - lastVoiceAt < 600);
+      const quietFor = Date.now() - Math.max(lastVoiceAt, startedLevel);
+      const hint = paused ? "" : quietFor > 4000
+        ? "Je n'entends rien : vérifie que le micro est branché, autorisé et pas coupé."
+        : lastVoiceAt ? "Le micro capte bien le son ✓" : "";
+      if (levelHint.textContent !== hint) levelHint.textContent = hint;
       raf = requestAnimationFrame(loop);
     };
     loop();
@@ -182,11 +272,17 @@ export async function render({ view, go, refreshQuota }) {
 
   async function start() {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    } catch {
-      toast("Accès au micro refusé. Autorise le micro dans les réglages du navigateur.", "error", 8000);
+      // Réduction de bruit et annulation d'écho : faites pour les appels, elles peuvent couper la voix d'un
+      // professeur éloigné. On les désactive ; le gain automatique reste (voix faibles).
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
+    } catch (err) {
+      showResult({ kind: "mic", title: "Micro inaccessible", text: micErrorMessage(err) });
       return;
     }
+    mount(result);
+    stream.getAudioTracks()[0]?.addEventListener("ended", () => {
+      if (running && !stopping) toast("Le micro s'est déconnecté : l'enregistrement s'arrête.", "error", 8000), stop();
+    });
     startedAt = new Date().toISOString();
     running = true;
     segmentStart = Date.now();
@@ -230,11 +326,23 @@ export async function render({ view, go, refreshQuota }) {
     window.removeEventListener("beforeunload", warn);
   }
 
+  function showResult(msg) {
+    mount(result, h("section", { class: "card sketch stack rec-result", role: "alert" },
+      h("h2", {}, icon("alert-triangle"), " ", msg.title),
+      h("p", {}, msg.text),
+      h("div", { class: "row" },
+        h("button", { class: "btn primary", type: "button", onclick: () => go(location.pathname, { replace: true }) }, icon("refresh"), "Recommencer"),
+        msg.kind === "service" ? null : h("a", { class: "btn", href: "https://support.google.com/chrome/answer/2693767", target: "_blank", rel: "noopener" }, icon("microphone"), "Vérifier le micro"))));
+  }
+
   async function stop() {
     if (!running || stopping) return;
     stopping = true;
     if (!paused) elapsedBefore += Date.now() - segmentStart;
+    stats.seconds = Math.round(elapsedBefore / 1000);
     recorder.stop();
+    // Attend que TOUTES les tranches arrêtées soient livrées (sinon : « aucune parole » sur un enregistrement court)
+    await Promise.all([...pendingStops]);
     release();
     recBtn.classList.remove("on");
     pauseBtn.hidden = true;
@@ -247,9 +355,10 @@ export async function render({ view, go, refreshQuota }) {
     });
     running = false;
     const real = segments.filter((s) => s.speaker !== "Studoo");
+    debug("bilan", JSON.stringify(stats));
     if (!real.length) {
-      toast(failed ? "La transcription a échoué. Réessaie plus tard." : "Aucune parole détectée.", "error", 8000);
-      stopBtn.disabled = false;
+      showResult(outcomeMessage(stats));
+      status.textContent = "";
       return;
     }
     const excerpt = real.map((s) => `${s.speaker} : ${s.text}`).join("\n");
@@ -277,9 +386,10 @@ export async function render({ view, go, refreshQuota }) {
     h("h1", { class: "view-title" }, "Enregistrer un ", h("span", { class: "hl pink" }, "cours")),
     h("p", { class: "small muted" }, icon("shield-lock"), " Rappel : accord des personnes enregistrées · usage personnel · audio effacé après transcription."),
     h("section", { class: "recorder card sketch" },
-      recBtn, timeEl, level, status,
+      recBtn, timeEl, level, levelHint, status,
       h("div", { class: "row", style: { justifyContent: "center", marginTop: "14px" } }, pauseBtn, stopBtn),
       h("p", { class: "small muted", style: { marginTop: "12px" } }, "Pose ton téléphone près du prof, écran allumé. Durée maximale : 2 h.")),
+    result,
     live);
 
   // Si l'élève quitte la page : on arrête tout (micro coupé, audio oublié).

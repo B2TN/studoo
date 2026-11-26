@@ -17,6 +17,7 @@ class Segment(BaseModel):
 class Transcript(BaseModel):
     language: str = Field(description="Code langue principal, ex. fr, en, es")
     segments: list[Segment]
+    duration: float = Field(default=0, description="Durée du son reçu, en secondes (0 si inconnue)")
 
 
 # ---------- Estimation du cours / titre ----------

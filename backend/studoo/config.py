@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     gemini_model_flash: str = "gemini-flash-latest"
     gemini_model_tts: str = "gemini-2.5-flash-preview-tts"
 
+    # Transcription des cours : Azure AI Speech (service « studoo-voix », offre gratuite F0)
+    speech_key: str = ""
+    speech_region: str = "italynorth"
+
     # Quotas quotidiens (niveau gratuit, partagés entre tous les utilisateurs)
     quota_lite_per_day: int = 450
     quota_flash_per_day: int = 18

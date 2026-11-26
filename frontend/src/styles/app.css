@@ -194,3 +194,9 @@ table.data th, table.data td { border-bottom: 1.5px dashed var(--grid-strong); p
 .voice-info .icon, .eta .icon, .notice .icon { width: 1em; height: 1em; vertical-align: -0.15em; }
 .notice { background: var(--fluo-yellow); color: var(--on-fluo); padding: 6px 10px; border-radius: 10px 14px 9px 13px; display: inline-block; }
 .eta { color: var(--ink); font-weight: 600; margin-top: 4px; }
+
+/* Itération 5 : niveau du micro et bilan d'enregistrement */
+.bar.level span { transition: width .08s linear; }
+.bar.level.hearing span { background: var(--fluo-green); }
+.level-hint { min-height: 1.4em; margin-top: 6px; }
+.rec-result h2 .icon { width: 1em; height: 1em; vertical-align: -0.15em; }

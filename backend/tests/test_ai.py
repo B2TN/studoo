@@ -10,8 +10,11 @@ def test_ai_requires_login(client):
     assert client.post("/api/ai/fiche", json=SOURCES).status_code == 401
 
 
+AUDIO = b"\x1a\x45\xdf\xa3" + b"\x00" * 2000  # en-tête WebM + données (≈ 2 Ko, comme quelques secondes de son)
+
+
 def test_transcribe_chunk(logged):
-    res = logged.post("/api/ai/transcribe?index=0", content=b"\x1a\x45\xdf\xa3fake", headers={"Content-Type": "audio/webm"})
+    res = logged.post("/api/ai/transcribe?index=0", content=AUDIO, headers={"Content-Type": "audio/webm"})
     assert res.status_code == 200
     assert res.json()["segments"][0]["speaker"] == "Professeur"
     assert db.read_count(db.generations, {"day": db.today(), "kind": "transcription"}) == 1
