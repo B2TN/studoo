@@ -121,3 +121,18 @@ def test_stuck_job_is_woken_again_at_most_every_5_min(logged, monkeypatch):
     logged.get("/api/jobs")
     logged.get("/api/jobs")
     assert len(calls) == 1
+
+
+def test_forget_file_and_full_history(logged):
+    """Itération 5 (C2) : un fichier supprimé dans « Mes cours » fait disparaître sa génération ; « Voir tout » = 100."""
+    ids = []
+    for i in range(3):
+        ids.append(logged.post("/api/jobs", json=_job(sources=[{"title": f"C{i}", "text": f"Cours {i}"}])).json()["job"]["id"])
+    with db.get_engine().begin() as conn:
+        conn.execute(db.jobs.update().where(db.jobs.c.id == ids[0]).values(status="done", result_file_id="fichier-1", payload=None))
+        conn.execute(db.jobs.update().where(db.jobs.c.id == ids[1]).values(result_file_id="fichier-1"))  # en cours : garde
+    res = logged.post("/api/jobs/forget-file", json={"file_id": "fichier-1"}).json()
+    assert res["forgotten"] == 1
+    left = [j["id"] for j in logged.get("/api/jobs?limit=100").json()["jobs"]]
+    assert ids[0] not in left and ids[1] in left and ids[2] in left
+    assert logged.get("/api/jobs?limit=500").status_code == 422

@@ -8,6 +8,40 @@ export const listJobs = () => api("/api/jobs").then((r) => r.jobs);
 export const cancelJob = (id) => api(`/api/jobs/${id}/cancel`, { method: "POST" });
 export const retryJob = (id) => api(`/api/jobs/${id}/retry`, { method: "POST" });
 export const deleteJob = (id) => api(`/api/jobs/${id}`, { method: "DELETE" });
+export const listAllJobs = () => api("/api/jobs?limit=100").then((r) => r.jobs);
+/** Le fichier d'une génération a été supprimé (dans « Mes cours ») : le serveur oublie cette génération. */
+export const forgetFile = (fileId) => api("/api/jobs/forget-file", { method: "POST", json: { file_id: fileId } }).catch(() => {});
+
+/**
+ * « Mes générations » sur l'accueil : au plus `max` lignes, plus récentes d'abord. Les générations en cours ou en
+ * attente sont TOUJOURS affichées (même s'il y en a plus de `max`) ; les terminées (réussies, échouées, annulées)
+ * n'occupent que la place restante. Le reste est dans « Voir tout ».
+ */
+export function visibleJobs(jobs, max = 5) {
+  const sorted = [...jobs].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  const active = sorted.filter(isActive);
+  const finished = sorted.filter((j) => !isActive(j)).slice(0, Math.max(0, max - active.length));
+  const shown = sorted.filter((j) => active.includes(j) || finished.includes(j));
+  return { shown, hidden: jobs.length - shown.length };
+}
+
+// Vérification de l'existence des fichiers (une fois par minute au plus pour un même fichier).
+const checked = new Map(); // id → { ok, at }
+/**
+ * Retire les générations terminées dont le fichier n'existe plus dans le Drive (supprimé dans « Mes cours » ou
+ * directement dans Google Drive) et demande au serveur de les oublier : une seule vérité, le fichier.
+ */
+export async function withExistingFiles(jobs, exists) {
+  const now = Date.now();
+  const toCheck = jobs.filter((j) => j.status === "done" && j.result_file_id
+    && !(checked.has(j.result_file_id) && now - checked.get(j.result_file_id).at < 60_000));
+  await Promise.all(toCheck.map(async (j) => {
+    checked.set(j.result_file_id, { ok: await exists(j.result_file_id), at: now });
+  }));
+  const gone = jobs.filter((j) => j.status === "done" && j.result_file_id && checked.get(j.result_file_id)?.ok === false);
+  gone.forEach((j) => forgetFile(j.result_file_id));
+  return jobs.filter((j) => !gone.includes(j));
+}
 
 export const isActive = (job) => job.status === "queued" || job.status === "running";
 

@@ -76,8 +76,8 @@ function consentCard(onAccept) {
     h("ul", {},
       h("li", {}, "tu demandes l'accord de ton enseignant (et des personnes qui parlent) ;"),
       h("li", {}, "la transcription sert uniquement à TES révisions, tu ne la publies pas ;"),
-      h("li", {}, "l'audio est envoyé à Google Gemini par tranches de 5 min pour être transcrit, puis effacé : aucun fichier audio n'est conservé ;"),
-      h("li", {}, "avec l'offre gratuite de Gemini, Google peut utiliser ces extraits pour améliorer ses services (voir la page ", h("a", { href: "/rgpd" }, "RGPD"), ").")),
+      h("li", {}, "l'audio est envoyé par tranches de 5 min au service de transcription de Microsoft (Azure AI Speech, en Italie), puis effacé : aucun fichier audio n'est conservé, même si la transcription échoue ;"),
+      h("li", {}, "Microsoft n'utilise pas ces extraits pour entraîner ses modèles (voir la page ", h("a", { href: "/rgpd" }, "RGPD"), ").")),
     h("label", { class: "check", for: "consent" }, box, h("span", {}, "Je m'engage à demander l'accord des personnes enregistrées et à garder les transcriptions pour mon usage personnel.")),
     err,
     h("button", { class: "btn primary", type: "button", onclick: () => {
@@ -333,6 +333,7 @@ export async function render({ view, go, refreshQuota }) {
       h("div", { class: "row" },
         h("button", { class: "btn primary", type: "button", onclick: () => go(location.pathname, { replace: true }) }, icon("refresh"), "Recommencer"),
         msg.kind === "service" ? null : h("a", { class: "btn", href: "https://support.google.com/chrome/answer/2693767", target: "_blank", rel: "noopener" }, icon("microphone"), "Vérifier le micro"))));
+    result.scrollIntoView?.({ behavior: "smooth", block: "center" }); // visible même sur un petit écran
   }
 
   async function stop() {

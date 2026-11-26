@@ -10,7 +10,9 @@ const UPLOAD = "https://www.googleapis.com/upload/drive/v3";
 const FOLDER = "application/vnd.google-apps.folder";
 const FIELDS = "id,name,mimeType,modifiedTime,createdTime,size,appProperties,parents";
 
-export class DriveError extends Error {}
+export class DriveError extends Error {
+  constructor(message, status = 0) { super(message); this.status = status; }
+}
 
 async function call(url, init = {}, retry = true) {
   const token = await accessToken();
@@ -23,7 +25,7 @@ async function call(url, init = {}, retry = true) {
     let msg = `Google Drive a répondu ${res.status}`;
     try { msg = (await res.json()).error?.message || msg; } catch { /* ignoré */ }
     if (res.status === 403 && /quota|storage/i.test(msg)) msg = "Ton Google Drive est plein.";
-    throw new DriveError(msg);
+    throw new DriveError(msg, res.status);
   }
   return res;
 }
@@ -175,6 +177,20 @@ export function createGoogleDrive({ rootId: knownRoot = null, onRoot } = {}) {
 
     async move(id, fromId, toId) {
       return (await call(`${API}/files/${id}?addParents=${toId}&removeParents=${fromId}&fields=${FIELDS}`, { method: "PATCH" })).json();
+    },
+
+    /**
+     * true si le fichier existe et n'est pas à la corbeille. Seules deux preuves comptent comme « supprimé » :
+     * 404 (introuvable) et trashed. En cas de doute — réseau, 403 (limite de requêtes Google, accès retiré)… — on
+     * considère qu'il existe, pour ne jamais faire disparaître une génération à tort.
+     */
+    async exists(id) {
+      try {
+        const meta = await (await call(`${API}/files/${id}?fields=id,trashed`)).json();
+        return !meta.trashed;
+      } catch (err) {
+        return !(err instanceof DriveError && err.status === 404);
+      }
     },
 
     async trash(id) {

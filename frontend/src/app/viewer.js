@@ -7,7 +7,7 @@ import { renderCorrection, renderSheet } from "../lib/exercise-render.js";
 import { createJob, etaText } from "../lib/jobs.js";
 import { canvasToBase64 } from "../lib/pdf-tools.js";
 import { icon } from "../lib/icons.js";
-import { drive, KINDS, kindOf, SOURCE_KINDS } from "../lib/storage.js";
+import { drive, KINDS, kindOf, SOURCE_KINDS, trashFile } from "../lib/storage.js";
 import { confirmDialog, errorToast, toast } from "../lib/ui.js";
 import { renderMp4, supportsMp4Export } from "../lib/video-anim.js";
 import { askName } from "./explorer.js";
@@ -227,9 +227,7 @@ export async function render({ view, params, go }) {
     } }, icon("edit"), "Renommer"),
     h("button", { class: "btn small danger", onclick: async () => {
       if (!(await confirmDialog("Mettre à la corbeille ?", "Le fichier ira dans la corbeille de ton Google Drive (récupérable 30 jours).", { ok: "Supprimer", danger: true }))) return;
-      await drive.trash(file.id);
-      if (file.appProperties?.textId) await drive.trash(file.appProperties.textId).catch(() => {});
-      if (file.appProperties?.audioId) await drive.trash(file.appProperties.audioId).catch(() => {});
+      await trashFile(file);
       toast("Mis à la corbeille", "success");
       go(backHref, { replace: true });
     } }, icon("trash"), "Supprimer"),

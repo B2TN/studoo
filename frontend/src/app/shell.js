@@ -21,6 +21,7 @@ const ROUTES = [
   { path: "/confirmer", title: "Ranger le document", nav: "/cours", load: () => import("./confirm.js") },
   { path: "/creer/:type", title: "Créer", nav: "/cours", load: () => import("./create.js") },
   { path: "/emploi-du-temps", title: "Emploi du temps", nav: "/emploi-du-temps", load: () => import("./timetable.js") },
+  { path: "/generations", title: "Mes générations", nav: "/", load: () => import("./jobs-panel.js") },
   { path: "/reglages", title: "Réglages", nav: "/reglages", load: () => import("./settings.js") },
   { path: "/admin", title: "Admin", nav: "/admin", admin: true, load: () => import("./admin.js") },
   { path: "/analytics", title: "Analytics", nav: "/analytics", admin: true, load: () => import("./admin.js") },

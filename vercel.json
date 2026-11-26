@@ -85,6 +85,10 @@
       "destination": "/"
     },
     {
+      "source": "/generations",
+      "destination": "/"
+    },
+    {
       "source": "/reglages",
       "destination": "/"
     },

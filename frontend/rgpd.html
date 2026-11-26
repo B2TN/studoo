@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Données personnelles (RGPD) · Studoo</title>
-  <meta name="description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA Gemini, tes droits.">
+  <meta name="description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA (Microsoft Azure, Google Gemini), tes droits.">
   <link rel="canonical" href="https://studoo-app.vercel.app/rgpd">
   <meta name="theme-color" content="#FBF6E9">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta property="og:title" content="Données personnelles (RGPD) · Studoo">
-  <meta property="og:description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA Gemini, tes droits.">
+  <meta property="og:description" content="Comment Studoo protège tes données : cours stockés dans ton Google Drive, aucun audio conservé, cookies, IA (Microsoft Azure, Google Gemini), tes droits.">
   <meta property="og:image" content="https://studoo-app.vercel.app/og-image.png">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
@@ -30,7 +30,7 @@
   </header>
   <main id="contenu" class="page">
     <h1>Tes données <span class="hl">personnelles</span></h1>
-    <p class="muted">Dernière mise à jour : 26 novembre 2026 (robot d'emploi du temps, correction des copies, voix).</p>
+    <p class="muted">Dernière mise à jour : 26 novembre 2026 (transcription par Microsoft Azure AI Speech, robot d'emploi du temps, correction des copies, voix).</p>
     <div class="card sketch">
       <p><strong>En bref :</strong> tes cours sont rangés dans <strong>ton</strong> Google Drive, pas chez nous. Studoo garde seulement le strict nécessaire pour te connecter et protéger le service (ton e-mail, ton nom, des compteurs). Pas de pub, pas de revente. Si tu as moins de 15 ans, lis cette page avec un parent.</p>
     </div>
@@ -66,8 +66,9 @@
       <li><strong>Photos de cours :</strong> le redressement se fait dans ton navigateur ; une copie réduite est envoyée à l'IA pour lire le texte, puis oubliée.</li>
     </ul>
 
-    <h2>Intelligence artificielle (Google Gemini)</h2>
-    <p>Pour transcrire, lire, résumer ou mettre en voix tes cours, leur contenu transite par notre serveur jusqu'à l'API Google Gemini, sans y être stocké. Studoo utilise actuellement <strong>l'offre gratuite</strong> de Gemini : selon les conditions de Google, les contenus envoyés peuvent alors être utilisés par Google pour améliorer ses produits et être examinés par des personnes. <strong>N'enregistre donc pas d'informations sensibles</strong> (santé, données d'autres élèves…). Si Studoo passe à l'offre payante, cette réutilisation cessera et cette page sera mise à jour.</p>
+    <h2>Intelligence artificielle</h2>
+    <p><strong>Transcription des cours enregistrés :</strong> le son est envoyé par tranches de 5 minutes à <strong>Microsoft Azure AI Speech</strong> (région Italy North, Union européenne), qui le transcrit en reconnaissant les différentes voix, puis il est effacé — aucun fichier audio n'est conservé, ni chez nous, ni chez Microsoft, même si la transcription échoue. Microsoft n'utilise pas ces données pour entraîner ses modèles.</p>
+    <p><strong>Autres usages (lecture de photos, fiches) :</strong> le contenu transite par notre serveur jusqu'à l'API Google Gemini, sans y être stocké. Studoo utilise actuellement <strong>l'offre gratuite</strong> de Gemini : selon les conditions de Google, les contenus envoyés peuvent alors être utilisés par Google pour améliorer ses produits et être examinés par des personnes. <strong>N'enregistre donc pas d'informations sensibles</strong> (santé, données d'autres élèves…). Si Studoo passe à l'offre payante, cette réutilisation cessera et cette page sera mise à jour.</p>
 
     <h2>Emploi du temps</h2>
     <p><strong>Le robot (lycées) :</strong> tu choisis ton établissement dans l'annuaire public de l'Éducation nationale (data.education.gouv.fr : seul le nom tapé dans la recherche y est envoyé), puis tu tapes ton identifiant et ton mot de passe. Le serveur de Studoo (Vercel, région Paris) s'en sert <strong>une seule fois</strong> pour se connecter à Pronote ou à ton ENT, récupère ton emploi du temps, puis les <strong>supprime aussitôt</strong> : ils ne sont jamais écrits dans une base, un fichier, un journal ou un rapport d'erreur, et disparaissent dans tous les cas (réussite, erreur, délai dépassé, plantage).</p>
@@ -81,7 +82,7 @@
       <li><strong>Google</strong> (connexion, Drive, Gemini) — Irlande / États-Unis.</li>
       <li><strong>Vercel</strong> (hébergement du site et de l'API) — États-Unis, encadré par le Data Privacy Framework UE–États-Unis.</li>
       <li><strong>Neon</strong> (base de données des comptes, compteurs et tâches en cours) — région Union européenne.</li>
-      <li><strong>Microsoft Azure</strong> (serveur de tâches, écriture des scripts et des feuilles d'exercices, lecture et correction des copies avec Azure OpenAI, voix Azure AI Speech : fabrication des podcasts, vidéos, exercices et corrections) — stockage en région Italy North (Milan, Union européenne) ; l'écriture des scripts peut être calculée dans un autre centre de Microsoft, encadré par le Data Privacy Framework UE–États-Unis.</li>
+      <li><strong>Microsoft Azure</strong> (transcription des cours enregistrés avec Azure AI Speech, serveur de tâches, écriture des scripts et des feuilles d'exercices, lecture et correction des copies avec Azure OpenAI, voix Azure AI Speech : fabrication des podcasts, vidéos, exercices et corrections) — stockage en région Italy North (Milan, Union européenne) ; l'écriture des scripts peut être calculée dans un autre centre de Microsoft, encadré par le Data Privacy Framework UE–États-Unis.</li>
       <li><strong>Index Éducation (Pronote) et ton ENT régional</strong> (le robot s'y connecte avec tes identifiants, à ta demande) — France.</li>
       <li><strong>Brevo</strong> (envoi de l'e-mail « c'est prêt » si les notifications ne sont pas activées) — Union européenne.</li>
     </ul>

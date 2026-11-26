@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from typing import Annotated, Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, desc, func, insert, select, update
 
@@ -202,10 +202,11 @@ async def create_job(body: JobIn, user: CurrentUser):
 
 
 @router.get("/jobs")
-async def list_jobs(user: CurrentUser):
+async def list_jobs(user: CurrentUser, limit: int = Query(20, ge=1, le=100)):
+    """Générations de l'élève, plus récentes d'abord (20 pour l'accueil, jusqu'à 100 pour « Voir tout »)."""
     with db.get_engine().connect() as conn:
         rows = conn.execute(select(db.jobs).where(db.jobs.c.sub == user.sub)
-                            .order_by(desc(db.jobs.c.created_at)).limit(20)).mappings().all()
+                            .order_by(desc(db.jobs.c.created_at)).limit(limit)).mappings().all()
         public = _with_eta(conn, rows)
     now = db.now()
     if any(_stuck(r, now) for r in rows):
@@ -245,6 +246,20 @@ async def retry_job(job_id: str, user: CurrentUser):
             status="queued", attempts=0, error="", step="En attente du serveur", progress=0))
     await wake_worker()
     return {"ok": True}
+
+
+class ForgetFileIn(BaseModel):
+    file_id: str = Field(min_length=5, max_length=128)
+
+
+@router.post("/jobs/forget-file")
+async def forget_file(body: ForgetFileIn, user: CurrentUser):
+    """Le fichier d'une génération a été supprimé du Drive : la génération disparaît de « Mes générations »."""
+    with db.get_engine().begin() as conn:
+        res = conn.execute(delete(db.jobs).where(
+            db.jobs.c.sub == user.sub, db.jobs.c.result_file_id == body.file_id,
+            db.jobs.c.status.in_(["done", "failed", "cancelled"])))
+    return {"forgotten": res.rowcount}
 
 
 @router.delete("/jobs/{job_id}")

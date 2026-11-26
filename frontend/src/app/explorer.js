@@ -2,7 +2,7 @@
 import { h, mount } from "../lib/dom.js";
 import { plural } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
-import { COLORS, dedupe, drive, isFolder, kindOf, safeName, SOURCE_KINDS } from "../lib/storage.js";
+import { COLORS, dedupe, drive, isFolder, kindOf, safeName, SOURCE_KINDS, trashFile } from "../lib/storage.js";
 import { loadEvents, subjectsOf } from "../lib/timetable-data.js";
 import { confirmDialog, errorToast, openDialog, toast } from "../lib/ui.js";
 import { fileRow } from "./dashboard.js";
@@ -108,7 +108,7 @@ function selectionBar(selected, files, { go, course, chapter }) {
       ] : null,
       h("button", { class: "btn small danger", onclick: async () => {
         if (!(await confirmDialog("Mettre à la corbeille ?", `${plural(chosen.length, "fichier")} ira dans la corbeille de ton Google Drive (récupérable pendant 30 jours).`, { ok: "Mettre à la corbeille", danger: true }))) return;
-        for (const f of chosen) await drive.trash(f.id);
+        for (const f of chosen) await trashFile(f);
         toast("Mis à la corbeille", "success");
         go(location.pathname, { replace: true });
       } }, icon("trash"), "Supprimer"));

@@ -199,6 +199,19 @@ export function dedupe(files) {
   return out;
 }
 
+/**
+ * Met un fichier à la corbeille du Drive (récupérable 30 jours) avec ses fichiers liés (voix d'une vidéo, texte lu
+ * d'un scan), et prévient le serveur pour que la génération correspondante disparaisse de « Mes générations ».
+ */
+export async function trashFile(file) {
+  await drive.trash(file.id);
+  for (const linked of [file.appProperties?.textId, file.appProperties?.audioId].filter(Boolean)) {
+    await drive.trash(linked).catch(() => {});
+  }
+  const { forgetFile } = await import("./jobs.js");
+  await forgetFile(file.id);
+}
+
 /** Nettoie un nom de fichier pour Drive. */
 export function safeName(name, max = 90) {
   return String(name).replace(/[\\/:*?"<>|\n\r]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max) || "Sans titre";

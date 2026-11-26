@@ -78,6 +78,7 @@ export function createMemoryDrive({ seed = false } = {}) {
     async setProps(id, props) { const i = must(id); Object.assign(i.meta.appProperties, props); return { ...i.meta }; },
     async move(id, fromId, toId) { const i = must(id); i.meta.parents = [toId]; return { ...i.meta }; },
     async trash(id) { must(id).meta.trashed = true; },
+    async exists(id) { const i = items.get(id); return Boolean(i && !i.meta.trashed); },
     async findSettings() { return metas().find((m) => m.appProperties.kind === "settings") || null; },
     openUrl: () => "#",
   };
