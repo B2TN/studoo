@@ -185,3 +185,23 @@ def test_client_id_is_registered_like_ade_does_at_startup():
     assert "method1getInitialConfiguration|J|java.lang.String/2004016611|fr|" in bodies[0]
     # relevé réel du démarrage d'ADE 2025.1 (demande de connexion vide : la session vient de l'université)
     assert bodies[1].endswith(".DirectLoginRequest/635437471||fr|1|2|3|4|4|5|6|7|8|aIYfuuc|9|0|10|0|1|1|10|10|-1|0|0|11|0|")
+
+
+def test_long_gwt_answers_split_with_concat_are_read():
+    long_answer = '//OK[1,2,["a","b"].concat(["{\\"4\\"\\"UPCité 2026-2027\\""]),0,7]'
+    assert ade._strings(long_answer)  # ne plante plus
+    assert ade._strings('//OK[1,["x"],0,7]') == "x"
+    assert ade._strings("//OK[pas du json") == "[pas du json"
+
+
+def test_httpx_urls_are_not_logged():
+    import studoo.main  # noqa: F401 - règle les journaux
+    assert logging.getLogger("httpx").level >= logging.WARNING
+
+
+def test_unexpected_robot_error_gives_a_clear_message(logged, monkeypatch):
+    def boom(*a):
+        raise ValueError("réponse inattendue")
+    monkeypatch.setattr(ade, "login", boom)
+    res = logged.post("/api/timetable/ade/login", json={"university": "paris-cite", "username": "etu", "password": "x"})
+    assert res.status_code == 502 and res.json()["detail"]["code"] == "ade_robot"

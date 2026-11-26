@@ -1,4 +1,6 @@
 """Point d'entrée de l'API Studoo (FastAPI)."""
+import logging
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -6,6 +8,11 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from .config import get_settings
 from .deps import csrf_guard
 from .routes import admin, ai, auth, jobs, keys, site, timetable
+
+# httpx écrit chaque adresse appelée : elles peuvent contenir des jetons (ticket de connexion de l'université,
+# clés…). On ne garde que les avertissements.
+for noisy in ("httpx", "httpcore"):
+    logging.getLogger(noisy).setLevel(logging.WARNING)
 
 app = FastAPI(
     title="Studoo API",

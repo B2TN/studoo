@@ -210,9 +210,21 @@ def _rpc(client: httpx.Client, gwt: dict, service: str, body: str) -> str:
         "Content-Type": "text/x-gwt-rpc; charset=utf-8", "X-GWT-Permutation": gwt["perm"], "X-GWT-Module-Base": gwt["module"]})
     if res.status_code != 200 or not res.text.startswith("//OK"):
         raise _error(502, "ade_error", "ADE a refusé la demande (session expirée ?) : recommence la connexion.")
-    payload = json.loads(res.text[4:])
-    strings = next((x for x in payload if isinstance(x, list)), [])
-    return "".join(s for s in strings if isinstance(s, str))
+    return _strings(res.text)
+
+
+def _strings(text: str) -> str:
+    """Textes d'une réponse GWT « //OK[…] ». Les longues réponses sont découpées en « ].concat([ » (syntaxe
+    JavaScript) : on les recolle avant de lire. Si le format reste inconnu, on renvoie le texte brut."""
+    body = text[4:]
+    for candidate in (body, body.replace("].concat([", ",")):
+        try:
+            payload = json.loads(candidate)
+        except ValueError:
+            continue
+        lists = [x for x in payload if isinstance(x, list)] if isinstance(payload, list) else []
+        return "".join(s for s in (lists[0] if lists else []) if isinstance(s, str))
+    return body
 
 
 def _call(client, gwt, service, method_word, template) -> str:
@@ -248,8 +260,8 @@ def register(client: httpx.Client, gwt: dict) -> None:
             _call(client, gwt, "ConfigurationServiceProxy", "getInitialConfiguration", lambda m: (
                 f"7|0|7|{gwt['module']}|{conf}|com.adesoft.gwt.core.client.rpc.ConfigurationServiceProxy|{m}|J|"
                 f"{JRE_SIGS['String']}|fr|1|2|3|4|2|5|6|{gwt['cid']}|7|"))
-        except HTTPException:
-            pass  # facultatif selon les versions
+        except (HTTPException, ValueError, httpx.HTTPError):
+            pass  # facultatif selon les versions : la suite dira si ADE accepte le client
     sn = gwt["names"]["DirectPlanningServiceProxy"]
     _call(client, gwt, "DirectPlanningServiceProxy", "login", lambda m: (
         f"7|0|11|{gwt['module']}|{sn}|com.adesoft.gwt.directplan.client.rpc.DirectPlanningServiceProxy|{m}|J|"

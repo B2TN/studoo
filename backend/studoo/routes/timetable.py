@@ -150,6 +150,24 @@ class AdeChooseIn(BaseModel):
     label: str = Field(default="", max_length=300)
 
 
+def _ade_guard(step: str):
+    """Erreur inattendue du robot ADE → message clair (jamais une « erreur 500 »), journal sans contenu."""
+    import contextlib
+    import logging
+
+    @contextlib.contextmanager
+    def guard():
+        try:
+            yield
+        except HTTPException:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger("studoo.ade").warning("Robot ADE (%s) : %s", step, type(exc).__name__)
+            raise HTTPException(502, detail={"code": "ade_robot", "message": "Le robot n'a pas compris la réponse d'ADE. "
+                                             "Réessaie ; si ça recommence, utilise le dernier recours (.ics)."}) from None
+    return guard()
+
+
 def _ade_state(sub: str, sealed: str) -> dict:
     state = unseal(sub, sealed)
     if state.get("kind") != "ade-session":
@@ -169,14 +187,15 @@ def ade_login(body: AdeLoginIn, user: CurrentUser):
     uni = ade.UNIVERSITIES.get(body.university)
     if not uni:
         raise HTTPException(422, detail={"code": "invalid", "message": "Université non prise en charge par le robot."})
-    client = ade.login(uni["base"], body.username, body.password.get_secret_value())
-    try:
-        gwt = ade.discover(client, uni["base"])
-        ade.register(client, gwt)
-        projects = ade.projects(client, gwt)
-        state = {"kind": "ade-session", **ade.dump(client, uni["base"], gwt)}
-    finally:
-        client.close()
+    with _ade_guard("connexion"):
+        client = ade.login(uni["base"], body.username, body.password.get_secret_value())
+        try:
+            gwt = ade.discover(client, uni["base"])
+            ade.register(client, gwt)
+            projects = ade.projects(client, gwt)
+            state = {"kind": "ade-session", **ade.dump(client, uni["base"], gwt)}
+        finally:
+            client.close()
     return {"session": seal(user.sub, state), "projects": projects}
 
 
@@ -187,11 +206,12 @@ def ade_tree(body: AdeStepIn, user: CurrentUser):
     state = _ade_state(user.sub, body.session)
     client = ade.resume(state)
     try:
-        node = body.node or {}
-        if not node:
-            ade.load_project(client, state["gwt"], body.project)
-        nodes = ade.children(client, state["gwt"], int(node.get("id", -1)), str(node.get("name", "Formations"))[:200],
-                             int(node.get("level", 0)))
+        with _ade_guard("arborescence"):
+            node = body.node or {}
+            if not node:
+                ade.load_project(client, state["gwt"], body.project)
+            nodes = ade.children(client, state["gwt"], int(node.get("id", -1)), str(node.get("name", "Formations"))[:200],
+                                 int(node.get("level", 0)))
     except httpx.HTTPError:
         raise HTTPException(503, detail={"code": "unavailable", "message": "ADE ne répond pas : réessaie."}) from None
     finally:
