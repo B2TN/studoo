@@ -216,15 +216,17 @@ def _rpc(client: httpx.Client, gwt: dict, service: str, body: str) -> str:
 def _strings(text: str) -> str:
     """Textes d'une réponse GWT « //OK[…] ». Les longues réponses sont découpées en « ].concat([ » (syntaxe
     JavaScript) : on les recolle avant de lire. Si le format reste inconnu, on renvoie le texte brut."""
-    body = text[4:]
+    # GWT écrit certains caractères à la mode JavaScript (« d\x27APOGEE ») : on les traduit en JSON (\u0027).
+    body = re.sub(r"(?<!\\)\\x([0-9a-fA-F]{2})", r"\\u00\1", text[4:])
     for candidate in (body, body.replace("].concat([", ",")):
         try:
-            payload = json.loads(candidate)
+            payload = json.loads(candidate, strict=False)  # strict=False : tabulations / retours à la ligne dans les noms
         except ValueError:
             continue
         lists = [x for x in payload if isinstance(x, list)] if isinstance(payload, list) else []
         return "".join(s for s in (lists[0] if lists else []) if isinstance(s, str))
-    return body
+    # Format inattendu : on enlève au moins l'échappement des guillemets pour que l'analyse trouve les dossiers.
+    return body.replace('\\\\"', '"').replace('\\"', '"')
 
 
 def _call(client, gwt, service, method_word, template) -> str:

@@ -205,3 +205,20 @@ def test_unexpected_robot_error_gives_a_clear_message(logged, monkeypatch):
     monkeypatch.setattr(ade, "login", boom)
     res = logged.post("/api/timetable/ade/login", json={"university": "paris-cite", "username": "etu", "password": "x"})
     assert res.status_code == 502 and res.json()["detail"]["code"] == "ade_robot"
+
+
+def test_javascript_escapes_from_gwt_are_read():
+    """Relevé réel (26/11/2026) : sous « IUT Paris - Rives de Seine », le 1er dossier s'appelle « 0-IUT PRS remontée d'APOGEE »,
+    écrit d\x27APOGEE par GWT : toute la réponse était illisible et la liste paraissait vide."""
+    inner = ('{"0"{"32464""true""1""22""0""21""0""false"[1]{"StringField""NAME""LabelName""IUT Paris - Rives de Seine""false""false""""trainee""1""0"[0][0][22]'
+             '{"40289""true""2""-1""0""0""0""false"[2]{"ColorField""COLOR""LabelColor""102,102,255""false""false"'
+             '{"StringField""NAME""LabelName""0-IUT PRS remontée d\x27APOGEE""false""false""IUT Paris - Rives de Seine.0-IUT PRS remontée d\x27APOGEE""trainee""1""0"[0][0]'
+             '{"32465""true""2""-1""10""10""0""false"[2]{"ColorField""COLOR""LabelColor""255,102,102""false""false"'
+             '{"StringField""NAME""LabelName""Département INFO""false""false""IUT Paris - Rives de Seine.Département INFO""trainee""1""0"[0][0]"false"')
+    raw = "//OK" + json.dumps([1, ["X"], 0, 7], ensure_ascii=False).replace('"X"', '"' + inner.replace('"', '\\"') + '"')
+    assert "\x27" in raw  # comme la vraie réponse
+
+    def handler(req):
+        return httpx.Response(200, text=raw)
+    nodes = ade.children(client_for(handler), GWT, 32464, "IUT Paris - Rives de Seine", 1)
+    assert [n["name"] for n in nodes] == ["0-IUT PRS remontée d'APOGEE", "Département INFO"]
