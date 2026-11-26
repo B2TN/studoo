@@ -22,7 +22,19 @@ html:not(.is-app) #app { display: none; }
 .hero-mascot { position: absolute; right: 4%; bottom: 0; width: 130px; height: 130px; transform: rotate(8deg); }
 
 .section-title { font-size: clamp(32px, 4vw, 44px); margin: 30px 0 22px; }
-.tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+/* Sept cartes, jamais une seule sur la dernière ligne : 1 colonne, puis 3+2+2, puis 4+3 centrée. */
+.tools-l { container-type: inline-size; }
+.tool-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+@container (min-width: 620px) {
+  .tool-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .tool-grid > * { grid-column: span 2; }
+  .tool-grid > :nth-child(n + 4) { grid-column: span 3; }
+}
+@container (min-width: 1000px) {
+  .tool-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .tool-grid > *, .tool-grid > :nth-child(n + 4) { grid-column: span 2; }
+  .tool-grid > :nth-child(5) { grid-column: 2 / span 2; }
+}
 .tool-card { position: relative; padding: 22px 20px; color: var(--on-fluo); border-radius: var(--radius-note); box-shadow: 2px 6px 0 rgba(22,41,110,.18); }
 .tool-card:nth-child(odd) { transform: rotate(-1deg); }
 .tool-card:nth-child(even) { transform: rotate(1deg); }
@@ -46,7 +58,7 @@ html:not(.is-app) #app { display: none; }
 @media (max-width: 900px) {
   .hero { grid-template-columns: minmax(0, 1fr); }
   .hero-art { min-height: 260px; }
-  .tool-grid, .steps { grid-template-columns: minmax(0, 1fr); }
+  .steps { grid-template-columns: minmax(0, 1fr); }
   .mini-note { width: 190px; font-size: 16px; }
   .site-footer { padding-bottom: 120px; }
 }
@@ -62,3 +74,15 @@ html:not(.is-app) #app { display: none; }
 .page th, .page td { border: 1.5px solid var(--grid-strong); padding: 6px 8px; text-align: left; vertical-align: top; }
 .not-found { text-align: center; padding-top: 40px; }
 .not-found .big-num { font-family: var(--font-title); font-size: 120px; line-height: 1; }
+
+/* Apparition des blocs au défilement, sans JavaScript (navigateurs qui le gèrent ; sinon tout est déjà visible) */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .tool-card, .steps > li, .privacy { animation: rise-in linear backwards; animation-timeline: view(); animation-range: entry 0% entry 35%; }
+  }
+}
+@keyframes rise-in { from { opacity: 0; transform: translateY(26px); } }
+.tool-card { transition: transform .2s cubic-bezier(.3, 1.4, .5, 1); }
+.tool-card:hover { transform: rotate(0) translateY(-4px); }
+.hero-mascot { transition: transform .3s cubic-bezier(.3, 1.4, .5, 1); }
+.hero-art:hover .hero-mascot { transform: rotate(2deg) scale(1.04); }

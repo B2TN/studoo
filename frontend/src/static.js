@@ -7,10 +7,12 @@ import "./styles/landing.css";
 
 import { api } from "./lib/api.js";
 import { $, h } from "./lib/dom.js";
+import { wakeLogos } from "./lib/logo-eyes.js";
 import { applyPreferences, cookieBanner, themeButtons, toast, trackPage, wobbleFilter } from "./lib/ui.js";
 
 applyPreferences();
 wobbleFilter();
+wakeLogos(); // les yeux du logo suivent la souris (PC seulement)
 $(".theme-slot")?.replaceChildren(...themeButtons());
 cookieBanner();
 trackPage(document.body.dataset.page === "404" ? "/404" : location.pathname);

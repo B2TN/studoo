@@ -119,9 +119,9 @@ export async function render({ view, user }) {
     h("section", { class: "hello" }, mascotSvg(),
       h("div", {}, h("h1", {}, "Salut ", h("span", { class: "hl" }, firstName(user)), " !"), subtitle)),
     h("h2", { class: "section" }, "Qu'est-ce qu'on fait ?"),
-    h("div", { class: "tools" }, TOOLS.map(([href, color, ic, title, sub]) =>
+    h("div", { class: "tools-wrap" }, h("div", { class: "tools" }, TOOLS.map(([href, color, ic, title, sub]) =>
       h("a", { class: `postit c-${color}`, href, "data-link": "1" }, h("span", { class: "tape" }), icon(ic, { doodle: true }),
-        h("strong", {}, title), h("small", {}, sub)))),
+        h("strong", {}, title), h("small", {}, sub))))),
     h("div", { class: "cols" }, todaySlot, coursesSlot),
     jobs.el,
     h("h2", { class: "section" }, h("span", { class: "hl pink" }, "Récemment")),

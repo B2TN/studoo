@@ -10,6 +10,7 @@ import "./styles/fiche.css";
 
 import { cachedUser, isLoggedFlag, restore, signIn } from "./lib/auth.js";
 import { $, $$ } from "./lib/dom.js";
+import { wakeLogos } from "./lib/logo-eyes.js";
 import { applyPreferences, cookieBanner, errorToast, themeButtons, trackPage, wobbleFilter } from "./lib/ui.js";
 
 applyPreferences();
@@ -26,6 +27,7 @@ async function startApp(user) {
 
 function showLanding() {
   document.documentElement.classList.remove("is-app");
+  wakeLogos(); // les yeux du logo suivent la souris (PC seulement)
   if (location.pathname !== "/") history.replaceState(null, "", "/");
   $(".theme-slot")?.replaceChildren(...themeButtons());
   for (const btn of $$(".google-cta")) {

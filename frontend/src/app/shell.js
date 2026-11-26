@@ -1,4 +1,5 @@
 // Coquille de l'application : barre du haut, menu, zone de contenu, navigation.
+import { wakeLogos } from "../lib/logo-eyes.js";
 import { api } from "../lib/api.js";
 import { signOut } from "../lib/auth.js";
 import { $, h, mount } from "../lib/dom.js";
@@ -83,6 +84,7 @@ export async function startShell(user) {
   const tabbar = h("nav", { class: "tabbar sketch", "aria-label": "Navigation mobile" }, TABS.map((t) => navLink(t)));
 
   mount($("#app"), layout, fab, tabbar);
+  wakeLogos(layout); // les yeux du logo suivent la souris (PC seulement)
 
   let cleanup = null; // fonction fournie par une page pour s'arrêter proprement (micro, lecture…)
   const router = createRouter(ROUTES, async (found, { query, data }) => {
@@ -103,6 +105,11 @@ export async function startShell(user) {
     try {
       const [mod] = await Promise.all([route.load(), storageReady]);
       cleanup = await mod.render({ view, params, query, data, route, user, go: router.go, refreshQuota });
+      wakeLogos(view);
+      // Entrée de page : fondu + léger glissement (désactivé si le système réduit les animations)
+      view.classList.remove("page-in");
+      void view.offsetWidth;
+      view.classList.add("page-in");
     } catch (err) {
       errorToast(err);
       mount(view, h("div", { class: "empty" }, h("p", {}, "Oups, cette page n'a pas pu se charger."),

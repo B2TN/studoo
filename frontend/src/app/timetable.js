@@ -10,12 +10,14 @@ import { icon } from "../lib/icons.js";
 import { drive, getSettings } from "../lib/storage.js";
 import {
   adeChoose, adeLogin, adeTree, addSource, celcatChoose, celcatGroups, celcatLogin, clearTimetableCache, guessProject,
-  higherDetect, higherSearch, loadEvents, removeSource, RECONNECT_DAYS, robotConnect, staleSources,
+  higherDetect, higherSearch, loadEvents, removeSource, RECONNECT_DAYS, robotConnect, staleSources, subjectsOf,
 } from "../lib/timetable-data.js";
+import {
+  blocksOfDay, dayKey, hourLabel, layoutColumns, visibleRange, wallMinutes, weekDays,
+} from "../lib/timetable-grid.js";
 import { detectSoftware, ICAL_STEPS_PRONOTE, ICAL_STEPS_UNIVERSITY, LAST_RESORT_STEPS, ROBOT_TESTED } from "../lib/establishments.js";
 import { openDialog, toast } from "../lib/ui.js";
 
-const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi"];
 const COLORS = ["yellow", "pink", "green", "blue", "orange", "lilac"];
 const PRIVACY_NOTE = "Ton identifiant sert uniquement à récupérer ton emploi du temps, il est supprimé juste après.";
 
@@ -31,20 +33,146 @@ function colorFor(subject, palette) {
   return palette.get(subject);
 }
 
-function weekView(events, monday) {
-  const palette = new Map();
-  const today = new Date().toDateString();
-  return h("div", { class: "week" }, DAYS.map((name, i) => {
-    const day = new Date(monday);
-    day.setDate(day.getDate() + i);
-    const list = events.filter((e) => new Date(e.start).toDateString() === day.toDateString());
-    return h("section", { class: `day card sketch${day.toDateString() === today ? " today" : ""}`, "aria-label": `${name} ${day.getDate()}` },
-      h("h3", {}, day.toDateString() === today ? h("span", { class: "hl" }, name) : name, " ", h("span", { class: "small muted" }, day.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }))),
-      list.length ? list.map((e) => h("div", { class: `lesson c-${colorFor(e.subject, palette)}${e.cancelled ? " cancelled" : ""}` },
-        h("time", { datetime: e.start }, `${time(e.start)} – ${time(e.end)}`), h("strong", {}, e.subject),
-        e.location ? h("span", { class: "small" }, ` · ${e.location}`) : null, e.cancelled ? h("span", { class: "small" }, " (annulé)") : null))
-        : h("p", { class: "small muted" }, "—"));
-  }));
+// ---------- Grille horaire (itération 6) ----------
+// PC et tablette : la semaine. Téléphone : un jour à la fois (aujourd'hui par défaut), avec un sélecteur de
+// jours, des flèches et le glissement du doigt. Dans les deux cas, chaque cours est placé à son heure réelle.
+const PX_PER_MIN = 1.1; // 1 h = 66 px
+const PHONE = "(max-width: 767px)";
+const SHORT_DAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const LONG_DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+
+function lessonLabel(e) {
+  return `${e.subject}, de ${time(e.start)} à ${time(e.end)}${e.location ? `, salle ${e.location}` : ""}${e.cancelled ? ", annulé" : ""}`;
+}
+
+function dayColumn(day, events, range, palette, now) {
+  const { blocks, allDay } = blocksOfDay(events, day.date);
+  const isToday = dayKey(day.date) === dayKey(now);
+  const col = h("ol", { class: `tt-col${isToday ? " today" : ""}`, "aria-label": `${LONG_DAYS[day.index]} ${day.date.getDate()}` },
+    layoutColumns(blocks).filter((b) => b.end > range.start && b.start < range.end).map((b) => {
+      const top = (Math.max(b.start, range.start) - range.start) * PX_PER_MIN;
+      const height = Math.max(20, (Math.min(b.end, range.end) - Math.max(b.start, range.start)) * PX_PER_MIN - 3);
+      const e = b.event;
+      return h("li", {
+        class: `lesson c-${colorFor(e.subject, palette)}${e.cancelled ? " cancelled" : ""}${height < 44 ? " compact" : ""}`,
+        style: { top: `${top}px`, height: `${height}px`, left: `calc(${(100 * b.col) / b.cols}% + 2px)`, width: `calc(${100 / b.cols}% - 4px)` },
+        title: lessonLabel(e), "aria-label": lessonLabel(e),
+      },
+      h("time", { datetime: e.start }, `${time(e.start)} – ${time(e.end)}`), h("strong", {}, e.subject),
+      e.location && height >= 60 ? h("span", { class: "small" }, e.location) : null,
+      e.cancelled ? h("span", { class: "small" }, " annulé") : null);
+    }));
+  if (isToday) {
+    const m = wallMinutes(now);
+    if (m > range.start && m < range.end) col.append(h("li", { class: "tt-now", "aria-hidden": "true", style: { top: `${(m - range.start) * PX_PER_MIN}px` } }));
+  }
+  return { col, allDay, empty: !blocks.length && !allDay.length };
+}
+
+/** La grille : colonne des heures + une colonne par jour. */
+function scheduleGrid(days, events, range, { headers = true } = {}) {
+  const palette = new Map(subjectsOf(events).map((s, i) => [s, COLORS[i % COLORS.length]]));
+  const now = new Date();
+  const cols = days.map((d) => dayColumn(d, events, range, palette, now));
+  const hours = [];
+  for (let m = range.start; m <= range.end; m += 60) hours.push(m);
+  const height = (range.end - range.start) * PX_PER_MIN;
+  const anyAllDay = cols.some((c) => c.allDay.length);
+  return h("div", { class: "tt", style: { "--tt-cols": String(days.length), "--tt-h": `${height}px`, "--tt-hour": `${60 * PX_PER_MIN}px` } },
+    headers ? [h("div", { class: "tt-corner" }), ...days.map((d) => {
+      const isToday = dayKey(d.date) === dayKey(now);
+      return h("div", { class: `tt-head${isToday ? " today" : ""}` }, isToday ? h("span", { class: "hl" }, LONG_DAYS[d.index]) : LONG_DAYS[d.index],
+        " ", h("span", { class: "small muted" }, d.date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })));
+    })] : null,
+    anyAllDay ? [h("div", { class: "tt-corner small muted" }, "Journée"), ...cols.map((c) => h("div", { class: "tt-allday" },
+      c.allDay.map((e) => h("span", { class: `allday c-${colorFor(e.subject, palette)}` }, e.subject))))] : null,
+    h("div", { class: "tt-gutter", "aria-hidden": "true" }, hours.map((m) => h("span", { style: { top: `${(m - range.start) * PX_PER_MIN}px` } }, hourLabel(m)))),
+    ...cols.map((c) => h("div", { class: "tt-cell" }, c.col,
+      c.empty ? h("p", { class: "tt-empty small muted" }, "Pas de cours") : null)));
+}
+
+function weekRange(events, monday) {
+  const all = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    all.push(...blocksOfDay(events, d).blocks);
+  }
+  return visibleRange(all);
+}
+
+/**
+ * Vue de l'emploi du temps : semaine (PC, tablette) ou jour (téléphone). Se redessine seule si la largeur
+ * change (rotation, fenêtre redimensionnée). Renvoie { el, stop }.
+ */
+function scheduleView(events, monday, offset, wantedDay, go) {
+  const el = h("div", { class: "schedule" });
+  const days = weekDays(monday, events);
+  const range = weekRange(events, monday); // même plage pour toute la semaine : la grille ne « saute » pas d'un jour à l'autre
+  const todayIndex = days.findIndex((d) => dayKey(d.date) === dayKey(new Date()));
+  let current = Number.isInteger(wantedDay) && days.some((d) => d.index === wantedDay) ? wantedDay
+    : todayIndex >= 0 ? days[todayIndex].index : days[0].index;
+  const mq = window.matchMedia?.(PHONE);
+
+  const goDay = (index, dir) => {
+    const pos = days.findIndex((d) => d.index === current);
+    if (index === undefined) {
+      const next = days[pos + dir];
+      if (!next) { // on change de semaine : premier ou dernier jour de la semaine voisine
+        go(`/emploi-du-temps?semaine=${offset + dir}&jour=${dir > 0 ? 0 : 4}`);
+        return;
+      }
+      index = next.index;
+    }
+    current = index;
+    try { history.replaceState(history.state, "", `/emploi-du-temps?semaine=${offset}&jour=${index}`); } catch { /* sans importance */ }
+    paint(dir);
+  };
+
+  function dayPicker() {
+    return h("div", { class: "day-picker", role: "tablist", "aria-label": "Choisir le jour" },
+      h("button", { class: "btn small icon-btn", type: "button", "aria-label": "Jour précédent", onclick: () => goDay(undefined, -1) }, icon("arrow-left")),
+      days.map((d) => h("button", {
+        class: `day-chip${d.index === current ? " active" : ""}${dayKey(d.date) === dayKey(new Date()) ? " today" : ""}`, type: "button", role: "tab",
+        "aria-selected": String(d.index === current), "aria-label": `${LONG_DAYS[d.index]} ${d.date.getDate()}`,
+        onclick: () => goDay(d.index, d.index > current ? 1 : -1),
+      }, h("span", {}, SHORT_DAYS[d.index]), h("strong", {}, String(d.date.getDate())))),
+      h("button", { class: "btn small icon-btn", type: "button", "aria-label": "Jour suivant", onclick: () => goDay(undefined, 1) }, icon("arrow-right")));
+  }
+
+  function swipe(target) {
+    let x0 = null;
+    let y0 = 0;
+    target.addEventListener("pointerdown", (e) => { if (e.pointerType !== "mouse") { x0 = e.clientX; y0 = e.clientY; } });
+    target.addEventListener("pointerup", (e) => {
+      if (x0 === null) return;
+      const dx = e.clientX - x0;
+      const dy = e.clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) goDay(undefined, dx < 0 ? 1 : -1);
+    });
+    target.addEventListener("pointercancel", () => { x0 = null; });
+  }
+
+  function paint(dir = 0) {
+    if (mq?.matches) {
+      const day = days.find((d) => d.index === current);
+      const grid = scheduleGrid([day], events, range, { headers: false });
+      grid.classList.add("tt-day-view");
+      if (dir) grid.classList.add(dir > 0 ? "from-right" : "from-left");
+      swipe(grid);
+      mount(el, dayPicker(),
+        h("h2", { class: "tt-day-title" }, LONG_DAYS[day.index], " ", day.date.toLocaleDateString("fr-FR", { day: "numeric", month: "long" }),
+          dayKey(day.date) === dayKey(new Date()) ? h("span", { class: "hl small" }, " aujourd'hui") : null),
+        grid);
+    } else {
+      mount(el, scheduleGrid(days, events, range));
+    }
+  }
+  const onChange = () => paint();
+  mq?.addEventListener?.("change", onChange);
+  paint();
+  return { el, stop: () => mq?.removeEventListener?.("change", onChange) };
 }
 
 // ---------- Dernier recours : lien ou fichier .ics ----------
@@ -466,6 +594,8 @@ export async function render({ view, query, go }) {
     try { events = await loadEvents(); } catch (e) { error = e; }
   }
   const stale = staleSources(sources);
+  const schedule = sources.length ? scheduleView(events, monday, offset, query.has("jour") ? Number(query.get("jour")) : null, go)
+    : { el: null, stop: () => {} };
   const reconnectOf = (s) => (s.uai ? { uai: s.uai, name: s.school || s.label, city: s.city || "" } : null);
   const reconnect = (s) => {
     const finish = (close) => (x) => { close(); afterImport(go)(x); };
@@ -489,7 +619,7 @@ export async function render({ view, query, go }) {
         h("span", { class: "spacer" }),
         h("button", { class: "btn small", onclick: async () => { clearTimetableCache(); go(location.pathname + location.search, { replace: true }); } }, icon("refresh"), "Actualiser")),
       error ? h("p", { class: "card sketch error" }, `Synchronisation impossible : ${error.message}`) : null,
-      weekView(events, monday),
+      schedule.el,
       h("h2", { class: "section" }, "Sources connectées"),
       h("ul", { class: "files card sketch" }, sources.map((s) => h("li", {},
         h("span", { class: "kind c-lilac" }, icon(s.type === "snapshot" || /pronote/i.test(s.label || "") ? "school" : "link")),
@@ -500,4 +630,5 @@ export async function render({ view, query, go }) {
           h("button", { class: "btn small danger", title: "Supprime le jeton chiffré : Studoo ne pourra plus lire cet emploi du temps", onclick: async () => { await removeSource(s.id); toast("Déconnecté : le jeton a été supprimé.", "success"); go(location.pathname, { replace: true }); } }, icon("logout"), "Déconnecter"))))),
     ] : h("p", { class: "muted" }, "Connecte ton emploi du temps : Studoo saura quel cours tu enregistres et créera tes dossiers de matières."),
     addPanel(go));
+  return schedule.stop;
 }
