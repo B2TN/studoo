@@ -1,6 +1,6 @@
 // Tâches lourdes traitées par le serveur (podcasts, vidéos, lecture de copies).
 // Le navigateur dépose la tâche puis peut être fermé : le résultat arrive dans le Drive
-// et l'élève est prévenu (notification web, e-mail de secours, pastille sur le site).
+// et l'élève est prévenu (notification web, e-mail de secours s'il est activé, pastille sur le site).
 import { api, getConfig } from "./api.js";
 
 export const createJob = (job) => api("/api/jobs", { method: "POST", json: job }).then((r) => r.job);
@@ -104,7 +104,10 @@ export async function enablePush() {
   if (!pushSupported()) throw new Error("Ce navigateur ne gère pas les notifications web.");
   if (needsHomeScreen()) throw new Error("Sur iPhone : ajoute d'abord Studoo à l'écran d'accueil (bouton Partager → « Sur l'écran d'accueil »), puis ouvre-le depuis là.");
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") throw new Error("Notifications refusées : tu recevras un e-mail à la place.");
+  if (permission !== "granted") {
+    throw new Error((await getConfig()).emailFallback ? "Notifications refusées : tu recevras un e-mail à la place."
+      : "Notifications refusées : regarde la pastille « Mes générations » sur le tableau de bord.");
+  }
   const reg = await registerServiceWorker();
   const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
   const json = sub.toJSON();

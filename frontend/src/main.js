@@ -11,11 +11,13 @@ import "./styles/fiche.css";
 import { cachedUser, isLoggedFlag, restore, signIn } from "./lib/auth.js";
 import { $, $$ } from "./lib/dom.js";
 import { wakeLogos } from "./lib/logo-eyes.js";
+import { installErrorReporting } from "./lib/errors.js";
 import { handleChunkError, installStaleGuard } from "./lib/stale.js";
 import { applyPreferences, cookieBanner, errorToast, themeButtons, trackPage, wobbleFilter } from "./lib/ui.js";
 
 applyPreferences();
 installStaleGuard(); // nouvelle version du site pendant que l'onglet est ouvert : rechargement propre
+installErrorReporting(); // bugs inattendus → Sentry (si activé), sans donnée personnelle
 
 // Le code de l'application est téléchargé dès que possible, en parallèle.
 const shellModule = isLoggedFlag() ? import("./app/shell.js") : null;

@@ -336,3 +336,15 @@ table.data th, table.data td { border-bottom: 1.5px dashed var(--grid-strong); p
 
 /* Quota d'IA restant (itération 7, C4) */
 .quota-text { display: block; margin-top: 4px; font-size: 13px; line-height: 1.25; }
+
+/* Admin : services et schéma (itération 7, C5) */
+.services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.service { display: flex; flex-direction: column; gap: 10px; justify-content: space-between; }
+.service .icon-btn { font-family: var(--font-title); font-size: 22px; width: 38px; height: 38px; min-height: 38px; flex: none; }
+.service-info ul { margin: 4px 0 0; padding-left: 1.2em; }
+.service-info .icon { width: .9em; height: .9em; vertical-align: -.1em; }
+.flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+.flow-step { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; color: var(--on-fluo);
+  border-radius: 2px 3px 14px 3px; box-shadow: 2px 4px 6px -2px rgba(22, 41, 110, .3); }
+.flow-step:nth-child(odd) { transform: rotate(-.6deg); } .flow-step:nth-child(even) { transform: rotate(.5deg); }
+.flow-step + .flow-step::before { content: "↓"; position: absolute; top: -23px; left: 50%; transform: translateX(-50%); font-size: 20px; color: var(--ink); }

@@ -11,6 +11,9 @@ APP_URL = os.environ.get("APP_URL", "https://studoo-app.vercel.app").rstrip("/")
 # Réveil par file Azure Storage (adresse de la file + jeton SAS « p ») ; vide = pas de file
 WORKER_QUEUE_URL = os.environ.get("WORKER_QUEUE_URL", "")
 
+# Suivi des erreurs (Sentry, facultatif) : même règle que l'API, rien de personnel n'est envoyé.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+
 # Notifications
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")  # format PEM ou base64url
 VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "https://studoo-app.vercel.app/contact")

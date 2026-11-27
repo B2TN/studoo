@@ -14,6 +14,10 @@ from .routes import admin, ai, auth, jobs, keys, site, timetable
 for noisy in ("httpx", "httpcore"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
 
+from . import monitoring
+
+monitoring.setup(get_settings().sentry_dsn, environment="local" if get_settings().is_local else "production")
+
 app = FastAPI(
     title="Studoo API",
     docs_url="/api/docs" if get_settings().is_local else None,

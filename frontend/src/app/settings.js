@@ -1,5 +1,5 @@
 // Réglages : compte, affichage, notifications, Gemini (clé personnelle facultative), confidentialité, suppression du compte.
-import { api } from "../lib/api.js";
+import { api, getConfig } from "../lib/api.js";
 import { deleteAccount, signOut } from "../lib/auth.js";
 import { h, mount } from "../lib/dom.js";
 import { icon } from "../lib/icons.js";
@@ -7,15 +7,17 @@ import { enablePush, disablePush, needsHomeScreen, pushStatus } from "../lib/job
 import { drive, getSettings } from "../lib/storage.js";
 import { confirmDialog, consent, errorToast, store, themeButtons, toast } from "../lib/ui.js";
 
-/** Notifications de fin de génération (PWA) ; sinon e-mail de secours. */
+/** Notifications de fin de génération (PWA) ; sinon e-mail de secours s'il est activé, et la pastille du tableau de bord. */
 function notifySection() {
   const state = h("p", { class: "small" }, "…");
   const btn = h("button", { class: "btn", type: "button" });
   const paint = async () => {
     const st = await pushStatus().catch(() => "unsupported");
+    const instead = (await getConfig().catch(() => ({}))).emailFallback ? "tu recevras un e-mail à la place"
+      : "regarde la pastille « Mes générations » sur le tableau de bord";
     const labels = {
-      on: "Activées sur cet appareil.", off: "Désactivées sur cet appareil : tu recevras un e-mail à la place.",
-      denied: "Bloquées par le navigateur : tu recevras un e-mail à la place.", unsupported: "Non disponibles dans ce navigateur : tu recevras un e-mail à la place.",
+      on: "Activées sur cet appareil.", off: `Désactivées sur cet appareil : ${instead}.`,
+      denied: `Bloquées par le navigateur : ${instead}.`, unsupported: `Non disponibles dans ce navigateur : ${instead}.`,
     };
     state.textContent = labels[st];
     btn.hidden = st === "unsupported" || st === "denied";

@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     vapid_public_key: str = ""
     worker_queue_url: str = ""  # file Azure « studoo-jobs » + jeton SAS d'ajout seul (réveil du serveur de tâches)
     max_pending_jobs: int = 5
+    # E-mail « c'est prêt » de secours (Brevo, réglé sur le serveur de tâches) : à mettre à 1 seulement quand il est
+    # vraiment configuré, pour que le site ne promette pas d'e-mail qui ne part pas.
+    email_notifications: bool = False
+    # Suivi des erreurs (Sentry) : adresse « DSN » publique du projet ; vide = désactivé.
+    sentry_dsn: str = ""
 
     # Base de données (SQLite en local, Postgres Neon en production)
     database_url: str = "sqlite:///./studoo-dev.db"

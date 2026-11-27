@@ -11,3 +11,4 @@ piper-tts==1.8.0
 kokoro-onnx==0.4.7
 imageio-ffmpeg==0.8.1
 pywebpush==2.5.0
+sentry-sdk==2.77.0

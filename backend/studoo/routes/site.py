@@ -35,6 +35,8 @@ async def public_config():
         "devLogin": s.dev_login_enabled,
         "aiFake": s.ai_fake_enabled,
         "vapidPublicKey": s.vapid_public_key,
+        "emailFallback": s.email_notifications,
+        "sentryDsn": s.sentry_dsn,  # adresse publique par conception (elle ne permet que d'ENVOYER des erreurs)
     }
 
 

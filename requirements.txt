@@ -11,3 +11,4 @@ recurring-ical-events==3.8.2
 pydantic-settings==2.16.3
 email-validator==2.4.0
 pronotepy==2.15.7
+sentry-sdk==2.77.0

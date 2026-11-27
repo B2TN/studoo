@@ -1,5 +1,5 @@
 // Création d'une fiche, d'un podcast ou d'une vidéo à partir des cours choisis.
-import { api } from "../lib/api.js";
+import { api, getConfig } from "../lib/api.js";
 import { createJob, enablePush, etaText, needsHomeScreen, pushStatus } from "../lib/jobs.js";
 import { h, mount } from "../lib/dom.js";
 import { icon } from "../lib/icons.js";
@@ -131,7 +131,12 @@ function launchedCard(job, go) {
   const paint = async () => {
     const status = await pushStatus().catch(() => "unsupported");
     if (status === "on") { mount(notifyArea, h("p", { class: "small" }, icon("check"), " Tu recevras une notification sur cet appareil.")); return; }
-    if (status === "unsupported" || status === "denied") { mount(notifyArea, h("p", { class: "small muted" }, "Tu recevras un e-mail et une pastille sur le tableau de bord à la fin.")); return; }
+    if (status === "unsupported" || status === "denied") {
+      const email = (await getConfig().catch(() => ({}))).emailFallback;
+      mount(notifyArea, h("p", { class: "small muted" }, email ? "Tu recevras un e-mail et une pastille sur le tableau de bord à la fin."
+        : "Une pastille apparaîtra sur le tableau de bord (« Mes générations ») à la fin."));
+      return;
+    }
     mount(notifyArea, h("button", { class: "btn", type: "button", onclick: async () => {
       try { await enablePush(); toast("Notifications activées", "success"); } catch (e) { toast(e.message, "info", 9000); }
       paint();

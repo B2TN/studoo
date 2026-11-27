@@ -8,11 +8,13 @@ import "./styles/landing.css";
 import { api } from "./lib/api.js";
 import { $, h } from "./lib/dom.js";
 import { wakeLogos } from "./lib/logo-eyes.js";
+import { installErrorReporting } from "./lib/errors.js";
 import { installStaleGuard } from "./lib/stale.js";
 import { applyPreferences, cookieBanner, themeButtons, toast, trackPage, wobbleFilter } from "./lib/ui.js";
 
 applyPreferences();
 installStaleGuard();
+installErrorReporting(); // bugs inattendus → Sentry (si activé), sans donnée personnelle
 wobbleFilter();
 wakeLogos(); // les yeux du logo suivent la souris (PC seulement)
 $(".theme-slot")?.replaceChildren(...themeButtons());

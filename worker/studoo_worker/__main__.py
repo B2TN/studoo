@@ -64,6 +64,9 @@ def process_one() -> bool:
 
 
 def main() -> None:
+    from studoo import monitoring  # suivi des erreurs facultatif (SENTRY_DSN), sans aucune donnée personnelle
+    from . import settings
+    monitoring.setup(settings.SENTRY_DSN, component="worker")
     mode = sys.argv[1] if len(sys.argv) > 1 else "loop"
     queue.purge()
     if mode == "once":

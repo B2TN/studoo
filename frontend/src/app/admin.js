@@ -3,6 +3,7 @@ import { api } from "../lib/api.js";
 import { h, mount } from "../lib/dom.js";
 import { relativeDate } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
+import { FLOW, SERVICES } from "../lib/services.js";
 import { confirmDialog, errorToast, openDialog, toast } from "../lib/ui.js";
 
 const LABELS = { transcription: "Transcriptions", fiche: "Fiches", podcast: "Podcasts", video: "Vidéos", scan: "Numérisations" };
@@ -125,6 +126,37 @@ function logSection(log) {
     : h("p", { class: "empty" }, "Aucune action pour l'instant."));
 }
 
+// ---------- Services utilisés (itération 7, C5) ----------
+const ext = { target: "_blank", rel: "noopener noreferrer" };
+
+function serviceInfo(svc) {
+  openDialog(svc.name, () => h("div", { class: "stack service-info" },
+    h("p", {}, h("strong", {}, "À quoi ça sert : "), svc.role, "."),
+    h("p", {}, h("strong", {}, "Comment ça marche dans Studoo : "), svc.how),
+    h("p", {}, h("strong", {}, "Offre gratuite et limites : "), svc.free),
+    h("p", {}, h("strong", {}, "Où sont la configuration et les clés : "), svc.config),
+    h("div", {}, h("strong", {}, "Où trouver quoi :"),
+      h("ul", {}, svc.where.map(([label, url]) => h("li", {}, h("a", { href: url, ...ext }, label), " ", icon("external-link"))))),
+    h("p", { class: "notice warn" }, h("strong", {}, "En cas de panne : "), svc.outage)));
+}
+
+function howItWorks() {
+  openDialog("Comment tout le site fonctionne", () => h("div", { class: "stack" },
+    h("ol", { class: "flow" }, FLOW.map(([title, text], i) => h("li", { class: `flow-step c-${["yellow", "blue", "green", "lilac", "orange", "pink"][i % 6]}` },
+      h("strong", {}, title), h("span", { class: "small" }, text)))),
+    h("p", { class: "small muted" }, "Règles qui tiennent l'ensemble : aucune clé dans le navigateur, cours jamais stockés chez nous, ",
+      "mots de passe des robots jamais enregistrés, tâches chiffrées puis effacées, IA sur Azure (Gemini seulement avec la clé d'un élève). ",
+      "Détails : docs/SERVICES.md et docs/ARCHITECTURE.md dans le dépôt GitHub.")));
+}
+
+function servicesSection() {
+  return h("section", { class: "services-grid" }, SERVICES.map((svc) => h("article", { class: "card sketch service" },
+    h("div", { class: "row", style: { alignItems: "flex-start", flexWrap: "nowrap" } },
+      h("span", { style: { flex: 1, minWidth: 0 } }, h("strong", {}, svc.name), h("br"), h("span", { class: "small muted" }, svc.role)),
+      h("button", { class: "btn small icon-btn", type: "button", "aria-label": `Comment marche ${svc.name}`, title: "Comment ça marche", onclick: () => serviceInfo(svc) }, "i")),
+    h("a", { class: "btn small", href: svc.url, ...ext }, icon("external-link"), "Tableau de bord"))));
+}
+
 async function renderAdmin(view, go) {
   const [ov, users, msgs, reports, bans, log] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/messages"),
     api("/api/admin/school-reports").catch(() => ({ reports: [] })), api("/api/admin/bans").catch(() => ({ bans: [] })),
@@ -149,6 +181,11 @@ async function renderAdmin(view, go) {
       h("span", {}, h("strong", {}, m.subject), h("br"), h("span", { class: "small muted" }, `${m.email} · ${relativeDate(m.createdAt)}`), h("p", { class: "small", style: { whiteSpace: "pre-wrap", margin: "6px 0 0" } }, m.body)),
       m.handled ? h("span", { class: "meta" }, "traité") : h("span", { class: "meta" }, h("button", { class: "btn small", onclick: async () => { await api(`/api/admin/messages/${m.id}/handled`, { method: "POST" }); go("/admin", { replace: true }); } }, icon("check"), "Traité")))))
       : h("p", { class: "empty" }, "Aucun message.")),
+    h("div", { class: "row", style: { alignItems: "baseline", marginTop: "28px" } },
+      h("h2", { class: "section", style: { margin: 0 } }, "Services"),
+      h("button", { class: "btn small", type: "button", onclick: howItWorks }, icon("info"), "Comment tout le site fonctionne")),
+    h("p", { class: "small muted" }, "Tout ce qui fait tourner Studoo. « Tableau de bord » ouvre la console du service ; « i » explique où trouver les journaux, la facturation, les quotas, les clés et quoi faire en cas de panne."),
+    servicesSection(),
     h("h2", { class: "section" }, "Établissements signalés"),
     h("p", { class: "small muted" }, "Envoyés après une erreur du robot ou un établissement non reconnu. Les plus demandés en premier : ce sont eux à prendre en charge."),
     h("section", { class: "card sketch table-wrap" }, reports.reports.length ? h("table", { class: "data" },
