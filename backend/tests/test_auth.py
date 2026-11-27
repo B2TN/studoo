@@ -38,8 +38,9 @@ def test_dev_login_disabled_outside_localhost(client, monkeypatch):
     assert client.post("/api/auth/dev-login").status_code == 404
 
 
-def _mock_google(monkeypatch, scope=DRIVE, refresh="rt-123"):
-    monkeypatch.setattr(auth, "_verify_id_token", lambda t: {"sub": "g-1", "email": "eleve@example.com", "name": "Élève"})
+def _mock_google(monkeypatch, scope=DRIVE, refresh="rt-123", verified=True):
+    monkeypatch.setattr(auth, "_verify_id_token",
+                        lambda t: {"sub": "g-1", "email": "eleve@example.com", "name": "Élève", "email_verified": verified})
     body = {"access_token": "at", "expires_in": 3599, "id_token": "idt", "scope": f"openid email {scope}"}
     if refresh:
         body["refresh_token"] = refresh
@@ -70,6 +71,15 @@ def test_google_login_without_refresh_asks_consent(client, monkeypatch):
     _mock_google(monkeypatch, refresh=None)
     res = client.post("/api/auth/google", json={"code": "4/abcdefghijkl"})
     assert res.status_code == 409
+
+
+@respx.mock
+def test_google_login_requires_a_verified_email(client, monkeypatch):
+    """Audit de sécurité (itération 7) : admin et bannissements reposent sur l'e-mail, qui doit être vérifié par Google."""
+    _mock_google(monkeypatch, verified=False)
+    res = client.post("/api/auth/google", json={"code": "4/abcdefghijkl"})
+    assert res.status_code == 403 and res.json()["detail"]["code"] == "email_unverified"
+    assert "studoo_session" not in client.cookies
 
 
 def test_delete_account(logged):

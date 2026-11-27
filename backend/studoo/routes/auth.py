@@ -82,6 +82,11 @@ async def login_google(body: CodeIn, request: Request, response: Response):
         claims = _verify_id_token(tokens["id_token"])
     except (ValueError, KeyError):
         raise HTTPException(400, detail={"code": "bad_id_token", "message": "Identité Google invalide."})
+    if claims.get("email_verified") is not True:
+        # Audit de sécurité : les droits admin et les bannissements reposent sur l'adresse e-mail ; elle doit avoir été
+        # vérifiée par Google (sinon n'importe qui pourrait se présenter avec l'adresse de quelqu'un d'autre).
+        raise HTTPException(403, detail={"code": "email_unverified", "message":
+                            "Ton adresse e-mail Google n'est pas vérifiée : vérifie-la dans ton compte Google, puis reconnecte-toi."})
 
     refresh = tokens.get("refresh_token")
     previous = read_session(request) or {}

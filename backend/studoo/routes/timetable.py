@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from .. import db
 from ..deps import User, current_user
 from ..limits import rate_limit
-from ..services import ade, aurion, higher, hyperplanning, pronote
+from ..services import ade, aurion, higher, hyperplanning, netguard, pronote
 from ..services.ics import _check_host, fetch_working, parse_ics
 from ..services.sealed import seal, unseal
 
@@ -80,7 +80,7 @@ async def sync(body: SyncIn, user: CurrentUser):
         return {**data, "sealed": None, "method": "ical"}
     if keep.get("kind") == "celcat":
         def read():
-            with httpx.Client(timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA}) as client:
+            with httpx.Client(timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA}, event_hooks=netguard.hooks()) as client:
                 return higher.celcat_events(client, _public_https(keep["base"]), keep["fid"])
         events = await run_in_threadpool(read)
         return {"events": events, "subjects": pronote.subjects(events), "sealed": None, "method": "celcat"}
@@ -303,7 +303,7 @@ def _celcat_client(user: User, body: CelcatIn):
         if state.get("kind") != "celcat-session" or state.get("base") != base:
             raise HTTPException(422, detail={"code": "bad_token", "message": "Session Celcat invalide : reconnecte-toi."})
         return base, ade.resume(state)
-    return base, httpx.Client(timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA})
+    return base, httpx.Client(timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA}, event_hooks=netguard.hooks())
 
 
 @router.post("/celcat/login")

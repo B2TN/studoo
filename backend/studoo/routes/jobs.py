@@ -41,6 +41,19 @@ class Source(BaseModel):
     chapter_id: str = Field(default="", max_length=128)
 
 
+def _is_image(data: str) -> bool:
+    """Base64 valide et signature d'image (JPEG, PNG, WebP) : rien d'autre n'arrive au serveur de tâches."""
+    import base64
+    import binascii
+    try:
+        head = base64.b64decode(data[:64], validate=True)
+    except (binascii.Error, ValueError):
+        return False
+    return (head.startswith(bytes([0xFF, 0xD8, 0xFF]))  # JPEG
+            or head.startswith(bytes([0x89]) + b"PNG" + bytes([0x0D, 0x0A, 0x1A, 0x0A]))  # PNG
+            or (head[:4] == b"RIFF" and head[8:12] == b"WEBP"))  # WebP
+
+
 class JobIn(BaseModel):
     kind: KINDS
     title: str = Field(default="", max_length=160)
@@ -58,6 +71,11 @@ class JobIn(BaseModel):
                 raise ValueError("Ajoute au moins une photo.")
             if sum(len(i) for i in self.images) > 3_500_000:
                 raise ValueError("Photos trop lourdes.")
+            for img in self.images:  # audit de sécurité : de vraies images, pas n'importe quel fichier
+                if not _is_image(img):
+                    raise ValueError("Une des photos n'est pas une image JPEG, PNG ou WebP valide.")
+        elif self.images:
+            raise ValueError("Pas de photo pour ce type de génération.")
         elif not self.sources:
             raise ValueError("Choisis au moins un cours.")
         if sum(len(s.text) for s in self.sources) > 400_000:

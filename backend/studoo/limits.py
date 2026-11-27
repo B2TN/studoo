@@ -99,13 +99,20 @@ def consume(tier: str, sub: str) -> None:
 def consume_job(sub: str) -> None:
     """Une génération de plus sur le serveur de tâches aujourd'hui ; 429 si la limite quotidienne est atteinte."""
     day = db.today()
-    limit = get_settings().quota_jobs_per_day
+    s = get_settings()
+    limit = s.quota_jobs_per_day
+    if db.read_count(db.ai_usage, {"day": day, "tier": "jobs"}) >= s.quota_site_jobs_per_day:
+        raise HTTPException(429, detail={
+            "code": "site_jobs_quota",
+            "message": "Le serveur de Studoo a fabriqué toutes ses générations pour aujourd'hui. Réessaie demain.",
+        })
     if db.read_count(db.user_job_usage, {"day": day, "sub": sub}) >= limit:
         raise HTTPException(429, detail={
             "code": "jobs_quota",
             "message": f"Tu as lancé tes {limit} générations du jour (podcasts, vidéos, exercices…). Reviens demain !",
         })
     db.increment(db.user_job_usage, {"day": day, "sub": sub})
+    db.increment(db.ai_usage, {"day": day, "tier": "jobs"})
 
 
 def public_limits() -> dict:
@@ -114,7 +121,7 @@ def public_limits() -> dict:
     return {
         "perUser": {"ai": s.quota_user_per_day, "jobs": s.quota_jobs_per_day, "pendingJobs": s.max_pending_jobs},
         "rates": {k: {"count": n, "minutes": w // 60} for k, (n, w) in RATES.items()},
-        "site": {"lite": s.quota_lite_per_day, "flash": s.quota_flash_per_day},
+        "site": {"lite": s.quota_lite_per_day, "flash": s.quota_flash_per_day, "jobs": s.quota_site_jobs_per_day},
         "reset": RESET_TEXT,
     }
 

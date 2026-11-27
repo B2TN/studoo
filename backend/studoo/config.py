@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     quota_flash_per_day: int = 300
     quota_user_per_day: int = 60   # demandes d'IA « en direct » par élève et par jour (transcription, rangement, fiches, PDF)
     quota_jobs_per_day: int = 10   # générations sur le serveur de tâches par élève et par jour (podcasts, vidéos, exercices…)
+    quota_site_jobs_per_day: int = 150  # plafond global du serveur de tâches (contre la création de comptes en masse)
 
     # Sécurité
     session_secret: str = Field(default="dev-secret-change-me-dev-secret-change-me", min_length=32)  # voir DEFAULT_SECRET

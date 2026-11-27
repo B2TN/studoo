@@ -25,6 +25,10 @@ def page(name: str) -> str:
 
 def fake_server(monkeypatch, handler):
     """Toutes les requêtes httpx (clients et httpx.get) passent par `handler(request) → Response`."""
+    from studoo.services import netguard
+    # Faux serveurs de test (noms qui n'existent pas) : seuls ceux-là sont acceptés sans résolution DNS.
+    real_check = netguard.check_host
+    monkeypatch.setattr(netguard, "check_host", lambda host: None if host.endswith(("exemple.fr", "univ-x.fr")) else real_check(host))
     transport = httpx.MockTransport(handler)
     real = REAL_CLIENT
     monkeypatch.setattr(httpx, "Client", lambda **kw: real(transport=transport, **kw))
@@ -255,3 +259,28 @@ def test_hyperplanning_route_keeps_only_a_sealed_link(logged, monkeypatch):
     body = res.json()
     assert body["experimental"] is True and body["method"] == "ical" and body["sealed"]
     assert "idICal" not in res.text  # le lien personnel n'est jamais renvoyé en clair
+
+
+# ---------------------------------------------------------------- SSRF (audit de sécurité, itération 7)
+def test_redirect_to_an_internal_address_is_refused(monkeypatch):
+    """Un faux établissement redirige le robot vers l'adresse des métadonnées du cloud : refusé avant la requête."""
+    asked = []
+
+    def handler(req):
+        asked.append(req.url.host)
+        if req.url.host == "aurion.ecole-exemple.fr":
+            return httpx.Response(302, headers={"location": "http://169.254.169.254/latest/meta-data/"})
+        return httpx.Response(200, text="secret interne")
+    fake_server(monkeypatch, handler)
+    with pytest.raises(HTTPException) as e:
+        aurion.robot(AURION, "u", "p")
+    assert e.value.status_code in (422, 502, 503) and "169.254.169.254" not in asked
+
+
+def test_guard_refuses_private_loopback_and_odd_schemes():
+    from studoo.services import netguard
+    for host in ("127.0.0.1", "10.0.0.5", "192.168.1.1", "169.254.169.254", "localhost", "[::1]"):
+        with pytest.raises(HTTPException):
+            netguard.check_host(host.strip("[]"))
+    with pytest.raises(httpx.UnsupportedProtocol):
+        netguard._check(httpx.Request("GET", "file:///etc/passwd"))

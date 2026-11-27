@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from . import ade, robot_errors
+from . import ade, netguard, robot_errors
 
 SERVICE = "HyperPlanning"
 log = logging.getLogger("studoo.hyperplanning")
@@ -90,7 +90,7 @@ def first_working(candidates: list[str], check) -> str:
 
 
 def looks_like_calendar(url: str) -> bool:
-    res = httpx.get(url, timeout=ade.TIMEOUT, follow_redirects=True, headers={"User-Agent": ade.UA})
+    res = netguard.get(url, timeout=ade.TIMEOUT, follow_redirects=True, headers={"User-Agent": ade.UA})
     return res.status_code == 200 and "BEGIN:VCALENDAR" in res.text[:2000]
 
 
@@ -98,7 +98,7 @@ def robot(base: str, username: str, password: str, *, check=looks_like_calendar)
     """Connexion à HyperPlanning → adresse iCal vérifiée. Le mot de passe ne sert qu'à la connexion."""
     url = espace_url(base)
     try:
-        probe = httpx.get(url, follow_redirects=True, timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA})
+        probe = netguard.get(url, follow_redirects=True, timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA})
     except httpx.HTTPError as exc:
         raise robot_errors.from_http(exc, SERVICE) from None
     if robot_errors.is_blocked(probe):

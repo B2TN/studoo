@@ -43,3 +43,12 @@ def test_double_click_does_not_count_twice(logged, monkeypatch):
     first = logged.post("/api/jobs", json={**SOURCES, "kind": "podcast"})
     again = logged.post("/api/jobs", json={**SOURCES, "kind": "podcast"})
     assert first.status_code == 201 and again.status_code in (200, 201) and again.json().get("existing") is True
+
+
+def test_site_wide_job_cap_against_mass_accounts(logged, monkeypatch):
+    """Audit de sécurité : même avec beaucoup de comptes, le serveur de tâches a un plafond global par jour."""
+    monkeypatch.setenv("QUOTA_SITE_JOBS_PER_DAY", "1")
+    get_settings.cache_clear()
+    assert logged.post("/api/jobs", json={**SOURCES, "kind": "podcast"}).status_code == 201
+    res = logged.post("/api/jobs", json={**SOURCES, "kind": "podcast", "sources": [{"title": "C", "text": "Autre cours"}]})
+    assert res.status_code == 429 and res.json()["detail"]["code"] == "site_jobs_quota"

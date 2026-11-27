@@ -23,7 +23,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
-from . import ade, robot_errors
+from . import ade, netguard, robot_errors
 from .ics import clean_subject
 
 SERVICE = "Aurion"
@@ -53,7 +53,7 @@ def login(base: str, username: str, password: str) -> tuple[httpx.Client, httpx.
     """Connexion à Aurion ; renvoie (client connecté, page du menu principal)."""
     start = f"{base}/faces/Login.xhtml"
     try:
-        probe = httpx.get(start, follow_redirects=True, timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA})
+        probe = netguard.get(start, follow_redirects=True, timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA})
     except httpx.HTTPError as exc:
         raise robot_errors.from_http(exc, SERVICE) from None
     if robot_errors.is_blocked(probe):
@@ -62,7 +62,7 @@ def login(base: str, username: str, password: str) -> tuple[httpx.Client, httpx.
         # Aurion renvoie vers la page de l'université (CAS/Shibboleth) : même connexion que pour ADE.
         return ade.sso_login(start, username, password,
                              back=lambda r: "/faces/" in r.url.path and not _is_login_page(r))
-    client = httpx.Client(follow_redirects=True, timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA})
+    client = httpx.Client(follow_redirects=True, timeout=ade.TIMEOUT, headers={"User-Agent": ade.UA}, event_hooks=netguard.hooks())
     try:
         page = client.get(start)
         form = next((f for f in ade._parse(page.text).forms if any(i["type"] == "password" for i in f["inputs"])), None)

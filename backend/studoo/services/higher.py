@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import HTTPException
 
+from . import netguard
 from .ics import clean_subject
 
 UA = "Mozilla/5.0 (Studoo; robot d'emploi du temps)"
@@ -129,7 +130,7 @@ async def detect(domain: str) -> list[dict]:
     if domain in KNOWN:
         return KNOWN[domain]
     sem = asyncio.Semaphore(12)
-    async with httpx.AsyncClient(timeout=6, follow_redirects=False, headers={"User-Agent": UA}) as client:
+    async with httpx.AsyncClient(timeout=6, follow_redirects=False, headers={"User-Agent": UA}, event_hooks=netguard.async_hooks()) as client:
         async def one(prefix):
             async with sem:
                 return await _probe(client, f"{prefix}.{domain}")

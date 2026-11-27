@@ -25,6 +25,8 @@ def test_detect_recognises_ade_and_celcat(monkeypatch):
 
     real = httpx.AsyncClient
     monkeypatch.setattr(higher.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    from studoo.services import netguard
+    monkeypatch.setattr(netguard, "check_host", lambda host: None)  # faux domaine de test (aucune résolution DNS)
     found = asyncio.run(higher.detect("https://www.example.fr/"))
     assert [(x["software"], x["base"], x["login"]) for x in found] == [
         ("ade", "https://adeconsult.app.example.fr", True),
@@ -81,3 +83,22 @@ def test_robot_addresses_must_be_public_https(logged):
     assert res.status_code == 422
     res = logged.post("/api/timetable/celcat/groups", json={"base": "https://localhost/calendar", "q": "x"})
     assert res.status_code in (400, 422)
+
+
+def test_detect_never_probes_internal_addresses(monkeypatch):
+    """Audit de sécurité : un domaine qui pointe vers le réseau interne n'est jamais interrogé."""
+    asked = []
+
+    def handler(req):
+        asked.append(req.url.host)
+        return httpx.Response(200, text="<title>CELCAT Calendar</title>")
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(higher.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    from studoo.services import netguard
+    from fastapi import HTTPException as E
+
+    def internal(host):
+        raise E(422, detail={"code": "bad_url", "message": "interne"})
+    monkeypatch.setattr(netguard, "check_host", internal)
+    assert asyncio.run(higher.detect("interne-exemple.fr")) == [] and asked == []

@@ -23,7 +23,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from fastapi import HTTPException
 
-from . import robot_errors
+from . import netguard, robot_errors
 
 UA = "Mozilla/5.0 (Studoo; robot d'emploi du temps)"
 TIMEOUT = 25
@@ -131,7 +131,7 @@ def sso_login(start_url: str, username: str, password: str, *, back=None) -> tup
     Renvoie (client avec les cookies de session, dernière réponse du service). `back(res)` dit si l'on est revenu
     sur le service ; par défaut : on n'est plus sur une page de connexion (hôte différent de l'IdP).
     """
-    client = httpx.Client(follow_redirects=True, timeout=TIMEOUT, headers={"User-Agent": UA})
+    client = httpx.Client(follow_redirects=True, timeout=TIMEOUT, headers={"User-Agent": UA}, event_hooks=netguard.hooks())
     service_host = urlparse(start_url).hostname
     try:
         res = client.get(start_url)
@@ -296,7 +296,7 @@ NATIVE_FIELDS = ("9|0|10|0|1|1|12|13|-1|0|0|11|0|", "9|0|12|0|1|1|13|10|-1|0|0|1
 
 def login_native(base: str, username: str, password: str) -> tuple[httpx.Client, dict, list[dict]]:
     """ADE ouvert sans passer par l'université : connexion par la demande GWT d'ADE. Renvoie (client, gwt, années)."""
-    client = httpx.Client(follow_redirects=True, timeout=TIMEOUT, headers={"User-Agent": UA})
+    client = httpx.Client(follow_redirects=True, timeout=TIMEOUT, headers={"User-Agent": UA}, event_hooks=netguard.hooks())
     try:
         gwt = discover(client, base)
         for fields in NATIVE_FIELDS:
@@ -405,7 +405,7 @@ SESSION_MINUTES = 25
 def resume(state: dict) -> httpx.Client:
     if time.time() - state.get("at", 0) > SESSION_MINUTES * 60:
         raise _error(401, "session_expired", "La session ADE a expiré : reconnecte-toi.")
-    client = httpx.Client(follow_redirects=False, timeout=TIMEOUT, headers={"User-Agent": UA})
+    client = httpx.Client(follow_redirects=False, timeout=TIMEOUT, headers={"User-Agent": UA}, event_hooks=netguard.hooks())
     for c in state["cookies"]:
         client.cookies.set(c["name"], c["value"], domain=c["domain"], path=c["path"])
     return client

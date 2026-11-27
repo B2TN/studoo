@@ -138,3 +138,14 @@ def test_forget_file_and_full_history(logged):
     left = [j["id"] for j in logged.get("/api/jobs?limit=100").json()["jobs"]]
     assert ids[0] not in left and ids[1] in left and ids[2] in left
     assert logged.get("/api/jobs?limit=500").status_code == 422
+
+
+def test_job_photos_must_be_real_images(logged):
+    """Audit de sécurité (itération 7) : seules de vraies images JPEG/PNG/WebP arrivent au serveur de tâches."""
+    import base64
+    jpeg = base64.b64encode(bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"\x00" * 200).decode()
+    fake = base64.b64encode(b"#!/bin/sh\nrm -rf /\n" + b"\x00" * 200).decode()
+    body = {"kind": "ocr", "folder_id": "dossier1", "options": {"title": "Copie"}}
+    assert logged.post("/api/jobs", json={**body, "images": [fake]}).status_code == 422
+    assert logged.post("/api/jobs", json={**body, "images": ["%%%pas du base64"]}).status_code == 422
+    assert logged.post("/api/jobs", json={**body, "images": [jpeg]}).status_code == 201
