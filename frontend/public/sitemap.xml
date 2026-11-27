@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://studoo-app.vercel.app/</loc><lastmod>2026-11-23</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://studoo-app.vercel.app/rgpd</loc><lastmod>2026-11-23</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://studoo-app.vercel.app/cgu</loc><lastmod>2026-11-23</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://studoo-app.vercel.app/contact</loc><lastmod>2026-11-23</lastmod><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://studoo-app.vercel.app/</loc><lastmod>2026-11-27</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://studoo-app.vercel.app/outils/transcrire-un-cours</loc><lastmod>2026-11-27</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://studoo-app.vercel.app/outils/fiche-de-revision-automatique</loc><lastmod>2026-11-27</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://studoo-app.vercel.app/outils/podcast-de-revision</loc><lastmod>2026-11-27</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://studoo-app.vercel.app/outils/video-de-revision</loc><lastmod>2026-11-27</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://studoo-app.vercel.app/outils/exercices-et-correction</loc><lastmod>2026-11-27</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://studoo-app.vercel.app/outils/emploi-du-temps</loc><lastmod>2026-11-27</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://studoo-app.vercel.app/rgpd</loc><lastmod>2026-11-27</lastmod><changefreq>monthly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://studoo-app.vercel.app/cgu</loc><lastmod>2026-11-27</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://studoo-app.vercel.app/contact</loc><lastmod>2026-11-27</lastmod><changefreq>yearly</changefreq><priority>0.4</priority></url>
 </urlset>

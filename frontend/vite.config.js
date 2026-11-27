@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
@@ -26,6 +27,9 @@ export default defineConfig(({ command }) => ({
         cgu: resolve(import.meta.dirname, "cgu.html"),
         contact: resolve(import.meta.dirname, "contact.html"),
         notFound: resolve(import.meta.dirname, "404.html"),
+        // Pages de contenu pré-générées (scripts/seo-pages.mjs)
+        ...Object.fromEntries(readdirSync(resolve(import.meta.dirname, "outils")).filter((f) => f.endsWith(".html"))
+          .map((f) => [`outil-${f.replace(".html", "")}`, resolve(import.meta.dirname, "outils", f)])),
       },
     },
   },

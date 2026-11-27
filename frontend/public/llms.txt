@@ -1,0 +1,35 @@
+# Studoo
+
+> Studoo est un site gratuit d'aide à la révision pour lycéens et étudiants francophones : il transcrit les cours enregistrés au micro, numérise les feuilles, range tout dans le Google Drive de l'élève, et crée des fiches de révision, des podcasts, des vidéos et des feuilles d'exercices UNIQUEMENT à partir des propres cours de l'élève.
+
+- Adresse : https://studoo-app.vercel.app/
+- Prix : gratuit, sans abonnement ni publicité ; limites quotidiennes par élève (détail à jour : https://studoo-app.vercel.app/rgpd#limites).
+- Connexion : compte Google (le stockage se fait dans le Google Drive de l'élève, autorisation « drive.file » : Studoo ne voit que ses propres fichiers).
+- IA : Microsoft Azure (Azure AI Speech pour la transcription et les voix, Azure OpenAI GPT-4.1 mini pour l'écriture) et un modèle open source (Qwen3-VL) sur le serveur de Studoo pour lire les photos. Google Gemini seulement avec la clé personnelle d'un élève qui le choisit.
+- Langue : français.
+- Éditeur : BastosDev (projet étudiant, code source public : https://github.com/B2TN/studoo).
+
+## Outils
+- [Transcrire un cours](https://studoo-app.vercel.app/outils/transcrire-un-cours) : Enregistre ton cours au micro : Studoo le transcrit en texte avec « Professeur : » et « Élève : », puis efface l'audio. Gratuit, rangé dans ton Google Drive.
+- [Fiche de révision automatique](https://studoo-app.vercel.app/outils/fiche-de-revision-automatique) : Choisis tes cours (transcriptions, PDF, photos) : Studoo crée une fiche de révision dessinée à la main avec définitions, formules, pièges et mini-quiz. Uniquement à partir de ton contenu.
+- [Podcast de révision](https://studoo-app.vercel.app/outils/podcast-de-revision) : Studoo transforme tes cours en podcast de 10, 20 ou 30 minutes : deux voix (Vivienne et Henri) t'expliquent ton chapitre comme une émission de radio. À écouter dans le bus ou au sport.
+- [Vidéo explicative](https://studoo-app.vercel.app/outils/video-de-revision) : Studoo crée une vidéo de révision animée et commentée à partir de tes cours : format TikTok (2 min), YouTube (10 min) ou long (30 min), exportable en MP4.
+- [Exercices et correction de copie](https://studoo-app.vercel.app/outils/exercices-et-correction) : Studoo crée des feuilles d'exercices (TD, TP, contrôle blanc, QCM) à partir de tes cours, puis corrige ta copie en photo : note sur 20, erreurs et notions à revoir.
+- [Emploi du temps](https://studoo-app.vercel.app/outils/emploi-du-temps) : Studoo récupère ton emploi du temps Pronote (lycée), ADE ou Celcat (université) avec un robot qui oublie ton mot de passe, et l'affiche aux vraies heures, semaine ou jour.
+
+## Limites honnêtes
+- Les contenus générés par une IA peuvent contenir des erreurs : à vérifier avec le cours et le professeur.
+- Enregistrer un cours exige l'accord du professeur et des personnes enregistrées.
+- Les connecteurs d'emploi du temps (Pronote, ENT, ADE, Celcat) sont non officiels ; HyperPlanning et Aurion sont expérimentaux.
+
+## Questions fréquentes
+- **Studoo est-il gratuit ?** Oui, entièrement : pas d'abonnement, pas de publicité, pas de revente de données. Des limites quotidiennes par élève protègent le service (détail dans la page Données personnelles).
+- **Où sont stockés mes cours ?** Dans ton propre Google Drive, dossier « Studoo ». Studoo ne voit que les fichiers qu'il a créés, jamais le reste de ton Drive.
+- **Quelle IA utilise Studoo ?** Les outils de Studoo sur Microsoft Azure (Azure AI Speech pour la transcription et les voix, Azure OpenAI GPT-4.1 mini pour l'écriture) et un modèle open source sur son propre serveur pour lire les photos. Google Gemini n'est utilisé que si tu choisis d'ajouter ta propre clé.
+- **Faut-il créer un compte ?** Non : on se connecte avec son compte Google, qui sert aussi au stockage dans le Drive.
+- **Pour qui est Studoo ?** Pour les lycéens et les étudiants qui veulent réviser à partir de leurs propres cours.
+
+## Pages utiles
+- [Données personnelles (RGPD)](https://studoo-app.vercel.app/rgpd)
+- [Conditions d'utilisation](https://studoo-app.vercel.app/cgu)
+- [Contact](https://studoo-app.vercel.app/contact)

@@ -1,7 +1,46 @@
+# Studoo — règles pour les robots (itération 7)
+# Moteurs de recherche et assistants qui CITENT leurs sources : bienvenus sur les pages publiques.
+# Robots qui collectent pour ENTRAÎNER des modèles d'IA : refusés.
+
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /admin
 Disallow: /analytics
+Disallow: /cours
+Disallow: /fichier
+Disallow: /enregistrer
+Disallow: /numeriser
+Disallow: /importer
+Disallow: /confirmer
+Disallow: /creer
+Disallow: /emploi-du-temps
+Disallow: /generations
+Disallow: /reglages
+
+# Recherche et réponses avec citation : autorisés (mêmes règles que ci-dessus)
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /analytics
+
+# Entraînement de modèles d'IA : refusé
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Bytespider
+User-agent: meta-externalagent
+User-agent: cohere-training-data-crawler
+User-agent: Diffbot
+Disallow: /
 
 Sitemap: https://studoo-app.vercel.app/sitemap.xml

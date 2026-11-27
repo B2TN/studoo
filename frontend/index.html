@@ -26,8 +26,11 @@
   <link rel="preload" href="/fonts/gochi-hand.woff2" as="font" type="font/woff2" crossorigin>
   <script src="/boot.js"></script>
   <script type="application/ld+json">
-  {"@context":"https://schema.org","@type":"WebApplication","name":"Studoo","url":"https://studoo-app.vercel.app/","applicationCategory":"EducationalApplication","operatingSystem":"Web","inLanguage":"fr","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"description":"Transcription de cours, fiches de révision, podcasts et vidéos générés à partir de tes propres cours."}
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Studoo","url":"https://studoo-app.vercel.app/","applicationCategory":"EducationalApplication","operatingSystem":"Web","inLanguage":"fr","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},"description":"Transcription de cours, fiches de révision, podcasts et vidéos générés à partir de tes propres cours.","author":{"@type":"Organization","name":"BastosDev"}}
   </script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "BastosDev", "url": "https://studoo-app.vercel.app/", "logo": "https://studoo-app.vercel.app/icon-512.png", "sameAs": ["https://github.com/B2TN"]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "Studoo", "url": "https://studoo-app.vercel.app/", "inLanguage": "fr", "publisher": {"@type": "Organization", "name": "BastosDev"}}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Studoo est-il gratuit ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui, entièrement : pas d'abonnement, pas de publicité, pas de revente de données. Des limites quotidiennes par élève protègent le service (détail dans la page Données personnelles)."}}, {"@type": "Question", "name": "Où sont stockés mes cours ?", "acceptedAnswer": {"@type": "Answer", "text": "Dans ton propre Google Drive, dossier « Studoo ». Studoo ne voit que les fichiers qu'il a créés, jamais le reste de ton Drive."}}, {"@type": "Question", "name": "Quelle IA utilise Studoo ?", "acceptedAnswer": {"@type": "Answer", "text": "Les outils de Studoo sur Microsoft Azure (transcription, voix, écriture) et un modèle open source sur son propre serveur pour lire les photos. Google Gemini n'est utilisé que si tu choisis d'ajouter ta propre clé."}}, {"@type": "Question", "name": "Faut-il créer un compte ?", "acceptedAnswer": {"@type": "Answer", "text": "Non : on se connecte avec son compte Google, qui sert aussi au stockage dans le Drive."}}, {"@type": "Question", "name": "L'IA peut-elle se tromper ?", "acceptedAnswer": {"@type": "Answer", "text": "Oui : fiches, podcasts, vidéos et corrections sont faits uniquement à partir de tes cours, mais une IA peut se tromper. Vérifie avec ton cours et ton professeur."}}]}</script>
   <script type="module" src="/src/main.js"></script>
 </head>
 <body>
@@ -62,11 +65,11 @@
         </div>
       </section>
 
-      <section class="tools-l" aria-labelledby="t-outils">
+      <section class="tools-l" id="outils" aria-labelledby="t-outils">
         <h2 id="t-outils" class="section-title">Sept outils, <span class="hl green">aucune prise de tête</span></h2>
         <div class="tool-grid">
           <article class="tool-card c-pink">
-            <h3>Enregistre ton cours</h3>
+            <h3><a class="card-link" href="/outils/transcrire-un-cours">Enregistre ton cours</a></h3>
             <p>Lance le micro, écoute le prof. Studoo écrit tout et indique <strong>qui parle</strong> : « Professeur : … », « Élève : … ». L'audio est effacé juste après : seul le texte est gardé.</p>
           </article>
           <article class="tool-card c-yellow">
@@ -74,23 +77,23 @@
             <p>Une photo de ton cours papier, et hop : un PDF droit, recadré, contrasté, comme s'il sortait de l'imprimante. Studoo devine même de quel cours il s'agit.</p>
           </article>
           <article class="tool-card c-green">
-            <h3>Des fiches qui donnent envie</h3>
+            <h3><a class="card-link" href="/outils/fiche-de-revision-automatique">Des fiches qui donnent envie</a></h3>
             <p>Choisis tes cours, obtiens une fiche dessinée à la main : définitions surlignées, formules encadrées, pièges à éviter, mini-quiz. Uniquement à partir de <strong>ton</strong> contenu.</p>
           </article>
           <article class="tool-card c-blue">
-            <h3>Révise en podcast</h3>
+            <h3><a class="card-link" href="/outils/podcast-de-revision">Révise en podcast</a></h3>
             <p>Dans le bus ou au sport : deux voix t'expliquent ton chapitre en 10, 20 ou 30 minutes, comme une vraie émission.</p>
           </article>
           <article class="tool-card c-orange">
-            <h3>Des vidéos explicatives</h3>
+            <h3><a class="card-link" href="/outils/video-de-revision">Des vidéos explicatives</a></h3>
             <p>Un diaporama animé et commenté, au format TikTok (2 min), YouTube (10 min) ou long (30 min). Parfait pour revoir un chapitre la veille d'un contrôle.</p>
           </article>
           <article class="tool-card c-pink">
-            <h3>Feuilles d'exercices</h3>
+            <h3><a class="card-link" href="/outils/exercices-et-correction">Feuilles d'exercices</a></h3>
             <p>Exercices d'entraînement, mise en pratique, contrôle blanc ou questions flash, tirés de tes cours. Le corrigé est caché, et tu fais corriger ta copie en photo : note sur 20 et notions à revoir.</p>
           </article>
           <article class="tool-card c-lilac">
-            <h3>Ton emploi du temps</h3>
+            <h3><a class="card-link" href="/outils/emploi-du-temps">Ton emploi du temps</a></h3>
             <p>Choisis ton lycée ou ton université et connecte-toi : le robot de Studoo récupère ton emploi du temps tout seul (Pronote et ENT régionaux, ADE, Celcat…), puis oublie ton mot de passe. Studoo crée tes dossiers de matières et sait quel cours tu enregistres.</p>
           </article>
         </div>
@@ -115,6 +118,17 @@
           <li>L'IA tourne sur les serveurs Microsoft Azure de Studoo : rien n'est envoyé à Google Gemini, sauf si tu choisis d'y mettre ta propre clé.</li>
           <li>Pas de pub, pas de revente de données. <a href="/rgpd">Tout savoir sur tes données</a>.</li>
         </ul>
+      </section>
+
+      <section class="faq" aria-labelledby="t-faq">
+        <h2 id="t-faq" class="section-title">Questions <span class="hl blue">fréquentes</span></h2>
+        <div class="stack">
+          <details class="card sketch faq-item"><summary>Studoo est-il gratuit ?</summary><p>Oui, entièrement : pas d'abonnement, pas de publicité, pas de revente de données. Des limites quotidiennes par élève protègent le service (détail dans la page Données personnelles).</p></details>
+          <details class="card sketch faq-item"><summary>Où sont stockés mes cours ?</summary><p>Dans ton propre Google Drive, dossier « Studoo ». Studoo ne voit que les fichiers qu'il a créés, jamais le reste de ton Drive.</p></details>
+          <details class="card sketch faq-item"><summary>Quelle IA utilise Studoo ?</summary><p>Les outils de Studoo sur Microsoft Azure (transcription, voix, écriture) et un modèle open source sur son propre serveur pour lire les photos. Google Gemini n'est utilisé que si tu choisis d'ajouter ta propre clé.</p></details>
+          <details class="card sketch faq-item"><summary>Faut-il créer un compte ?</summary><p>Non : on se connecte avec son compte Google, qui sert aussi au stockage dans le Drive.</p></details>
+          <details class="card sketch faq-item"><summary>L'IA peut-elle se tromper ?</summary><p>Oui : fiches, podcasts, vidéos et corrections sont faits uniquement à partir de tes cours, mais une IA peut se tromper. Vérifie avec ton cours et ton professeur.</p></details>
+        </div>
       </section>
 
       <section class="final-cta">

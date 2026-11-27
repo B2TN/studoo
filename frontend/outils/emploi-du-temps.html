@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Récupérer son emploi du temps Pronote, ADE ou Celcat · Studoo</title>
+  <meta name="description" content="Studoo récupère ton emploi du temps Pronote (lycée), ADE ou Celcat (université) avec un robot qui oublie ton mot de passe, et l'affiche aux vraies heures, semaine ou jour.">
+  <link rel="canonical" href="https://studoo-app.vercel.app/outils/emploi-du-temps">
+  <meta name="theme-color" content="#FBF6E9">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Studoo">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:title" content="Récupérer son emploi du temps Pronote, ADE ou Celcat · Studoo">
+  <meta property="og:description" content="Studoo récupère ton emploi du temps Pronote (lycée), ADE ou Celcat (université) avec un robot qui oublie ton mot de passe, et l'affiche aux vraies heures, semaine ou jour.">
+  <meta property="og:url" content="https://studoo-app.vercel.app/outils/emploi-du-temps">
+  <meta property="og:image" content="https://studoo-app.vercel.app/og-image.png">
+  <meta property="og:image:alt" content="Logo Studoo : un post-it rose avec deux yeux, sur une page de cahier">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="/fonts/patrick-hand.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/gochi-hand.woff2" as="font" type="font/woff2" crossorigin>
+  <script src="/boot.js"></script>
+  <script type="module" src="/src/static.js"></script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":"Récupérer son emploi du temps Pronote, ADE ou Celcat · Studoo","description":"Studoo récupère ton emploi du temps Pronote (lycée), ADE ou Celcat (université) avec un robot qui oublie ton mot de passe, et l'affiche aux vraies heures, semaine ou jour.","url":"https://studoo-app.vercel.app/outils/emploi-du-temps","inLanguage":"fr","dateModified":"2026-11-27","isPartOf":{"@type":"WebSite","name":"Studoo","url":"https://studoo-app.vercel.app/"},"publisher":{"@type":"Organization","name":"BastosDev","url":"https://studoo-app.vercel.app","logo":"https://studoo-app.vercel.app/icon-512.png"}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Studoo","item":"https://studoo-app.vercel.app/"},{"@type":"ListItem","position":2,"name":"Outils","item":"https://studoo-app.vercel.app/#outils"},{"@type":"ListItem","position":3,"name":"Emploi du temps","item":"https://studoo-app.vercel.app/outils/emploi-du-temps"}]}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Mon mot de passe est-il enregistré ?","acceptedAnswer":{"@type":"Answer","text":"Non. Il ne sert qu'à la connexion, dans la mémoire du serveur, puis il est supprimé dans tous les cas, sans jamais être écrit dans un journal."}},{"@type":"Question","name":"Mon établissement n'est pas reconnu ?","acceptedAnswer":{"@type":"Answer","text":"Utilise le dernier recours (.ics) et signale-nous ton établissement en un clic : les plus demandés sont pris en charge en premier."}}]}</script>
+</head>
+<body data-page="outil">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+  <header class="l-top">
+    <a class="logo" href="/" aria-label="Studoo, accueil"><img src="/favicon.svg" alt="" width="46" height="46"><span>Studoo</span></a>
+    <span class="spacer"></span>
+    <div class="theme-slot"></div>
+  </header>
+  <main id="contenu" class="page">
+    <nav class="crumbs small" aria-label="Fil d'Ariane"><a href="/">Studoo</a> › <a href="/#outils">Outils</a> › <span aria-current="page">Emploi du temps</span></nav>
+    <h1>Ton <span class="hl">emploi du temps</span> récupéré tout seul</h1>
+    <p class="lead">Choisis ton lycée ou ton université : le robot de Studoo trouve le bon logiciel (Pronote et ENT régionaux, ADE, Celcat), se connecte une seule fois avec tes identifiants, récupère ton emploi du temps puis les oublie. HyperPlanning et Aurion ont des robots expérimentaux ; sinon, un lien ou un fichier .ics suffit.</p>
+    <p><a class="btn primary" href="/">Essayer gratuitement avec Google</a></p>
+    <h2>Comment ça marche</h2>
+    <ol class="steps-list">
+      <li>Ouvre « Emploi du temps » et choisis ton établissement.</li>
+      <li>Connecte-toi une fois : le robot récupère tes cours.</li>
+      <li>Ton emploi du temps se met à jour tout seul quand ton établissement le permet.</li>
+    </ol>
+    <h2>Bon à savoir</h2>
+    <ul>
+      <li>Connecteurs non officiels : ils peuvent cesser de marcher après une mise à jour du logiciel.</li>
+      <li>La double authentification n'est pas prise en charge par les robots : utilise alors le lien .ics.</li>
+      <li>Robots HyperPlanning, Aurion et ADE à identifiants propres : expérimentaux, jamais testés sur un vrai compte.</li>
+      <li>Tout est rangé dans <strong>ton</strong> Google Drive ; Studoo est gratuit, sans publicité. <a href="/rgpd">Tes données</a> · <a href="/rgpd#limites">Limites d'utilisation</a>.</li>
+    </ul>
+    <h2>Questions fréquentes</h2>
+    <h3>Mon mot de passe est-il enregistré ?</h3>
+    <p>Non. Il ne sert qu'à la connexion, dans la mémoire du serveur, puis il est supprimé dans tous les cas, sans jamais être écrit dans un journal.</p>
+    <h3>Mon établissement n'est pas reconnu ?</h3>
+    <p>Utilise le dernier recours (.ics) et signale-nous ton établissement en un clic : les plus demandés sont pris en charge en premier.</p>
+    <h2>Les autres outils de Studoo</h2>
+    <ul class="tool-links">
+      <li><a href="/outils/transcrire-un-cours">Transcrire un cours</a></li>
+      <li><a href="/outils/fiche-de-revision-automatique">Fiche de révision automatique</a></li>
+      <li><a href="/outils/podcast-de-revision">Podcast de révision</a></li>
+      <li><a href="/outils/video-de-revision">Vidéo explicative</a></li>
+      <li><a href="/outils/exercices-et-correction">Exercices et correction de copie</a></li>
+    </ul>
+  </main>
+  <footer class="site-footer">
+    <nav aria-label="Liens légaux">
+      <a href="/rgpd">Données personnelles (RGPD)</a>
+      <a href="/cgu">Conditions d'utilisation</a>
+      <a href="/contact">Contact</a>
+    </nav>
+    <p class="small muted">Studoo · BastosDev · <a href="https://github.com/B2TN/studoo">code sur GitHub</a></p>
+  </footer>
+</body>
+</html>
