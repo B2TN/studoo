@@ -333,3 +333,6 @@ table.data th, table.data td { border-bottom: 1.5px dashed var(--grid-strong); p
 .failure .error { margin: 0; }
 .report-box { margin-top: 10px; animation: page-in .25s ease-out backwards; }
 .report-box h3 { font-size: 22px; }
+
+/* Quota d'IA restant (itération 7, C4) */
+.quota-text { display: block; margin-top: 4px; font-size: 13px; line-height: 1.25; }

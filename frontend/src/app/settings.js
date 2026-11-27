@@ -49,6 +49,22 @@ export const GEMINI_DATA = {
  * SA clé Gemini, puis cocher les fonctionnalités où il la préfère aux outils de Studoo (tout est décoché au départ).
  * La clé est vérifiée, chiffrée sur le serveur, jamais réaffichée, et supprimable en un clic.
  */
+/** Quota d'IA restant aujourd'hui (itération 7, C4) : chiffres lus sur le serveur. */
+function quotaSection() {
+  const box = h("div", { class: "stack" }, h("p", { class: "small muted" }, "…"));
+  api("/api/ai/quota").then((q) => {
+    const line = (label, x) => h("div", {}, h("div", { class: "row", style: { justifyContent: "space-between" } }, h("span", {}, label),
+      h("strong", {}, `${x.remaining} / ${x.limit} restant${x.remaining > 1 ? "s" : ""}`)),
+    h("div", { class: "bar", role: "meter", "aria-valuemin": "0", "aria-valuemax": String(x.limit), "aria-valuenow": String(x.remaining),
+      "aria-label": label }, h("span", { style: { width: `${Math.round(100 * x.remaining / Math.max(1, x.limit))}%` } })));
+    mount(box, line("Demandes d'IA (transcription, rangement, fiches, PDF)", q.user),
+      q.jobs ? line("Générations (podcasts, vidéos, exercices, corrections)", q.jobs) : null,
+      h("p", { class: "small muted" }, `Remise à zéro ${q.reset || "chaque jour à minuit (heure de Paris)"}. `,
+        h("a", { href: "/rgpd#limites" }, "Toutes les limites")));
+  }).catch(() => mount(box, h("p", { class: "small muted" }, "Quota momentanément indisponible.")));
+  return h("section", { class: "card sketch stack", style: { marginTop: "22px" } }, h("h2", {}, "Ton utilisation de l'IA aujourd'hui"), box);
+}
+
 function geminiKeySection() {
   const box = h("div", { class: "stack" });
   const prefsBox = (st) => {
@@ -128,6 +144,7 @@ export async function render({ view, user, go }) {
       h("div", { class: "row" }, ...themeButtons(), h("span", { class: "small muted" }, "Mode sombre · police plus lisible (Atkinson Hyperlegible)"))),
 
     notifySection(),
+    quotaSection(),
     geminiKeySection(),
 
     h("section", { class: "card sketch stack", style: { marginTop: "22px" } },

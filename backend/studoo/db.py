@@ -85,6 +85,14 @@ user_ai_usage = Table(
     Column("count", Integer, nullable=False, default=0),
 )
 
+# Générations lancées sur le serveur de tâches par élève et par jour (podcasts, vidéos, exercices…), itération 7.
+user_job_usage = Table(
+    "user_job_usage", metadata,
+    Column("day", Date, primary_key=True),
+    Column("sub", String(64), primary_key=True),
+    Column("count", Integer, nullable=False, default=0),
+)
+
 generations = Table(
     "generations", metadata,
     Column("day", Date, primary_key=True),
@@ -226,7 +234,9 @@ def now() -> datetime:
 
 
 def today() -> date:
-    return now().date()
+    """Jour en cours à l'heure de Paris : les compteurs quotidiens repartent à zéro à minuit (heure française)."""
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("Europe/Paris")).date()
 
 
 def increment(table: Table, keys: dict, amount: int = 1) -> int:

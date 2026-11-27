@@ -11,12 +11,18 @@ from sqlalchemy.exc import IntegrityError
 
 from .. import db
 from ..config import get_settings
-from ..limits import client_ip, rate_limit
+from ..limits import client_ip, public_limits, rate_limit
 from ..security import daily_visitor_hash
 
 router = APIRouter(prefix="/api", tags=["site"])
 
 PATH_RE = re.compile(r"^/[a-z0-9\-/:]{0,120}$")
+
+
+@router.get("/limits")
+async def limits():
+    """Limites d'utilisation de l'IA, lues dans la configuration (page RGPD et interface : jamais recopiées à la main)."""
+    return public_limits()
 
 
 @router.get("/config")

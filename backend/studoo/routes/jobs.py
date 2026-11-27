@@ -20,7 +20,7 @@ from .. import db
 from ..config import get_settings
 from ..deps import User, current_user
 from ..jobcrypto import seal_payload
-from ..limits import rate_limit
+from ..limits import consume_job, rate, rate_limit
 from ..services import estimate, user_keys
 
 router = APIRouter(prefix="/api", tags=["jobs"])
@@ -163,7 +163,7 @@ async def create_job(body: JobIn, user: CurrentUser):
     if not user.refresh_token or user.refresh_token == "dev" and not s.is_local:
         raise HTTPException(401, detail={"code": "session_expired", "message": "Reconnecte-toi pour lancer une génération."})
     # Anti-spam : pas de limite de durée, mais un nombre raisonnable de tâches en attente.
-    rate_limit(f"jobs:{user.sub}", limit=30, window_seconds=3600)
+    rate("jobs", user.sub)
     with db.get_engine().connect() as conn:
         pending = conn.execute(select(func.count()).select_from(db.jobs).where(
             db.jobs.c.sub == user.sub, db.jobs.c.status.in_(["queued", "running"]))).scalar_one()
@@ -177,6 +177,7 @@ async def create_job(body: JobIn, user: CurrentUser):
             db.jobs.c.status.in_(["queued", "running"]))).mappings().first()
         if same:  # double clic / page renvoyée : on rend la tâche déjà en route
             return {"job": _with_eta(conn, [same])[0], "existing": True}
+    consume_job(user.sub)  # limite quotidienne de générations (après l'anti-doublon : un double clic ne compte pas)
     job_id = str(uuid.uuid4())
     payload = seal_payload(s.job_secret, {
         # Jeton Google « hors ligne » : permet au serveur d'écrire dans TON Drive pendant que tu es absent.

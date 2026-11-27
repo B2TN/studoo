@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     # Quotas quotidiens de l'IA du site (partagés entre tous les élèves, pour tenir dans le crédit Azure)
     quota_lite_per_day: int = 2000
     quota_flash_per_day: int = 300
-    quota_user_per_day: int = 60
+    quota_user_per_day: int = 60   # demandes d'IA « en direct » par élève et par jour (transcription, rangement, fiches, PDF)
+    quota_jobs_per_day: int = 10   # générations sur le serveur de tâches par élève et par jour (podcasts, vidéos, exercices…)
 
     # Sécurité
     session_secret: str = Field(default="dev-secret-change-me-dev-secret-change-me", min_length=32)  # voir DEFAULT_SECRET

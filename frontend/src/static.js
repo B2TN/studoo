@@ -63,3 +63,18 @@ if (form) {
     }
   });
 }
+
+// ---------- Page RGPD : limites d'IA lues sur le serveur (jamais recopiées à la main) ----------
+const limitsBox = $("#limites-ia");
+if (limitsBox) {
+  api("/api/limits").then((data) => {
+    const per = (r) => `${r.count} demandes par ${r.minutes >= 60 ? `${r.minutes / 60} h` : `${r.minutes} min`}`;
+    for (const el of document.querySelectorAll("[data-limit]")) {
+      const value = el.dataset.limit.split(".").reduce((o, k) => o?.[k], data);
+      if (value === undefined) continue;
+      el.textContent = typeof value === "object" ? per(value) : String(value);
+    }
+  }).catch(() => {
+    limitsBox.insertAdjacentText("afterend", " (Chiffres momentanément indisponibles : réessaie plus tard.)");
+  });
+}

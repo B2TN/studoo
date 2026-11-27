@@ -10,6 +10,22 @@ from .config import get_settings
 
 TIERS = ("lite", "flash")
 
+# Limites de débit par élève : (nombre de demandes, fenêtre en secondes). SEULE source de ces valeurs :
+# les routes les appliquent avec `rate()`, et la page RGPD / l'interface les lisent via /api/limits.
+RATES = {
+    "transcribe": (30, 600),   # morceaux de 5 min d'enregistrement
+    "classify": (30, 600),     # deviner le cours d'un document
+    "gen": (10, 600),          # fiches
+    "ocr": (15, 600),          # lecture de PDF scannés
+    "jobs": (30, 3600),        # générations envoyées au serveur de tâches
+}
+RESET_TEXT = "chaque jour à minuit (heure de Paris)"
+
+
+def rate(name: str, sub: str) -> None:
+    limit, window = RATES[name]
+    rate_limit(f"{name}:{sub}", limit=limit, window_seconds=window)
+
 
 def client_ip(request: Request) -> str:
     # Derrière Vercel, la vraie IP est dans x-forwarded-for (premier élément).
@@ -51,6 +67,10 @@ def quota_status(sub: str | None = None) -> dict:
         used = db.read_count(db.user_ai_usage, {"day": day, "sub": sub})
         limit = get_settings().quota_user_per_day
         status["user"] = {"used": used, "limit": limit, "remaining": max(0, limit - used)}
+        jobs = db.read_count(db.user_job_usage, {"day": day, "sub": sub})
+        jlimit = get_settings().quota_jobs_per_day
+        status["jobs"] = {"used": jobs, "limit": jlimit, "remaining": max(0, jlimit - jobs)}
+        status["reset"] = RESET_TEXT
     return status
 
 
@@ -74,6 +94,29 @@ def consume(tier: str, sub: str) -> None:
         })
     db.increment(db.ai_usage, {"day": day, "tier": tier})
     db.increment(db.user_ai_usage, {"day": day, "sub": sub})
+
+
+def consume_job(sub: str) -> None:
+    """Une génération de plus sur le serveur de tâches aujourd'hui ; 429 si la limite quotidienne est atteinte."""
+    day = db.today()
+    limit = get_settings().quota_jobs_per_day
+    if db.read_count(db.user_job_usage, {"day": day, "sub": sub}) >= limit:
+        raise HTTPException(429, detail={
+            "code": "jobs_quota",
+            "message": f"Tu as lancé tes {limit} générations du jour (podcasts, vidéos, exercices…). Reviens demain !",
+        })
+    db.increment(db.user_job_usage, {"day": day, "sub": sub})
+
+
+def public_limits() -> dict:
+    """Limites réelles, lues dans la configuration : affichées telles quelles par la page RGPD et l'interface."""
+    s = get_settings()
+    return {
+        "perUser": {"ai": s.quota_user_per_day, "jobs": s.quota_jobs_per_day, "pendingJobs": s.max_pending_jobs},
+        "rates": {k: {"count": n, "minutes": w // 60} for k, (n, w) in RATES.items()},
+        "site": {"lite": s.quota_lite_per_day, "flash": s.quota_flash_per_day},
+        "reset": RESET_TEXT,
+    }
 
 
 def count_generation(kind: str) -> None:

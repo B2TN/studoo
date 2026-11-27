@@ -52,4 +52,4 @@ def test_site_quota_exhausted(logged, monkeypatch):
 
 def test_quota_status(logged):
     q = logged.get("/api/ai/quota").json()
-    assert set(q) == {"lite", "flash", "user"}
+    assert set(q) == {"lite", "flash", "user", "jobs", "reset"}

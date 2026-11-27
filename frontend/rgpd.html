@@ -77,6 +77,25 @@
     <p><strong>Autres usages :</strong> pour deviner le cours d'un document (un extrait du texte et les noms de tes cours et chapitres), écrire une fiche (le texte des cours choisis) ou lire un PDF scanné (les pages réduites), le contenu transite par notre serveur jusqu'à <strong>Microsoft Azure OpenAI</strong> (modèle GPT-4.1 mini, payé par le crédit Azure for Students de l'éditeur), sans être stocké par Studoo. Selon les conditions de Microsoft, ces contenus ne servent pas à entraîner ses modèles ; Microsoft peut les garder jusqu'à 30 jours pour détecter les abus. Le stockage de ce service est en Italy North ; le calcul peut avoir lieu dans un autre centre de Microsoft (offre « Global »).</p>
     <p><strong>Google Gemini :</strong> jamais utilisé par défaut, et jamais avec une clé du site. Seulement si tu enregistres ta propre clé et coches une fonctionnalité dans les réglages (voir plus haut).</p>
 
+    <h2 id="limites">Limites quotidiennes d'utilisation de l'IA</h2>
+    <p>Pour que le service reste gratuit et pour éviter les abus, chaque élève a des limites. Les chiffres ci-dessous sont lus directement dans la configuration du serveur : ce sont ceux qui s'appliquent vraiment.</p>
+    <div class="table-wrap" id="limites-ia" aria-live="polite">
+    <table>
+      <thead><tr><th scope="col">Quoi</th><th scope="col">Limite par élève</th></tr></thead>
+      <tbody>
+        <tr><td>Demandes d'IA « en direct » (morceaux de 5 min de transcription, rangement automatique, fiches, lecture de PDF scannés) — compteur commun</td><td><span data-limit="perUser.ai">…</span> par jour</td></tr>
+        <tr><td>Générations sur le serveur de Studoo (podcasts, vidéos, feuilles d'exercices, corrections, lectures de photos)</td><td><span data-limit="perUser.jobs">…</span> par jour, et <span data-limit="perUser.pendingJobs">…</span> en cours à la fois</td></tr>
+        <tr><td>Transcription</td><td><span data-limit="rates.transcribe">…</span></td></tr>
+        <tr><td>Rangement automatique (deviner le cours)</td><td><span data-limit="rates.classify">…</span></td></tr>
+        <tr><td>Fiches</td><td><span data-limit="rates.gen">…</span></td></tr>
+        <tr><td>Lecture de PDF scannés</td><td><span data-limit="rates.ocr">…</span></td></tr>
+        <tr><td>Lancement de générations sur le serveur</td><td><span data-limit="rates.jobs">…</span></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Remise à zéro :</strong> <span data-limit="reset">chaque jour à minuit (heure de Paris)</span>. <strong>Quand une limite est atteinte</strong>, la demande est refusée avec un message clair (rien n'est facturé, rien n'est perdu : tes fichiers restent dans ton Drive) ; tu peux réessayer après la remise à zéro, ou après quelques minutes pour les limites par période. Le site a aussi une limite globale, partagée par tous les élèves, pour rester dans son budget. Si tu utilises ta propre clé Gemini pour une fonctionnalité, ces demandes ne comptent pas dans les limites de Studoo (seulement dans celles de Google). Ton quota restant du jour est affiché dans l'application, sous le menu.</p>
+    <noscript><p>Active JavaScript pour afficher les chiffres à jour.</p></noscript>
+
     <h2>Emploi du temps</h2>
     <p><strong>Le robot (lycées) :</strong> tu choisis ton établissement dans l'annuaire public de l'Éducation nationale (data.education.gouv.fr : seul le nom tapé dans la recherche y est envoyé), puis tu tapes ton identifiant et ton mot de passe. Le serveur de Studoo (Vercel, région Paris) s'en sert <strong>une seule fois</strong> pour se connecter à Pronote ou à ton ENT, récupère ton emploi du temps, puis les <strong>supprime aussitôt</strong> : ils ne sont jamais écrits dans une base, un fichier, un journal ou un rapport d'erreur, et disparaissent dans tous les cas (réussite, erreur, délai dépassé, plantage).</p>
     <p><strong>Après la connexion :</strong> si ton établissement le permet, Studoo garde le lien iCal officiel de ton compte, chiffré, dans ton Drive : l'emploi du temps se met à jour tout seul, sans mot de passe. Sinon, il garde une copie de tes cours dans ton Drive et te propose de te reconnecter toutes les 2 semaines. Le code et le nom de ton établissement sont aussi rangés dans ton Drive (fichier de réglages).</p>

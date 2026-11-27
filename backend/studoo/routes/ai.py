@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from ..deps import User, current_user
 from ..config import get_settings
-from ..limits import consume, count_generation, quota_status, rate_limit
+from ..limits import consume, count_generation, quota_status, rate
 from ..services import ai, fake, gemini, speech, user_keys
 from ..services.schemas import Classification, Fiche, OcrResult, Transcript
 
@@ -64,7 +64,7 @@ async def transcribe(
     L'audio est lu en mémoire (jamais écrit sur disque), envoyé à Azure AI Speech (ou à Gemini avec la
     clé de l'élève, s'il l'a choisi), puis supprimé dès la réponse reçue, même en cas d'échec.
     """
-    rate_limit(f"transcribe:{user.sub}", limit=30, window_seconds=600)
+    rate("transcribe", user.sub)
     mime = (request.headers.get("content-type") or "").split(";")[0].strip()
     if mime not in AUDIO_TYPES:
         raise HTTPException(415, detail={"code": "bad_audio", "message": "Format audio non pris en charge."})
@@ -127,7 +127,7 @@ class ClassifyIn(BaseModel):
 @router.post("/classify", response_model=Classification)
 async def classify(body: ClassifyIn, user: CurrentUser):
     """Devine le cours et le chapitre, et propose un titre automatique."""
-    rate_limit(f"classify:{user.sub}", limit=30, window_seconds=600)
+    rate("classify", user.sub)
     tree = "\n".join(f"- {c.course} : {', '.join(c.chapters) or '(aucun chapitre)'}" for c in body.tree) or "(aucun cours)"
     prompt = (
         f"Voici un extrait d'un document de cours ({body.kind}).\n"
@@ -144,7 +144,7 @@ async def classify(body: ClassifyIn, user: CurrentUser):
 
 @router.post("/fiche", response_model=Fiche)
 async def fiche(body: SourcesIn, user: CurrentUser):
-    rate_limit(f"gen:{user.sub}", limit=10, window_seconds=600)
+    rate("gen", user.sub)
     prompt = (
         "Crée une fiche de révision claire et visuelle à partir des documents ci-dessous.\n"
         f"Cours : {body.course or 'non précisé'} · Chapitre : {body.chapter or 'non précisé'}.\n"
@@ -172,7 +172,7 @@ class OcrIn(BaseModel):
 @router.post("/ocr", response_model=OcrResult)
 async def ocr(body: OcrIn, user: CurrentUser):
     """Lit le texte de pages de cours photographiées (pour les fiches et le classement)."""
-    rate_limit(f"ocr:{user.sub}", limit=15, window_seconds=600)
+    rate("ocr", user.sub)
     media = []
     for img in body.images:
         try:

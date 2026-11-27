@@ -57,6 +57,7 @@ export async function startShell(user) {
 
   const view = h("main", { class: "view", id: "contenu", tabindex: "-1" });
   const quotaBar = h("div", { class: "bar", role: "meter", "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": "Quota d'IA restant aujourd'hui" }, h("span"));
+  const quotaText = h("small", { class: "quota-text muted" });
   const initial = (user.name || user.email || "?").trim().charAt(0).toUpperCase();
   const avatar = h("a", { class: "avatar", href: "/reglages", "data-link": "1", "aria-label": `Compte de ${user.name || user.email}` },
     user.picture ? h("img", { src: user.picture, alt: "", referrerpolicy: "no-referrer" }) : initial);
@@ -74,7 +75,7 @@ export async function startShell(user) {
     h("aside", { class: "sidebar" },
       h("nav", { class: "nav", "aria-label": "Navigation principale" }, NAV.map((n) => navLink(n))),
       h("div", { class: "bottom" },
-        h("div", { class: "quota" }, "IA disponible aujourd'hui", quotaBar),
+        h("div", { class: "quota" }, "IA disponible aujourd'hui", quotaBar, quotaText),
         h("nav", { class: "nav", "aria-label": "Compte" },
           ...adminLinks,
           navLink(["/reglages", "settings", "Réglages"]),
@@ -136,6 +137,10 @@ export async function startShell(user) {
       quotaBar.classList.toggle("warn", pct < 25);
       quotaBar.setAttribute("aria-valuenow", String(pct));
       quotaBar.title = `${pct} % restant`;
+      // Chiffres réels (lus sur le serveur) : demandes en direct + générations, et remise à zéro.
+      mount(quotaText, `${q.user.remaining}/${q.user.limit} demandes`, q.jobs ? ` · ${q.jobs.remaining}/${q.jobs.limit} générations` : "",
+        h("br"), `Remise à zéro ${q.reset ? q.reset.replace("chaque jour ", "") : "à minuit"}. `,
+        h("a", { href: "/rgpd#limites" }, "Détail"));
     } catch { /* pas grave */ }
   }
   // La jauge d'IA n'est pas urgente : on la charge après l'affichage de la page.
