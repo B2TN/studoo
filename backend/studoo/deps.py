@@ -49,6 +49,9 @@ def current_user(request: Request) -> User:
     data = read_session(request)
     if not data or "sub" not in data:
         raise HTTPException(401, detail={"code": "not_logged_in", "message": "Connecte-toi pour continuer."})
+    # Le cookie seul ne suffit pas : le compte doit toujours exister (pas supprimé par l'admin) et ne pas être banni.
+    from .services import accounts
+    accounts.guard_session(request, data["sub"])
     return User(
         sub=data["sub"], email=data.get("email", ""), name=data.get("name", ""),
         picture=data.get("picture", ""), refresh_token=data.get("rt", ""),

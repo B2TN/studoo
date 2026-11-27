@@ -25,6 +25,37 @@ users = Table(
     Column("name", String(200), nullable=False, default=""),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("last_seen_at", DateTime(timezone=True), nullable=False),
+    # Empreintes chiffrées (HMAC, jamais les valeurs) de la dernière adresse IP et de l'appareil (identifiant au
+    # hasard gardé par le navigateur). Servent UNIQUEMENT à bannir en cas d'abus (itération 7) ; effacées avec le compte.
+    Column("last_ip_hash", String(48), nullable=False, default=""),
+    Column("last_device_hash", String(48), nullable=False, default=""),
+)
+
+# Bannissements (itération 7) : uniquement des empreintes chiffrées. kind : account (compte Google), email, ip, device.
+# expires_at vide = définitif. Supprimés 30 jours après leur fin (expiration ou levée).
+bans = Table(
+    "bans", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=True),
+    Column("lifted_at", DateTime(timezone=True), nullable=True),
+    Column("kind", String(12), nullable=False),
+    Column("value_hash", String(48), nullable=False, index=True),
+    Column("label", String(120), nullable=False, default=""),  # ex. « m•••@gmail.com » : pour s'y retrouver, sans l'adresse
+    Column("reason", String(300), nullable=False, default=""),
+    Column("admin", String(320), nullable=False, default=""),
+)
+
+# Journal des actions admin : qui, quand, quoi, pourquoi. Gardé 12 mois.
+admin_log = Table(
+    "admin_log", metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("admin", String(320), nullable=False),
+    Column("action", String(40), nullable=False),
+    Column("target", String(120), nullable=False, default=""),
+    Column("details", String(500), nullable=False, default=""),
+    Column("reason", String(300), nullable=False, default=""),
 )
 
 page_views = Table(
@@ -164,6 +195,7 @@ _LATE_COLUMNS = {
     "jobs": {"note": "VARCHAR(300) NOT NULL DEFAULT ''", "fingerprint": "VARCHAR(64) NOT NULL DEFAULT ''",
              "size": "INTEGER NOT NULL DEFAULT 0"},
     "user_keys": {"prefs": "TEXT NOT NULL DEFAULT '{}'"},
+    "users": {"last_ip_hash": "VARCHAR(48) NOT NULL DEFAULT ''", "last_device_hash": "VARCHAR(48) NOT NULL DEFAULT ''"},
 }
 
 

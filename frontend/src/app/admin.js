@@ -3,7 +3,7 @@ import { api } from "../lib/api.js";
 import { h, mount } from "../lib/dom.js";
 import { relativeDate } from "../lib/format.js";
 import { icon } from "../lib/icons.js";
-import { confirmDialog, errorToast } from "../lib/ui.js";
+import { confirmDialog, errorToast, openDialog, toast } from "../lib/ui.js";
 
 const LABELS = { transcription: "Transcriptions", fiche: "Fiches", podcast: "Podcasts", video: "Vidéos", scan: "Numérisations" };
 
@@ -53,9 +53,82 @@ function barChart(series, key, label) {
   return h("figure", { style: { margin: 0 } }, svg, h("figcaption", { class: "small muted" }, label));
 }
 
+// ---------- Corbeille d'un compte : supprimer ou bannir (itération 7, C3) ----------
+const KIND_LABELS = { account: "compte Google", email: "adresse e-mail", ip: "adresse IP", device: "appareil" };
+const ACTION_LABELS = { delete_user: "Compte supprimé", ban: "Compte banni", unban: "Bannissement levé" };
+
+function removeDialog(u, go) {
+  openDialog(`Que faire du compte ${u.email} ?`, (close) => {
+    const mode = (v) => h("input", { type: "radio", name: "rm-mode", value: v, checked: v === "delete" });
+    const del = mode("delete");
+    const ban = mode("ban");
+    const days = h("select", { class: "input", id: "rm-days" },
+      [["7", "7 jours"], ["30", "30 jours (conseillé)"], ["90", "90 jours"], ["", "Définitif"]].map(([v, l]) => h("option", { value: v, selected: v === "30" }, l)));
+    const reason = h("textarea", { class: "input", id: "rm-reason", maxlength: "300", rows: "2", placeholder: "Ex. : spam répété dans le formulaire de contact" });
+    const banOptions = h("div", { class: "stack", hidden: true },
+      h("div", { class: "field" }, h("label", { for: "rm-days" }, "Durée du bannissement"), days),
+      h("p", { class: "small notice warn" }, h("strong", {}, "Limites à connaître. "),
+        "Une adresse IP est souvent partagée (lycée, université, wifi public, réseau mobile) : la bloquer peut gêner des innocents, "
+        + "elle n'est donc jamais bloquée plus de 30 jours, même en « définitif ». L'appareil est reconnu par un identifiant gardé dans "
+        + "le navigateur : vider les données du site ou changer de navigateur suffit à le contourner. Le plus solide est le blocage du "
+        + "compte Google et de l'adresse e-mail (empêche de se réinscrire). Tu pourras lever le bannissement à tout moment."));
+    const err = h("p", { class: "error", role: "alert" });
+    const sync = () => { banOptions.hidden = !ban.checked; };
+    del.addEventListener("change", sync);
+    ban.addEventListener("change", sync);
+    const confirm = h("button", { class: "btn danger", type: "submit" }, icon("trash"), "Confirmer");
+    return h("form", { class: "stack", onsubmit: async (e) => {
+      e.preventDefault();
+      confirm.disabled = true;
+      try {
+        await api(`/api/admin/users/${encodeURIComponent(u.sub)}/remove`, { method: "POST", json: {
+          mode: ban.checked ? "ban" : "delete", days: ban.checked && days.value ? Number(days.value) : (ban.checked ? null : 30),
+          reason: reason.value.trim() } });
+        close();
+        toast(ban.checked ? "Compte supprimé et banni" : "Compte supprimé", "success");
+        go("/admin", { replace: true });
+      } catch (e2) { err.textContent = e2.message; confirm.disabled = false; }
+    } },
+      h("label", { class: "check-row" }, del, h("span", {}, h("strong", {}, "Supprimer le compte"), h("br"),
+        h("small", { class: "muted" }, "Efface tout ce que Studoo garde sur ce compte (compte, tâches, compteurs, clé Gemini, notifications) "
+          + "et ferme sa session. Il pourra revenir plus tard avec le même compte Google."))),
+      h("label", { class: "check-row" }, ban, h("span", {}, h("strong", {}, "Bannir"), h("br"),
+        h("small", { class: "muted" }, "Supprime le compte ET bloque son compte Google, son adresse e-mail, sa dernière adresse IP et son appareil. "
+          + "Studoo ne garde que des empreintes chiffrées, jamais les valeurs."))),
+      banOptions,
+      h("div", { class: "field" }, h("label", { for: "rm-reason" }, "Motif (facultatif, gardé dans le journal)"), reason),
+      h("p", { class: "small muted" }, icon("info"), " Dans tous les cas, les fichiers de son Google Drive ne sont jamais touchés."),
+      err,
+      h("div", { class: "row" }, confirm, h("button", { class: "btn ghost", type: "button", onclick: () => close() }, "Annuler")));
+  });
+}
+
+function bansSection(bans, go) {
+  return h("section", { class: "card sketch" }, bans.length ? h("ul", { class: "files" }, bans.map((b) => h("li", { style: { alignItems: "flex-start" } },
+    h("span", { class: "kind c-pink" }, icon("lock")),
+    h("span", {}, h("strong", {}, b.label), h("br"),
+      h("span", { class: "small muted" }, b.items.map((i) => `${KIND_LABELS[i.kind] || i.kind} ${i.until ? `jusqu'au ${new Date(i.until).toLocaleDateString("fr-FR")}` : "(définitif)"}`).join(" · ")),
+      b.reason ? h("p", { class: "small", style: { margin: "4px 0 0" } }, `Motif : ${b.reason}`) : null),
+    h("span", { class: "meta" }, h("button", { class: "btn small", type: "button", onclick: async () => {
+      if (!(await confirmDialog("Lever ce bannissement ?", `${b.label} pourra de nouveau se connecter (compte, e-mail, IP et appareil débloqués).`, { ok: "Lever" }))) return;
+      try { await api(`/api/admin/bans/${b.id}/lift`, { method: "POST", json: { reason: "" } }); toast("Bannissement levé", "success"); go("/admin", { replace: true }); }
+      catch (e) { errorToast(e); }
+    } }, icon("refresh"), "Lever")))))
+    : h("p", { class: "empty" }, "Aucun bannissement en cours."));
+}
+
+function logSection(log) {
+  return h("section", { class: "card sketch table-wrap" }, log.length ? h("table", { class: "data" },
+    h("thead", {}, h("tr", {}, ["Quand", "Qui", "Quoi", "Compte", "Détails", "Pourquoi"].map((t) => h("th", { scope: "col" }, t)))),
+    h("tbody", {}, log.map((e) => h("tr", {}, h("td", { class: "small" }, relativeDate(e.at)), h("td", { class: "small" }, e.admin),
+      h("td", {}, ACTION_LABELS[e.action] || e.action), h("td", {}, e.target), h("td", { class: "small" }, e.details), h("td", { class: "small" }, e.reason || "—")))))
+    : h("p", { class: "empty" }, "Aucune action pour l'instant."));
+}
+
 async function renderAdmin(view, go) {
-  const [ov, users, msgs, reports] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/messages"),
-    api("/api/admin/school-reports").catch(() => ({ reports: [] }))]);
+  const [ov, users, msgs, reports, bans, log] = await Promise.all([api("/api/admin/overview"), api("/api/admin/users"), api("/api/admin/messages"),
+    api("/api/admin/school-reports").catch(() => ({ reports: [] })), api("/api/admin/bans").catch(() => ({ bans: [] })),
+    api("/api/admin/log").catch(() => ({ log: [] }))]);
   const SOFT = { ade: "ADE", celcat: "Celcat", hyperplanning: "HyperPlanning", aurion: "Aurion", pronote: "Pronote", ent: "ENT", autre: "Autre", inconnu: "Inconnu" };
   const ERR = { not_recognized: "non reconnu", bad_credentials: "identifiants", two_factor: "double auth.", page_changed: "page changée",
     timeout: "délai", blocked: "bloqué", unavailable: "indisponible", ade_native_refused: "ADE refusé", other: "autre" };
@@ -90,11 +163,13 @@ async function renderAdmin(view, go) {
     h("section", { class: "card sketch table-wrap" }, h("table", { class: "data" },
       h("thead", {}, h("tr", {}, h("th", { scope: "col" }, "Nom"), h("th", { scope: "col" }, "E-mail"), h("th", { scope: "col" }, "Inscription"), h("th", { scope: "col" }, "Dernière visite"), h("th", { scope: "col" }, h("span", { class: "sr-only" }, "Actions")))),
       h("tbody", {}, users.users.map((u) => h("tr", {}, h("td", {}, u.name), h("td", {}, u.email), h("td", {}, relativeDate(u.createdAt)), h("td", {}, relativeDate(u.lastSeenAt)),
-        h("td", {}, h("button", { class: "btn small danger", "aria-label": `Supprimer le compte ${u.email}`, onclick: async () => {
-          if (!(await confirmDialog("Supprimer ce compte ?", `${u.email} sera effacé de la base (ses fichiers Drive restent chez lui).`, { ok: "Supprimer", danger: true }))) return;
-          await api(`/api/admin/users/${encodeURIComponent(u.sub)}`, { method: "DELETE" }).catch(errorToast);
-          go("/admin", { replace: true });
-        } }, icon("trash")))))))));
+        h("td", {}, h("button", { class: "btn small danger", "aria-label": `Supprimer ou bannir le compte ${u.email}`,
+          onclick: () => removeDialog(u, go) }, icon("trash")))))))),
+    h("h2", { class: "section" }, "Bannissements en cours"),
+    bansSection(bans.bans, go),
+    h("h2", { class: "section" }, "Journal des actions admin"),
+    h("p", { class: "small muted" }, "Qui, quand, quoi et pourquoi. Gardé 12 mois."),
+    logSection(log.log));
 }
 
 async function renderAnalytics(view, query, go) {

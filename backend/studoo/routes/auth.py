@@ -18,6 +18,7 @@ from .. import db
 from ..config import get_settings
 from ..deps import User, clear_session, current_user, read_session, write_session
 from ..limits import client_ip, rate_limit
+from ..services import accounts
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -95,7 +96,9 @@ async def login_google(body: CodeIn, request: Request, response: Response):
         "sub": claims["sub"], "email": claims.get("email", ""), "name": claims.get("name", ""),
         "picture": claims.get("picture", ""), "rt": refresh,
     }
+    fp = accounts.check_login(request, session["sub"], session["email"])  # compte, e-mail, IP ou appareil bannis → refus
     _upsert_user(session["sub"], session["email"], session["name"])
+    accounts.remember_fingerprints(session["sub"], fp)
     write_session(response, session)
     return {
         "user": _public_user(session),
@@ -105,12 +108,14 @@ async def login_google(body: CodeIn, request: Request, response: Response):
 
 
 @router.post("/dev-login")
-async def dev_login(response: Response):
+async def dev_login(request: Request, response: Response):
     """Connexion factice, uniquement en local, pour tester sans compte Google."""
     if not get_settings().dev_login_enabled:
         raise HTTPException(404)
     session = {"sub": "dev-user", "email": "dev@studoo.localhost", "name": "Léa Démo", "picture": "", "rt": "dev"}
+    fp = accounts.check_login(request, session["sub"], session["email"])
     _upsert_user(session["sub"], session["email"], session["name"])
+    accounts.remember_fingerprints(session["sub"], fp)
     write_session(response, session)
     return {"user": {**_public_user(session), "isAdmin": True}, "accessToken": "dev", "expiresIn": 3600}
 
@@ -123,7 +128,14 @@ async def me(request: Request, response: Response):
         if request.cookies:
             clear_session(response)  # cookie expiré ou invalide : on nettoie
         return {"user": None}
-    user = current_user(request)
+    try:
+        user = current_user(request)
+    except HTTPException as exc:
+        if exc.status_code == 401:  # compte supprimé : session effacée, retour à l'accueil
+            clear_session(response)
+            return {"user": None}
+        raise
+    accounts.remember_fingerprints(user.sub, accounts.fingerprints(request))
     data = {"sub": user.sub, "email": user.email, "name": user.name, "picture": user.picture}
     out = _public_user(data)
     if user.refresh_token == "dev":
@@ -169,10 +181,7 @@ async def delete_account(user: Annotated[User, Depends(current_user)], response:
             except httpx.HTTPError:
                 pass
     with db.get_engine().begin() as conn:
-        conn.execute(delete(db.users).where(db.users.c.sub == user.sub))
-        conn.execute(delete(db.user_ai_usage).where(db.user_ai_usage.c.sub == user.sub))
-        conn.execute(delete(db.jobs).where(db.jobs.c.sub == user.sub))
-        conn.execute(delete(db.push_subscriptions).where(db.push_subscriptions.c.sub == user.sub))
-        conn.execute(delete(db.user_keys).where(db.user_keys.c.sub == user.sub))
+        accounts.erase(conn, user.sub)
+    accounts.forget_cache()
     clear_session(response)
     return {"ok": True}

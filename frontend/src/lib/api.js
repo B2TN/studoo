@@ -18,8 +18,42 @@ async function simulatedLatency() {
   if (ms) await new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Identifiant au hasard de ce navigateur (itération 7) : le serveur n'en garde qu'une empreinte chiffrée,
+ * utilisée seulement pour bloquer un appareil en cas d'abus. Il ne permet pas de suivre quelqu'un sur d'autres
+ * sites, et il disparaît si l'on vide les données du site.
+ */
+export function deviceId() {
+  try {
+    let id = localStorage.getItem("studoo-device");
+    if (!id) {
+      id = (crypto.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`).replace(/[^a-z0-9-]/gi, "");
+      localStorage.setItem("studoo-device", id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+
+/** Compte supprimé ou banni pendant que la page est ouverte : on ferme la session proprement, avec un message. */
+let ending = false;
+function endSession(detail) {
+  if (ending || typeof document === "undefined") return;
+  ending = true;
+  const box = document.createElement("div");
+  box.className = "stale-banner";
+  box.setAttribute("role", "alert");
+  box.textContent = detail?.message || "Ta session est terminée.";
+  document.body.append(box);
+  fetch("/api/auth/logout", { method: "POST", headers: { "X-Studoo": "1" }, credentials: "same-origin" })
+    .catch(() => {}).finally(() => setTimeout(() => location.assign("/"), 4000));
+}
+
 export async function api(path, { method = "GET", json, body, headers = {}, raw = false, signal } = {}) {
-  const init = { method, headers: { "X-Studoo": "1", ...headers }, credentials: "same-origin", signal };
+  const device = deviceId();
+  const init = { method, headers: { "X-Studoo": "1", ...(device ? { "X-Studoo-Device": device } : {}), ...headers },
+    credentials: "same-origin", signal };
   if (json !== undefined) {
     init.body = JSON.stringify(json);
     init.headers["Content-Type"] = "application/json";
@@ -38,6 +72,7 @@ export async function api(path, { method = "GET", json, body, headers = {}, raw 
     let detail = null;
     try { detail = (await res.json()).detail; } catch { /* réponse non JSON */ }
     if (typeof detail === "string") detail = { message: detail };
+    if (detail?.code === "banned" || detail?.code === "account_deleted") endSession(detail);
     throw new ApiError(res.status, detail || { message: `Erreur ${res.status}` });
   }
   if (raw) return res;

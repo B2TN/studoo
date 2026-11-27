@@ -63,6 +63,8 @@ def test_jobs_are_private(logged):
     from studoo.deps import write_session
     from fastapi import Response
     resp = Response()
+    from conftest import add_user
+    add_user("autre", "x@y.z")
     write_session(resp, {"sub": "autre", "email": "x@y.z", "name": "x", "rt": "r"})
     logged.cookies.clear()
     logged.cookies.set("studoo_session", resp.headers["set-cookie"].split("=", 1)[1].split(";")[0])

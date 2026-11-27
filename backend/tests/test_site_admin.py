@@ -50,6 +50,8 @@ def test_admin_forbidden_for_normal_user(client, monkeypatch):
     from studoo.deps import write_session
     from fastapi import Response
     resp = Response()
+    from conftest import add_user
+    add_user("u1", "eleve@example.com")
     write_session(resp, {"sub": "u1", "email": "eleve@example.com", "name": "x", "rt": "r"})
     client.cookies.set("studoo_session", resp.headers["set-cookie"].split("=", 1)[1].split(";")[0])
     assert client.get("/api/admin/overview").status_code == 403
@@ -59,6 +61,8 @@ def test_admin_overview_and_analytics(client):
     from studoo.deps import write_session
     from fastapi import Response
     resp = Response()
+    from conftest import add_user
+    add_user("a1", "admin@example.com", "Admin")
     write_session(resp, {"sub": "a1", "email": "admin@example.com", "name": "Admin", "rt": "r"})
     client.cookies.set("studoo_session", resp.headers["set-cookie"].split("=", 1)[1].split(";")[0])
     client.post("/api/events", json={"path": "/"})

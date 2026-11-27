@@ -16,6 +16,8 @@ def env(tmp_path, monkeypatch):
     from studoo.config import get_settings
     get_settings.cache_clear()
     db.reset_engine()
+    from studoo.services import accounts
+    accounts.forget_cache()
     yield
     db.reset_engine()
     get_settings.cache_clear()
@@ -33,3 +35,10 @@ def logged(client):
     res = client.post("/api/auth/dev-login")
     assert res.status_code == 200
     return client
+
+
+def add_user(sub: str, email: str, name: str = "x") -> None:
+    """Crée la ligne du compte (une session n'est valable que si le compte existe en base)."""
+    from studoo import db
+    with db.get_engine().begin() as conn:
+        conn.execute(db.users.insert().values(sub=sub, email=email, name=name, created_at=db.now(), last_seen_at=db.now()))

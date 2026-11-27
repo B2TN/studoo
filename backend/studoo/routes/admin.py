@@ -2,12 +2,16 @@
 from datetime import timedelta
 from typing import Annotated
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, desc, func, select, update
 
 from .. import db
 from ..deps import User, admin_user
 from ..limits import quota_status
+from ..services import accounts
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 Admin = Annotated[User, Depends(admin_user)]
@@ -44,13 +48,58 @@ async def list_users(_: Admin, page: int = Query(1, ge=1), size: int = Query(50,
     ]}
 
 
+class RemoveIn(BaseModel):
+    mode: Literal["delete", "ban"] = "delete"
+    days: int | None = Field(default=accounts.DEFAULT_DAYS, ge=1, le=3650)  # None = définitif (bannissement)
+    reason: str = Field(default="", max_length=300)
+
+
+@router.post("/users/{sub}/remove")
+async def remove_user(sub: str, body: RemoveIn, admin: Admin):
+    """Corbeille de l'admin : supprimer le compte, ou le bannir (compte Google, e-mail, IP, appareil).
+    Protégé côté serveur (admin_user) ; les fichiers Drive de l'utilisateur ne sont jamais touchés."""
+    return accounts.remove_user(sub, admin=admin.email, mode=body.mode, days=body.days, reason=body.reason.strip())
+
+
 @router.delete("/users/{sub}")
-async def remove_user(sub: str, _: Admin):
-    with db.get_engine().begin() as conn:
-        res = conn.execute(delete(db.users).where(db.users.c.sub == sub))
-    if res.rowcount == 0:
-        raise HTTPException(404)
+async def delete_user_compat(sub: str, admin: Admin):
+    return accounts.remove_user(sub, admin=admin.email, mode="delete", days=None)
+
+
+@router.get("/bans")
+async def list_bans(_: Admin):
+    """Bannissements en cours (regroupés par personne), avec leur fin."""
+    now = db.now()
+    t = db.bans
+    with db.get_engine().connect() as conn:
+        rows = conn.execute(select(t).where(t.c.lifted_at.is_(None)).order_by(desc(t.c.created_at)).limit(500)).mappings().all()
+    groups: dict = {}
+    for r in rows:
+        end = r["expires_at"]
+        if end is not None and end.replace(tzinfo=end.tzinfo or now.tzinfo) <= now:
+            continue
+        g = groups.setdefault((r["label"], r["created_at"]), {"id": r["id"], "label": r["label"], "createdAt": r["created_at"].isoformat(),
+                                                             "reason": r["reason"], "admin": r["admin"], "items": []})
+        g["items"].append({"kind": r["kind"], "until": end.isoformat() if end else None})
+    return {"bans": list(groups.values())}
+
+
+class LiftIn(BaseModel):
+    reason: str = Field(default="", max_length=300)
+
+
+@router.post("/bans/{ban_id}/lift")
+async def lift_ban(ban_id: int, body: LiftIn, admin: Admin):
+    accounts.lift(ban_id, admin.email, body.reason.strip())
     return {"ok": True}
+
+
+@router.get("/log")
+async def admin_log(_: Admin):
+    with db.get_engine().connect() as conn:
+        rows = conn.execute(select(db.admin_log).order_by(desc(db.admin_log.c.created_at)).limit(200)).mappings().all()
+    return {"log": [{"at": r["created_at"].isoformat(), "admin": r["admin"], "action": r["action"], "target": r["target"],
+                     "details": r["details"], "reason": r["reason"]} for r in rows]}
 
 
 @router.get("/analytics")
