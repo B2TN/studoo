@@ -46,17 +46,30 @@ function lessonLabel(e) {
   return `${e.subject}, de ${time(e.start)} à ${time(e.end)}${e.location ? `, salle ${e.location}` : ""}${e.cancelled ? ", annulé" : ""}`;
 }
 
+/**
+ * Inclinaison du post-it (−0,7° à +0,7°), toujours la même pour un même cours. Assez petite pour que deux
+ * cours qui se suivent ne se touchent jamais (écart de 5 px entre eux), et plus faible pour les cours courts.
+ */
+function tilt(e, height) {
+  let n = 0;
+  for (const ch of `${e.uid || ""}${e.start}`) n = (n * 31 + ch.charCodeAt(0)) % 997;
+  const max = height < 44 ? 0.3 : 0.7;
+  return ((n % 15) / 7 - 1) * max;
+}
+
 function dayColumn(day, events, range, palette, now) {
   const { blocks, allDay } = blocksOfDay(events, day.date);
   const isToday = dayKey(day.date) === dayKey(now);
   const col = h("ol", { class: `tt-col${isToday ? " today" : ""}`, "aria-label": `${LONG_DAYS[day.index]} ${day.date.getDate()}` },
     layoutColumns(blocks).filter((b) => b.end > range.start && b.start < range.end).map((b) => {
-      const top = (Math.max(b.start, range.start) - range.start) * PX_PER_MIN;
-      const height = Math.max(20, (Math.min(b.end, range.end) - Math.max(b.start, range.start)) * PX_PER_MIN - 3);
+      // 5 px d'écart entre deux cours qui se suivent : même penchés, deux post-it ne se touchent jamais.
+      const top = (Math.max(b.start, range.start) - range.start) * PX_PER_MIN + 1;
+      const height = Math.max(20, (Math.min(b.end, range.end) - Math.max(b.start, range.start)) * PX_PER_MIN - 5);
       const e = b.event;
       return h("li", {
         class: `lesson c-${colorFor(e.subject, palette)}${e.cancelled ? " cancelled" : ""}${height < 44 ? " compact" : ""}`,
-        style: { top: `${top}px`, height: `${height}px`, left: `calc(${(100 * b.col) / b.cols}% + 2px)`, width: `calc(${100 / b.cols}% - 4px)` },
+        style: { top: `${top}px`, height: `${height}px`, left: `calc(${(100 * b.col) / b.cols}% + 2px)`, width: `calc(${100 / b.cols}% - 4px)`,
+          "--rot": `${tilt(e, height)}deg` },
         title: lessonLabel(e), "aria-label": lessonLabel(e),
       },
       h("time", { datetime: e.start }, `${time(e.start)} – ${time(e.end)}`), h("strong", {}, e.subject),
