@@ -14,6 +14,14 @@ from ..limits import quota_status
 from ..services import accounts
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _iso(value) -> str | None:
+    """Date en ISO avec fuseau (SQLite, en local, perd le fuseau : les dates y sont en UTC)."""
+    if value is None:
+        return None
+    from datetime import timezone
+    return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
 Admin = Annotated[User, Depends(admin_user)]
 
 
@@ -43,7 +51,7 @@ async def list_users(_: Admin, page: int = Query(1, ge=1), size: int = Query(50,
                             .limit(size).offset((page - 1) * size)).mappings().all()
     return {"users": [
         {"sub": r["sub"], "email": r["email"], "name": r["name"],
-         "createdAt": r["created_at"].isoformat(), "lastSeenAt": r["last_seen_at"].isoformat()}
+         "createdAt": _iso(r["created_at"]), "lastSeenAt": _iso(r["last_seen_at"])}
         for r in rows
     ]}
 
@@ -78,9 +86,9 @@ async def list_bans(_: Admin):
         end = r["expires_at"]
         if end is not None and end.replace(tzinfo=end.tzinfo or now.tzinfo) <= now:
             continue
-        g = groups.setdefault((r["label"], r["created_at"]), {"id": r["id"], "label": r["label"], "createdAt": r["created_at"].isoformat(),
+        g = groups.setdefault((r["label"], r["created_at"]), {"id": r["id"], "label": r["label"], "createdAt": _iso(r["created_at"]),
                                                              "reason": r["reason"], "admin": r["admin"], "items": []})
-        g["items"].append({"kind": r["kind"], "until": end.isoformat() if end else None})
+        g["items"].append({"kind": r["kind"], "until": _iso(end)})
     return {"bans": list(groups.values())}
 
 
@@ -98,7 +106,7 @@ async def lift_ban(ban_id: int, body: LiftIn, admin: Admin):
 async def admin_log(_: Admin):
     with db.get_engine().connect() as conn:
         rows = conn.execute(select(db.admin_log).order_by(desc(db.admin_log.c.created_at)).limit(200)).mappings().all()
-    return {"log": [{"at": r["created_at"].isoformat(), "admin": r["admin"], "action": r["action"], "target": r["target"],
+    return {"log": [{"at": _iso(r["created_at"]), "admin": r["admin"], "action": r["action"], "target": r["target"],
                      "details": r["details"], "reason": r["reason"]} for r in rows]}
 
 
@@ -132,7 +140,7 @@ async def list_messages(_: Admin):
     with db.get_engine().connect() as conn:
         rows = conn.execute(select(db.messages).order_by(desc(db.messages.c.created_at)).limit(100)).mappings().all()
     return {"messages": [
-        {"id": r["id"], "createdAt": r["created_at"].isoformat(), "email": r["email"],
+        {"id": r["id"], "createdAt": _iso(r["created_at"]), "email": r["email"],
          "subject": r["subject"], "body": r["body"], "handled": r["handled"]}
         for r in rows
     ]}
@@ -162,6 +170,6 @@ async def school_reports(_: Admin):
         by.setdefault((e["e"], e["software"]), {})[e["error_code"]] = int(e["n"])
     return {"reports": [
         {"establishment": r["establishment"], "software": r["software"], "count": int(r["n"]), "people": int(r["people"]),
-         "last": r["last"].isoformat() if r["last"] else None, "errors": by.get((r["key"], r["software"]), {})}
+         "last": _iso(r["last"]), "errors": by.get((r["key"], r["software"]), {})}
         for r in rows
     ]}
