@@ -11,9 +11,11 @@ import "./styles/fiche.css";
 import { cachedUser, isLoggedFlag, restore, signIn } from "./lib/auth.js";
 import { $, $$ } from "./lib/dom.js";
 import { wakeLogos } from "./lib/logo-eyes.js";
+import { handleChunkError, installStaleGuard } from "./lib/stale.js";
 import { applyPreferences, cookieBanner, errorToast, themeButtons, trackPage, wobbleFilter } from "./lib/ui.js";
 
 applyPreferences();
+installStaleGuard(); // nouvelle version du site pendant que l'onglet est ouvert : rechargement propre
 
 // Le code de l'application est téléchargé dès que possible, en parallèle.
 const shellModule = isLoggedFlag() ? import("./app/shell.js") : null;
@@ -21,7 +23,13 @@ const shellModule = isLoggedFlag() ? import("./app/shell.js") : null;
 async function startApp(user) {
   document.documentElement.classList.add("is-app");
   $("#landing")?.remove(); // la page d'accueil n'existe plus une fois connecté
-  const { startShell } = await (shellModule || import("./app/shell.js"));
+  let startShell;
+  try {
+    ({ startShell } = await (shellModule || import("./app/shell.js")));
+  } catch (err) {
+    if (handleChunkError(err)) return;
+    throw err;
+  }
   await startShell(user);
 }
 

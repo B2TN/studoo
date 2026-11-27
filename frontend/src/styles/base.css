@@ -194,3 +194,8 @@ dialog.sheet h2 { font-size: 30px; margin-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::backdrop { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Nouvelle version du site (lib/stale.js) */
+.stale-banner { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); z-index: 100; display: flex; gap: 10px; align-items: center;
+  padding: 10px 16px; background: var(--fluo-yellow); color: var(--on-fluo); border: 2px solid var(--ink); border-radius: var(--wobbly);
+  box-shadow: 3px 4px 0 var(--shadow); animation: pop .2s ease-out; max-width: calc(100vw - 32px); }

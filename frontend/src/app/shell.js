@@ -1,5 +1,6 @@
 // Coquille de l'application : barre du haut, menu, zone de contenu, navigation.
 import { wakeLogos } from "../lib/logo-eyes.js";
+import { handleChunkError, newerBuildOnline } from "../lib/stale.js";
 import { api } from "../lib/api.js";
 import { signOut } from "../lib/auth.js";
 import { $, h, mount } from "../lib/dom.js";
@@ -102,6 +103,8 @@ export async function startShell(user) {
       else a.removeAttribute("aria-current");
     }
     mount(view, skeletonPage());
+    // Nouvelle version en ligne ? On charge la page en entier plutôt que des morceaux qui n'existent plus.
+    if (await newerBuildOnline()) { location.assign(location.href); return; }
     try {
       const [mod] = await Promise.all([route.load(), storageReady]);
       cleanup = await mod.render({ view, params, query, data, route, user, go: router.go, refreshQuota });
@@ -111,6 +114,10 @@ export async function startShell(user) {
       void view.offsetWidth;
       view.classList.add("page-in");
     } catch (err) {
+      if (handleChunkError(err)) { // ancienne version de la page : rechargement propre, pas d'erreur brute
+        mount(view, h("div", { class: "loading" }, h("div", { class: "spinner" }), "Nouvelle version disponible, rechargement…"));
+        return;
+      }
       errorToast(err);
       mount(view, h("div", { class: "empty" }, h("p", {}, "Oups, cette page n'a pas pu se charger."),
         h("button", { class: "btn", onclick: () => router.run() }, icon("refresh"), "Réessayer")));
