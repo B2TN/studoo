@@ -5,13 +5,15 @@
 <h1 align="center">Studoo</h1>
 
 <p align="center"><strong>Tes cours, au propre.</strong><br>
-Un site de révision pour lycéens et étudiants : transcription de cours, numérisation de feuilles,<br>
-fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes propres cours, le tout rangé dans ton Google Drive.</p>
+Un site de révision gratuit pour lycéens et étudiants : transcription de cours, numérisation de feuilles,<br>
+fiches, podcasts, vidéos et exercices générés <em>uniquement</em> à partir de tes propres cours, le tout rangé dans ton Google Drive.</p>
 
 <p align="center">
-  <a href="https://studoo-app.vercel.app">studoo-app.vercel.app</a> ·
+  <a href="https://studoo-app.vercel.app"><strong>studoo-app.vercel.app</strong></a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
-  <a href="docs/DEPLOIEMENT.md">Mise en ligne</a>
+  <a href="docs/SERVICES.md">Services</a> ·
+  <a href="docs/SECURITE.md">Sécurité</a> ·
+  <a href="docs/LANCEMENT.md">Mise en ligne</a>
 </p>
 
 ![Page d'accueil de Studoo au style cahier quadrillé](docs/screenshots/accueil.png)
@@ -20,60 +22,64 @@ fiches, podcasts et vidéos générés <em>uniquement</em> à partir de tes prop
 
 | Outil | Comment |
 |---|---|
-| 🎙️ **Enregistrer un cours** | Le micro de l'appareil enregistre par tranches de 5 min. Chaque tranche est transcrite par **Azure AI Speech** avec le **rôle de chaque personne** (« Professeur : », « Élève : »), puis **l'audio est effacé**. |
-| 📷 **Numériser une feuille** | Photo → détection de la feuille → redressement → suppression des ombres → **PDF propre**. Traitement d'image écrit à la main en JavaScript, dans le navigateur. |
-| 🗂️ **Ranger automatiquement** | Après chaque enregistrement/numérisation, Studoo **devine le cours** (emploi du temps + IA), le chapitre et **génère le titre**. |
-| 📝 **Fiches de révision** | Fiches dessinées à la main (définitions surlignées, formules encadrées, pièges, mini-quiz), exportables en PDF. |
-| 🎧 **Podcasts** | 10, 20 ou 30 min, dialogue Vivienne + Henri (voix Azure, allure radio), script écrit par GPT-4.1 mini sur le serveur de tâches. |
-| 🎬 **Vidéos explicatives** | Diaporama animé dessiné + voix (Vivienne) + sous-titres, animé dans le navigateur et exportable en **MP4** (WebCodecs) : format TikTok, YouTube ou long. |
-| ✏️ **Feuilles d'exercices** | Entraînement (TD), mise en pratique (TP), contrôle blanc (DST) ou questions flash (QCM), tirés des cours ; corrigé masqué ; **correction de la copie en photo** (note /20, erreurs, notions à revoir). |
-| 📅 **Emploi du temps** | Grille aux **vraies heures** (vue semaine, vue jour sur téléphone). **Robots** : lycée → Pronote et l'ENT régional trouvés tout seuls ; supérieur → ADE (vérifié sur un vrai compte) et Celcat. **Expérimentaux, jamais testés sur un vrai compte** : HyperPlanning, Aurion, ADE à identifiants propres. Le mot de passe est oublié après la connexion. À chaque échec : dernier recours `.ics` + signalement de l'établissement ([détails](docs/EMPLOI_DU_TEMPS.md)). |
+| 🎙️ **[Enregistrer un cours](https://studoo-app.vercel.app/outils/transcrire-un-cours)** | Le micro enregistre par tranches de 5 min ; **Azure AI Speech** transcrit en indiquant **qui parle** (« Professeur : », « Élève : »), puis **l'audio est effacé**. Jauge de niveau sonore, messages clairs (micro inaccessible, silence, service indisponible). |
+| 📷 **Numériser une feuille** | Photo → détection de la feuille → redressement → suppression des ombres → **PDF propre**. Traitement d'image écrit à la main en JavaScript, dans le navigateur. Le texte est lu sur notre serveur par un modèle open source (Qwen3-VL). |
+| 🗂️ **Ranger automatiquement** | Après chaque enregistrement ou numérisation, Studoo **devine le cours** (emploi du temps + IA), le chapitre, et **propose un titre**. |
+| 📝 **[Fiches de révision](https://studoo-app.vercel.app/outils/fiche-de-revision-automatique)** | Fiches dessinées à la main (définitions surlignées, formules encadrées, pièges, mini-quiz), exportables en PDF. |
+| 🎧 **[Podcasts](https://studoo-app.vercel.app/outils/podcast-de-revision)** | 10, 20 ou 30 min, dialogue Vivienne + Henri (voix Azure, allure radio), écrit sur le serveur de tâches : on peut fermer la page. |
+| 🎬 **[Vidéos explicatives](https://studoo-app.vercel.app/outils/video-de-revision)** | Diaporama dessiné, commenté et sous-titré, animé dans le navigateur, exportable en **MP4** (WebCodecs) : format TikTok, YouTube ou long. |
+| ✏️ **[Exercices et correction](https://studoo-app.vercel.app/outils/exercices-et-correction)** | TD, TP, contrôle blanc ou QCM tirés des cours ; corrigé caché ; **correction de la copie en photo** (note /20, erreurs, notions à revoir). |
+| 📅 **[Emploi du temps](https://studoo-app.vercel.app/outils/emploi-du-temps)** | Grille **dessinée à la main**, cours en post-it **à leur heure réelle** (semaine sur PC, jour par jour sur téléphone). **Robots** : Pronote et ENT régionaux (lycées), ADE (vérifié sur un vrai compte) et Celcat (supérieur) ; **expérimentaux, jamais testés sur un vrai compte** : HyperPlanning, Aurion, ADE à identifiants propres. Le mot de passe est oublié après la connexion. À chaque échec : dernier recours `.ics` + signalement de l'établissement. |
+| ⚙️ **Admin** | Comptes (supprimer ou **bannir**, journal des actions), établissements signalés, quotas, **services** (tableau de bord et mode d'emploi de chacun), schéma du site. |
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/tableau-de-bord.jpg" alt="Tableau de bord : outils en post-it, cours du jour, mes cours"></td>
-    <td><img src="docs/screenshots/fiche.jpg" alt="Fiche de révision générée au style cahier"></td>
+    <td><img src="docs/screenshots/tableau-de-bord.jpg" alt="Tableau de bord : outils en post-it (4 + 3), cours du jour, mes cours"></td>
+    <td><img src="docs/screenshots/emploi-du-temps.jpg" alt="Emploi du temps dessiné à la main, cours en post-it placés à leur heure réelle"></td>
   </tr>
   <tr>
+    <td><img src="docs/screenshots/fiche.jpg" alt="Fiche de révision générée au style cahier"></td>
     <td><img src="docs/screenshots/video.jpg" alt="Vidéo explicative générée au format vertical"></td>
-    <td><img src="docs/screenshots/emploi-du-temps-sombre.jpg" alt="Emploi du temps de la semaine en mode sombre"></td>
   </tr>
 </table>
 
-<p align="center"><img src="docs/screenshots/mobile.jpg" alt="Tableau de bord sur téléphone avec barre de navigation et bouton micro" width="260"></p>
+<p align="center"><img src="docs/screenshots/mobile.jpg" alt="Emploi du temps sur téléphone : un jour à la fois, sélecteur de jours" width="260"></p>
 
 ## Choix techniques (et pourquoi)
 
 | Partie | Technologie | Pourquoi |
 |---|---|---|
-| Site | **HTML, CSS, JavaScript** sans framework, assemblés par **Vite** | Comprendre chaque ligne ; site léger (Lighthouse **100/100** partout). |
-| API | **Python 3 + FastAPI** | Lisible, rapide, validation automatique des données (Pydantic). |
-| Connexion | **Google uniquement** (OAuth 2.0, flux « code ») | Un seul compte, qui donne aussi accès au stockage (Drive). |
-| Stockage | **Google Drive** de l'utilisateur, autorisation `drive.file` | Aucun cours sur nos serveurs ; Studoo ne voit que ses propres fichiers. |
-| IA | **Microsoft Azure** : AI Speech (transcription avec rôles, voix Vivienne/Henri), Azure OpenAI GPT-4.1 mini (rangement, fiches, scripts, exercices, corrections), Qwen3-VL open source sur notre serveur (lecture des photos) | Crédit Azure for Students, données en Europe (Italy North). **Aucun envoi à Google par défaut** ; chaque élève peut, s'il le veut, utiliser **sa propre clé Gemini** pour les fonctionnalités qu'il coche. |
-| Base de données | **Postgres (Neon)**, SQLite en local, SQLAlchemy Core | Seulement comptes, compteurs et messages. |
-| Pronote / ENT | **pronotepy** (Python, non officielle, MIT) | Robot : lycée trouvé dans l'annuaire officiel, ENT reconnu tout seul, récupération du lien iCal officiel. |
-| Hébergement | **Vercel** (site statique + fonction Python) | Gratuit, déploiement automatique depuis GitHub, HTTPS. |
+| Site | **HTML, CSS, JavaScript** sans framework, assemblés par **Vite** ; pages publiques pré-générées | Comprendre chaque ligne ; site léger ; contenu lisible par les moteurs et les IA sans JavaScript. |
+| API | **Python 3.12 + FastAPI** (fonction Vercel, région Paris) | Lisible, rapide, validation automatique des données (Pydantic). |
+| Connexion | **Google uniquement** (OAuth 2.0, flux « code »), portées minimales | Un seul compte, qui donne aussi accès au stockage. `drive.file` : Studoo ne voit que ses propres fichiers. |
+| Stockage | **Google Drive** de l'utilisateur | Aucun cours sur nos serveurs. |
+| IA | **Microsoft Azure** : AI Speech (transcription, voix), Azure OpenAI GPT-4.1 mini (rangement, fiches, scripts, exercices) ; **Qwen3-VL** open source sur notre serveur (photos) | Crédit Azure for Students, données stockées en Europe. **Rien n'est envoyé à Google Gemini par défaut** ; un élève peut utiliser *sa* clé pour les fonctionnalités qu'il coche. |
+| Tâches longues | **Azure Container Apps** (job) réveillé par une file Azure Storage | Podcasts, vidéos, exercices, corrections pendant que l'élève est absent ; s'arrête quand il n'y a rien à faire. |
+| Base de données | **Postgres (Neon)**, SQLite en local, SQLAlchemy Core | Seulement comptes, compteurs, tâches en cours (chiffrées), signalements, bannissements (empreintes). |
+| Suivi des erreurs | **Sentry** (facultatif) | Sans aucune donnée personnelle (ni corps de requête, ni variables, ni IP). |
 
 ```
 Navigateur ──► Google Drive (direct, jeton de l'utilisateur)
     │
-    └──► /api (FastAPI) ──► Azure    (AI Speech, OpenAI ; clés cachées côté serveur)
-    │                  └──► Neon     (comptes, compteurs)
-                       └──► Pronote / ENT / ADE (emploi du temps)
+    └──► /api (FastAPI, Vercel Paris) ──► Azure AI Speech / Azure OpenAI
+                  │                  ├──► Neon (comptes, compteurs, tâches chiffrées)
+                  │                  └──► Pronote / ENT / ADE / Celcat (robots d'emploi du temps)
+                  └──► file Azure ──► serveur de tâches (Azure) ──► Drive de l'élève + notification
 ```
 
-Détails, limites et quotas : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Le détail de chaque service (rôle, offre gratuite, où trouver journaux, quotas et clés, que faire en cas de panne) :
+[docs/SERVICES.md](docs/SERVICES.md). Architecture : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Sécurité et vie privée
 
-- **Aucune clé dans le navigateur** : clés Azure et secret OAuth restent dans l'API ; la clé Gemini *facultative* d'un élève est chiffrée sur le serveur et ne lui est jamais renvoyée.
-- **Session chiffrée** (Fernet/AES) dans un cookie `httpOnly`, `Secure`, `SameSite=Lax` ; protection **CSRF** par en-tête dédié.
-- **HTTPS forcé** + HSTS, **Content-Security-Policy** stricte, `X-Frame-Options`, `Permissions-Policy`.
-- **Validation côté serveur** de toutes les entrées (tailles, formats), **limitation de débit**, formulaire de contact **anti-spam** (pot de miel + piège temporel).
-- Import de liens `.ics` protégé contre le **SSRF** (adresses privées refusées, redirections vérifiées).
-- **Analytics maison sans cookie** (empreinte anonyme renouvelée chaque jour), avec consentement.
-- Pages **RGPD** et **CGU**, bannière cookies (« Refuser » aussi simple qu'« Accepter »), suppression du compte en un clic.
+Audit avant l'ouverture publique, par gravité (trouvé, corrigé, reste à faire) : [docs/SECURITE.md](docs/SECURITE.md).
+
+- **Aucune clé dans le navigateur** ; clé Gemini facultative d'un élève chiffrée sur le serveur, jamais renvoyée.
+- **Session chiffrée** (Fernet) dans un cookie `HttpOnly`, `Secure`, `SameSite=Lax`, revérifiée à chaque requête (compte supprimé ou banni → session coupée) ; **CSRF** bloqué par en-tête dédié.
+- **HTTPS forcé**, HSTS, **CSP stricte**, `X-Frame-Options`, `Permissions-Policy`, pas de CORS ouvert.
+- **Robots d'emploi du temps** : mot de passe utilisé une fois puis oublié, jamais écrit ni journalisé ; **anti-SSRF** sur chaque requête, redirections comprises.
+- **Limites côté serveur** : débit par fonctionnalité, quotas quotidiens par élève et pour tout le site, 5 générations en cours au plus, anti-spam des formulaires.
+- **Vie privée** : analytics maison sans cookie, empreintes HMAC au lieu des IP, pages RGPD et CGU fidèles au code, suppression du compte en un clic.
 
 ## Lancer le projet en local
 
@@ -107,23 +113,32 @@ npm run dev --prefix frontend                                     # site → htt
 ## Tests
 
 ```bash
-cd backend && python -m pytest -q     # sessions, CSRF, quotas, IA (Azure par défaut, Gemini seulement si choisi), .ics, robots, anti-SSRF, admin…
-npm test --prefix frontend             # scanner, homographie, routeur, fiches, emploi du temps…
+cd backend && python -m pytest -q     # API : sessions, CSRF, accès entre élèves, IA, robots, anti-SSRF, bannissements, limites…
+cd worker && python -m pytest -q      # serveur de tâches
+npm test --prefix frontend            # site : emploi du temps, récupération après déploiement, SEO, inventaire des services…
 ```
 
-Les tests tournent automatiquement sur GitHub à chaque envoi (GitHub Actions).
+Les tests tournent sur GitHub Actions à chaque envoi. **Mise en ligne contrôlée** : Vercel déploie la branche `main`
+seulement si ces tests ont réussi pour ce commit ([scripts/vercel-ignore.sh](scripts/vercel-ignore.sh)) et relance les
+tests du site pendant la construction ; sinon l'ancienne version reste en ligne.
 
-## Mise en ligne
+## À configurer soi-même (jamais dans le dépôt)
 
-Hébergement gratuit sur Vercel, base Neon, configuration Google Cloud et Search Console :
-voir le guide pas à pas [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
+| Où | Quoi |
+|---|---|
+| **Vercel** → Environment Variables | `APP_URL`, `SESSION_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DATABASE_URL`, `ADMIN_EMAILS`, `SPEECH_KEY`, `SPEECH_REGION`, `AZURE_OPENAI_KEY`, `AZURE_OPENAI_URL`, `JOB_SECRET`, `WORKER_QUEUE_URL`, `VAPID_PUBLIC_KEY` ; facultatifs : `SENTRY_DSN`, `EMAIL_NOTIFICATIONS`, `QUOTA_*` |
+| **Serveur de tâches** (`.env.worker`, lu par `worker/azure/deploy.ps1`) | `DATABASE_URL`, `JOB_SECRET`, `GOOGLE_CLIENT_ID/SECRET`, `SPEECH_KEY`, `AZURE_OPENAI_*`, `VAPID_PRIVATE_KEY`, `WORKER_QUEUE_URL` ; facultatifs : `SENTRY_DSN`, `BREVO_API_KEY`, `MAIL_FROM` |
+| **Google Cloud** | Écran de consentement (production), identifiant client OAuth, API Drive |
+| **Google Search Console / Bing** | Vérification du site, envoi du sitemap |
 
-## Limites connues (offre gratuite)
+Guide pas à pas : [docs/LANCEMENT.md](docs/LANCEMENT.md) (ouverture publique) et [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md), [docs/AZURE.md](docs/AZURE.md).
+
+## Limites connues
 
 - Azure AI Speech en offre gratuite (F0) : 5 h de transcription et 500 000 caractères de voix par mois pour tout le site.
-- Azure OpenAI payé par le crédit Azure for Students : quotas quotidiens partagés (`QUOTA_*`) pour ne pas l'épuiser.
-- Gemini n'est utilisé qu'avec la clé personnelle d'un élève qui l'a choisi ; en offre gratuite, Google peut alors réutiliser les contenus envoyés (indiqué dans les réglages et la page RGPD).
-- Pronote et les ENT n'ont pas d'API officielle : les connecteurs peuvent cesser de fonctionner ; le lien iCal reste toujours possible.
+- Azure OpenAI payé par le crédit Azure for Students (100 $/an) : limites quotidiennes affichées dans la page RGPD, lues dans la configuration.
+- Les connecteurs d'emploi du temps sont non officiels et peuvent cesser de marcher ; le lien `.ics` reste toujours possible.
+- Les contenus générés par une IA peuvent contenir des erreurs.
 
 ## Licence et crédits
 
@@ -131,5 +146,7 @@ Code sous licence **GNU GPL v3 ou ultérieure** (voir [LICENSE.md](LICENSE.md)).
 
 Icônes [Tabler](https://tabler.io/icons) (MIT) · polices Patrick Hand, Gochi Hand et Atkinson Hyperlegible (SIL OFL) ·
 [pdf-lib](https://pdf-lib.js.org) (MIT) · [PDF.js](https://mozilla.github.io/pdf.js/) (Apache 2.0) · [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT) ·
-[lamejs](https://github.com/breezystack/lamejs) (LGPL) · [jsQR](https://github.com/cozmo/jsQR) (Apache 2.0) · [pronotepy](https://github.com/bain3/pronotepy) (MIT).
-Studoo n'est affilié ni à Google, ni à Index Éducation, ni aux établissements cités.
+[pronotepy](https://github.com/bain3/pronotepy) (MIT) · [Sentry SDK](https://github.com/getsentry/sentry-javascript) (MIT) ·
+modèles [Qwen3-VL et Qwen3-4B](https://huggingface.co/Qwen) (Apache 2.0) · fonctionnement d'Aurion compris grâce à
+[ISENpy](https://github.com/CorentinMre/ISENpy) (MIT) et [Python-Planning-Aurion](https://github.com/Balth-D/Python-Planning-Aurion) (Apache 2.0), sans code recopié.
+Studoo n'est affilié ni à Google, ni à Microsoft, ni à Index Éducation, ni aux établissements cités. Site édité par **BastosDev**.

@@ -5,7 +5,8 @@
     "cdg1"
   ],
   "installCommand": "npm ci --prefix frontend",
-  "buildCommand": "npm run build --prefix frontend",
+  "buildCommand": "npm test --prefix frontend && npm run build --prefix frontend",
+  "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "outputDirectory": "frontend/dist",
   "cleanUrls": true,
   "trailingSlash": false,
